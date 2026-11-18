@@ -9,16 +9,13 @@ import { makeRng, dealLegalHand, dealVisible } from './fixtures/seeded-hands.js'
 const quadCase = GOLDEN_HANDS.find(({ id }) => id === 'four-quad-honors');
 
 for (const fixture of GOLDEN_HANDS) {
-  const knownDefect = fixture.id === 'four-quad-honors';
   test(`golden independent oracle: ${fixture.id}`, () => {
     assert.equal(referenceShanten(fixture.hand), fixture.shanten, fixture.note);
     if (fixture.draws) {
       assert.deepEqual(referenceImprovingDraws(fixture.hand).draws, fixture.draws);
     }
   });
-  test(`golden production: ${fixture.id}`, {
-    ...(knownDefect ? { todo: 'Known defect: 4 quads can be counted as unavailable pairs/taatsu; see docs/quality/KNOWN_ISSUES.md' } : {}),
-  }, () => {
+  test(`golden production: ${fixture.id}`, () => {
     assert.equal(shanten(fixture.hand), fixture.shanten, fixture.note);
     if (fixture.draws) assert.deepEqual(improvingDraws(fixture.hand).draws, fixture.draws);
   });
