@@ -111,7 +111,7 @@ test('初學者／進階中文解說及結構取捨有可回查的數值和來�
   assert.ok(decision.reasons.some(x => x.code === 'EFFECTIVE_DRAWS'));
   assert.ok(decision.reasons.every(x => x.evidence && typeof x.evidence === 'object'));
   assert.ok(decision.explanations.beginner.every(x => /[\u3400-\u9fff]/u.test(x)));
-  assert.ok(decision.explanations.advanced.some(x => x.includes('最佳拆解')));
+  assert.ok(decision.explanations.advanced.some(x => x.includes('最佳結構拆解') || x.includes('候選拆解')));
   assert.equal(decision.comparison.shantenDelta, selected.metrics.shanten - result.candidates[0].metrics.shanten);
   assert.equal(decision.comparison.copiesDelta, selected.metrics.copies - result.candidates[0].metrics.copies);
   assert.equal(decision.grade === 'optimal', decision.trainingGrade === 'perfect');
