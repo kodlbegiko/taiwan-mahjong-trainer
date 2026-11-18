@@ -128,9 +128,13 @@
 - [x] 確認五個工程分支及 Pull Request（#1 core、#2 benchmark、#3 explain、#5 training、#4 UI）；各分支 CI success 只代表個別分支檢查。
 - [x] 已以 PR #6 合併 `docs/API_CONTRACT.md`、`docs/INTEGRATION_PLAN.md`、`docs/quality/V0.2_INTEGRATION_REPORT.md`；PR #2 已合併獨立測試與 Benchmark（兩個 TODO 缺陷未修復）。
 - [x] 在 Draft PR #10 疊合四個功能 PR 執行整合 CI：66 tests、60 pass、3 fail、1 skip、2 TODO，**NO-GO**。
+- [x] 第二輪重新核對最新 main / feature SHA；無新修復 commit。更新 Draft PR #10，保留既有測試而不覆蓋衝突。
+- [x] 第二輪隔離 [CI #44358617174](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44358617174)：67 tests、61 pass、3 fail、1 skipped、2 TODO；固定 seed 10,000 題**數值級 Oracle** 通過，但無法豁免 Q-001 golden。
+- [ ] [Issue #13](https://github.com/kodlbegiko/taiwan-mahjong-trainer/issues/13)：main 分支保護仍未啟用；需人工到 GitHub Settings / Rules 設定，並測試 enforcement。
 - [ ] 修復 Q-001：四組槓子向聽錯誤，取消 TODO 失敗標記。
 - [ ] 修復 Q-002：何切捨牌必須扣除可摸數，統一 ranking/評分/解說與題目版本。
-- [ ] 10,000 題獨立 oracle 對整合 HEAD 交叉驗證，所有 `npm run check` 回歸通過。
+- [x] 固定 seed 的 10,000 題數值級獨立 Oracle 在整合 SHA `4f673f97` 通過（不代表所有邊界牌型均正確）。
+- [ ] 整合 HEAD 的 `npm run check` 全綠、Q-001/Q-002 強制回歸無 TODO、跨模組一致性及主線回歸通過。
 - [ ] 接通 v2 DecisionRecord 的 UI，並驗證 v1 localStorage 保留與匯入／匯出；若尚未接線須在 release notes 列未完成。
 - [ ] 手機答題、鍵盤操作、主流程、PWA 安裝／離線的實際驗收；manifest 並不等於離線 PWA。
 - [ ] 按整合驗證結果更新 README、CHANGELOG 與最終合併 PR / SHA；不得先標記 V0.2 完成。
