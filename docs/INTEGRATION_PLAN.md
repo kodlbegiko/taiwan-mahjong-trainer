@@ -51,3 +51,31 @@ v0.1 main
 - 合併時確認 HEAD SHA 與測試 SHA 相同；HEAD 移動時重新驗證。
 - 對無法執行的瀏覽器或本機 smoke、未取得的證據，明列「未驗證」，不能以 CI success 代替。
 - 回退以具體 merge commit／PR 做 revert；不強制改寫 main 歷史。
+
+## 2026-11-19 第二輪重新整合（保留歷史稽核基準）
+
+- 重新讀取 `main=53981149d5f632db8d8dbbf3bd11fbd0999d48e3`、四個功能 PR 與 Draft #10；功能分支 SHA 未移動，先前 QA 修復要求仍未落實。
+- main 自前次 staging 以來僅修改五個文件（README、ROADMAP、CHANGELOG、INTEGRATION_PLAN、V0.2_INTEGRATION_REPORT）。確認與四個功能 PR 的 27 條改動路徑**完全不相交**；比對原 staging 27 條 blob SHA 均一致，只額外保留 `tests/integration-contract.test.js`。
+- 以最新 main tree 作為 base，重新取四個功能 PR **最新 HEAD 的 blob**、保留整合測試，新增 `tests/integration-oracle-10k.test.js`；建立 parent 為舊 staging + 最新 main 的整合 commit，並以 `expected_sha` 更新 staging ref，沒有 `force push`、沒有覆蓋已衝突檔案。初版 SHA `4f673f97a137a886d6e0b14617a42e889a59d391`。
+- 針對 `4f673f97` 的 [Verify #44358617174](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44358617174) 結果：67 total / 61 pass / 3 fail / 1 skip / 2 TODO；10,000 題獨立數值級 oracle PASS；Q-001/Q-002/I-003 各一個強制測試 FAIL。後續 browser smoke 的獨立 HEAD 及結果依品質報告追蹤。
+- **流程停止點：第一階段（核心修復驗證）未通過。** 不合併 #1、#5、#3、#4，也不將 Draft #10 轉 Ready。若任何來源 HEAD 更新，重新疊合並在對應確切 SHA 重新驗證。
+
+### Issue #13：main 分支保護的人工設定清單
+
+GitHub API 查到 `main.protected=false`，Repository Rulesets API 回傳空陣列；Branch Protection 讀取端點因目前整合權限不足回傳 403，**沒有啟用保護的證據**。目前 GitHub 連線工具沒有設置 ruleset / branch protection 的寫入操作，不能代為宣告完成。
+
+請具管理權限者到 [Repository Settings](https://github.com/kodlbegiko/taiwan-mahjong-trainer/settings/rules) → **Rules → Rulesets → New branch ruleset**，依序：
+
+1. 規則目標選 `main`（Branch targeting）；設定 **Active**，避免 Evaluate/Disabled 只監控不阻擋。
+2. 啟用 **Require a pull request before merging**；建議 **Require conversation resolution before merging**。若有可實際審核的獨立協作者，可設最少 1 位 approval；只有同一帳號的 AI / 自己審核無法形成獨立 reviewer，不應開啟會讓單人專案永久無法合併的限制而無審核計畫。
+3. **Require status checks to pass** → 指定現有 GitHub Actions `Verify / test`（實際選單名稱以 GitHub 提供為準）；啟用 require branch up-to-date before merging（或使用 merge queue，二擇一）。**注意**：原本 `TODO` / opt-in skipped 仍可讓 Verify 成功；需要另行保留 P0 強制測試與 10k gate。
+4. 阻止 force push、禁止 branch deletion；設置 bypass 僅在明確緊急政策需要時，並審計。可要求 linear history，與 squash merge 策略一致。
+5. 以無害測試 PR 實際驗證 failing check 被拒絕合併、pass check 可合併；記錄 ruleset ID / 驗證證據，再關閉 Issue #13。
+
+上述是**待執行設定項**，不是已完成操作。
+
+### 獨立瀏覽器驗證（已執行，不替代 P0 gate）
+
+Staging `808e245ec99ec7512a544ae6beac1ee77f4b40cb` 的 [Chromium CI #44359395885](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44359395885) **success**：真實 headless Chromium 測桌面 1440px、手機模擬 390px、17 張點牌、方案/評分、下一題、方向鍵/Enter、舊 localStorage 保存/重載、手機牌按鈕尺寸與整頁水平溢出，四張 screenshot 上傳 artifact `v02-browser-smoke-images`。但相同 SHA 的 [Verify #44359395424](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44359395424) 仍因三項 P0 **failure**。
+
+沒有 iOS/Android 實機、PWA Service Worker 離線安裝或 v2 DecisionRecord UI 接線的驗收。**相同 commit 的瀏覽器 pass 與核心 fail 應並列展示，絕不能合成一個綠燈。**
