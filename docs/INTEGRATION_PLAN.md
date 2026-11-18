@@ -32,11 +32,17 @@ v0.1 main
 ## 階段門檻
 
 1. **Contract gate**：合併此文件 PR；檢查舊 exports 名稱、同步性、引數、排序、`draws[].count`；發現新欄位或重命名先更新 contract 再寫程式。
-2. **Core + Test gate**：讓 #1 修復 Q-001；#2 保持獨立 oracle，取消 Q-001 TODO 並將 Q-002 regression 明確追蹤。通過 main+兩 PR 疊合的 `npm run check`、10,000 固定 seed；完成再依順序合併。
+2. **Core + Test gate**：獨立測試 PR #2 已先合併作為不改動 production 的保護性基準（merge SHA `6415e6c72b307858d1d1e41e2be7bdc76635079d`）；**其兩項 TODO 仍待修復**。#1 修復 Q-001 後，將已存在的 golden TODO 轉成必過測試，通過主線合併後的 `npm run check` 與 10,000 固定 seed 數值級 oracle，再考慮合併 core。
 3. **Training gate**：#5 修復 Q-002 的公開 `rankDiscards` 行為；以 #1 的 `analyzeDiscards` 作對照；調升 scoringVersion，驗證 200 題及 v1 snapshot；通過後合併。
 4. **Explainability gate**：#3 使用同一套已修正評分口徑；映射 `optimal/same-shanten/higher-shanten` 與 `perfect/acceptable/improve`，解說拆解須與 canonical shanten 一致。通過後合併。
 5. **UI gate**：#4 的 v1 作答閉環不得退化；測試其與新版 `practice.js` 實際整合；若 v2 DecisionRecord 尚未在 UI 接線，保留未完成標記；行動瀏覽器實際操作、PWA 安裝／離線功能分別驗證。
 6. **Release gate**：每次合併後重跑 `npm run check`，核對 GitHub Actions 實際完成狀態及 SHA；手動驗收產題、捨牌、解說、下一題、儲存與資料遷移；更新 README、ROADMAP、CHANGELOG、`docs/quality/V0.2_INTEGRATION_REPORT.md`。所有未完成與已知缺陷開 issue。
+
+## 2026-11-19 實際驗證記錄
+
+- PR #6（文件）已通過 CI 並合併 main；PR #2（獨立測試）已通過 CI 並合併 main，兩次 push CI 皆 success。
+- 在 Draft PR #10 使用 Git tree 將 #1、#3、#5、#4 的**不重疊變更路徑**疊合（未處理或覆蓋任何衝突檔），加上強制整合測試。`npm run check`：66 tests，60 pass，3 fail，1 skip，2 TODO。Q-001/Q-002/I-003 三項失敗均有真實 CI 證據。
+- 因功能 gate 未過，四個功能 PR 暫不合併；詳細 SHA、CI 與剩餘風險見 `docs/quality/V0.2_INTEGRATION_REPORT.md`。
 
 ## 合併作業規則
 

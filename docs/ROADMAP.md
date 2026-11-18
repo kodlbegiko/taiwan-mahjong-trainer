@@ -126,7 +126,8 @@
 ## 11. V0.2 整合查核（2026-11-19）
 
 - [x] 確認五個工程分支及 Pull Request（#1 core、#2 benchmark、#3 explain、#5 training、#4 UI）；各分支 CI success 只代表個別分支檢查。
-- [x] 建立待審 `docs/API_CONTRACT.md`、`docs/INTEGRATION_PLAN.md`、`docs/quality/V0.2_INTEGRATION_REPORT.md`。
+- [x] 已以 PR #6 合併 `docs/API_CONTRACT.md`、`docs/INTEGRATION_PLAN.md`、`docs/quality/V0.2_INTEGRATION_REPORT.md`；PR #2 已合併獨立測試與 Benchmark（兩個 TODO 缺陷未修復）。
+- [x] 在 Draft PR #10 疊合四個功能 PR 執行整合 CI：66 tests、60 pass、3 fail、1 skip、2 TODO，**NO-GO**。
 - [ ] 修復 Q-001：四組槓子向聽錯誤，取消 TODO 失敗標記。
 - [ ] 修復 Q-002：何切捨牌必須扣除可摸數，統一 ranking/評分/解說與題目版本。
 - [ ] 10,000 題獨立 oracle 對整合 HEAD 交叉驗證，所有 `npm run check` 回歸通過。

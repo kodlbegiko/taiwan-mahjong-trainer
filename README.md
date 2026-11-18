@@ -80,4 +80,4 @@ tests/                  Node 內建測試
 
 ## V0.2 整合狀態（開發中）
 
-五個工程分支的功能尚未合併到 `main`，因此本 README 所述可使用功能仍以 **v0.1** 為準。整合者的 [API Contract](docs/API_CONTRACT.md)、[合併計畫](docs/INTEGRATION_PLAN.md) 與 [品質報告](docs/quality/V0.2_INTEGRATION_REPORT.md) 在文件 PR 中審查，**文件存在不代表功能發布**。核心正確性與統一進張計分是 V0.2 的阻擋門檻。
+整合文件 PR #6 與獨立測試 PR #2 已合併至 `main`，但**四個功能 PR（#1、#3、#4、#5）仍未合併**，本 README 可使用功能仍以 **v0.1** 為準。隔離 [PR #10](https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/10) 的 66 項整合測試有 3 項失敗（Q-001／Q-002／I-003），因此 V0.2 不可發布。整合者的 [API Contract](docs/API_CONTRACT.md)、[合併計畫](docs/INTEGRATION_PLAN.md) 與 [品質報告](docs/quality/V0.2_INTEGRATION_REPORT.md) 在文件 PR 中審查，**文件存在不代表功能發布**。核心正確性與統一進張計分是 V0.2 的阻擋門檻。
