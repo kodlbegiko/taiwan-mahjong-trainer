@@ -4,6 +4,8 @@ import { generateHand, rankDiscards, gradeAnswer } from './practice.js';
 const $ = selector => document.querySelector(selector);
 // Keep the v0.1 key and record shape so existing browser progress is retained.
 const STORAGE_KEY = 'tw-mahjong-trainer:session:v1';
+// V0.2 is NOT written here until Q-001/Q-002/I-003 and the archive adapter pass integration.
+let storageHealth = 'ok';
 const stats = loadStats();
 let difficulty = 'intermediate';
 let hand = [];
@@ -13,18 +15,43 @@ let startTime = 0;
 
 function loadStats() {
   try {
-    const stored = JSON.parse(localStorage.getItem(STORAGE_KEY));
-    if (Array.isArray(stored)) {
-      return stored.filter(item => item && ['perfect', 'acceptable', 'improve'].includes(item.grade)
-        && Number.isFinite(item.seconds) && item.seconds >= 0).slice(-500);
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw === null) return [];
+    const stored = JSON.parse(raw);
+    if (!Array.isArray(stored)) {
+      storageHealth = 'corrupt';
+      return [];
     }
-  } catch { /* Storage may be blocked or contain damaged JSON. */ }
-  return [];
+    return stored.filter(item => item && ['perfect', 'acceptable', 'improve'].includes(item.grade)
+      && Number.isFinite(item.seconds) && item.seconds >= 0).slice(-500);
+  } catch {
+    // Do not overwrite malformed historical data: it might be recoverable manually.
+    storageHealth = 'corrupt';
+    return [];
+  }
+}
+
+function showStorageHealth() {
+  const notice = $('#storage-status');
+  notice.hidden = storageHealth === 'ok';
+  notice.textContent = storageHealth === 'corrupt'
+    ? '既有紀錄無法讀取。已改用本次暫存，原始資料不會被覆寫；重新整理後本次成績可能消失。'
+    : storageHealth === 'blocked'
+      ? '無法儲存到瀏覽器，本次成績僅暫存在目前頁面；重新整理後可能消失。'
+      : '';
 }
 
 function saveStats() {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(stats)); }
-  catch { /* Exercise still works if browser storage is unavailable. */ }
+  if (storageHealth === 'corrupt') {
+    showStorageHealth();
+    return;
+  }
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(stats));
+  } catch {
+    storageHealth = 'blocked';
+  }
+  showStorageHealth();
 }
 
 function tileMarkup(tile, index, { disabled = false, picked = false } = {}) {
@@ -47,6 +74,7 @@ function updateStats() {
   $('#stat-perfect').textContent = total ? `${Math.round(perfect / total * 100)}%` : '—';
   $('#stat-same').textContent = total ? `${Math.round(same / total * 100)}%` : '—';
   $('#stat-seconds').textContent = total ? `${avg}s` : '—';
+  showStorageHealth();
 }
 
 function setStep(reviewing) {
@@ -99,7 +127,21 @@ function drawList(draws) {
 
 function submitAnswer(tile) {
   if (choice !== null || !ranking.length) return;
-  const result = gradeAnswer(ranking, tile);
+  let result;
+  try {
+    result = gradeAnswer(ranking, tile);
+    const candidate = ranking.find(item => item.tile === tile);
+    if (!candidate || !result?.answer || !result?.best
+      || result.answer.tile !== candidate.tile || result.best.tile !== ranking[0].tile
+      || !['perfect', 'acceptable', 'improve'].includes(result.grade)) {
+      throw new Error('練習評分與候選排序契約不一致');
+    }
+  } catch (error) {
+    $('#exercise-status').textContent = '評分結果無法確認，已停止這題以避免顯示矛盾數據。請略過重新產題。';
+    $('#exercise-status').className = 'status improve';
+    console.error('Unable to reconcile grade with ranking:', error);
+    return;
+  }
   choice = tile;
   const seconds = Math.round((performance.now() - startTime) / 100) / 10;
   stats.push({ grade: result.grade, seconds, difficulty, date: new Date().toISOString() });
@@ -116,7 +158,8 @@ function submitAnswer(tile) {
   $('#skip').hidden = true;
   setStep(true);
 
-  const bestOptions = ranking.filter(item => item.shanten === result.best.shanten && item.copies === result.best.copies);
+  // Ask the same authoritative grader which choices are equally best; do not derive a second score.
+  const bestOptions = ranking.filter(item => gradeAnswer(ranking, item.tile).grade === 'perfect');
   $('#chosen-tile').textContent = TILE_LABELS[tile];
   $('#chosen-shanten').textContent = String(result.answer.shanten);
   $('#chosen-kinds').textContent = String(result.answer.kinds);
@@ -155,9 +198,10 @@ $('#hand').addEventListener('keydown', event => {
   if (!button || button.disabled) return;
   const buttons = [...$('#hand').querySelectorAll('button[data-tile]')];
   const current = buttons.indexOf(button);
-  const offsets = window.matchMedia('(min-width: 1280px)').matches
-    ? { ArrowRight: 1, ArrowLeft: -1 }
-    : { ArrowRight: 1, ArrowLeft: -1, ArrowDown: 9, ArrowUp: -9 };
+  const columns = window.matchMedia('(max-width: 345px)').matches ? 5
+    : window.matchMedia('(max-width: 640px)').matches ? 6
+      : window.matchMedia('(min-width: 1280px)').matches ? 17 : 9;
+  const offsets = { ArrowRight: 1, ArrowLeft: -1, ArrowDown: columns, ArrowUp: -columns };
   let target = null;
   if (Object.hasOwn(offsets, event.key)) target = Math.max(0, Math.min(buttons.length - 1, current + offsets[event.key]));
   if (event.key === 'Home') target = 0;
@@ -179,6 +223,8 @@ $('#skip').addEventListener('click', () => drawNewHand({ focusHand: true }));
 $('#clear-stats').addEventListener('click', () => {
   if (!confirm('確定清除這個瀏覽器的練習紀錄？此動作無法復原。')) return;
   stats.length = 0;
+  // Clearing is an explicit user action, unlike silently overwriting corrupt data.
+  storageHealth = 'ok';
   saveStats();
   updateStats();
 });

@@ -42,10 +42,10 @@
           <ol class="steps" aria-label="訓練流程"><li id="step-decide" class="is-current" aria-current="step"><span>1</span>觀察並作答</li><li id="step-review"><span>2</span>檢查牌效率</li><li id="step-repeat"><span>3</span>前往下一題</li></ol>
           <div class="instruction"><div><strong>你的手牌</strong><span>摸牌後 17 張 · 點牌立即作答</span></div><span class="hand-count" id="hand-count">17 / 17</span></div>
           <div class="table-surface"><div id="hand" class="hand" role="group" aria-label="17 張手牌，選一張捨棄" aria-describedby="hand-help"></div></div>
-          <p class="hand-help" id="hand-help">可直接點選牌作答。使用鍵盤 Tab 或方向鍵切換牌，按 Enter／空白鍵作答。窄螢幕可左右滑動查看全部手牌。</p>
+          <p class="hand-help" id="hand-help">可直接點選牌作答。使用鍵盤 Tab 或方向鍵切換牌，按 Enter／空白鍵作答。手機版會自動分成多列，17 張牌皆可直接點選。</p>
           <div class="exercise-bottom"><p id="exercise-status" role="status" aria-live="polite" class="status">正在準備題目…</p><div class="button-row"><button class="secondary" id="skip" type="button">略過本題</button><button class="primary" id="next" type="button" hidden>下一題 <span aria-hidden="true">→</span></button></div></div>
           <section id="answer" class="answer" aria-labelledby="answer-heading" hidden>
-            <div class="answer-heading"><span class="eyebrow">RESULT / 計算結果</span><h3 id="answer-heading" tabindex="-1">出牌比較</h3><p class="answer-description">依據同一手牌的結構性牌效率計算，不是實戰必勝策略。</p></div>
+            <div class="answer-heading"><span class="eyebrow">RESULT / 計算結果</span><h3 id="answer-heading" tabindex="-1">出牌比較</h3><p class="answer-description">依據同一手牌的結構性牌效率計算，不是實戰必勝策略。<strong>目前仍使用 V0.1 評分引擎，棄牌後有效張數有已知待修正限制；正式 V0.2 解說尚未接入。</strong></p></div>
             <div class="comparison">
               <article class="comparison-card yours"><span class="card-kicker">你的選擇</span><strong id="chosen-tile">—</strong><dl><div><dt>向聽</dt><dd id="chosen-shanten">—</dd></div><div><dt>有效種類</dt><dd id="chosen-kinds">—</dd></div><div><dt>理論張數</dt><dd id="chosen-copies">—</dd></div></dl></article>
               <article class="comparison-card best"><span class="card-kicker">最高牌效率捨牌</span><strong id="best-tiles">—</strong><dl><div><dt>向聽</dt><dd id="best-shanten">—</dd></div><div><dt>有效種類</dt><dd id="best-kinds">—</dd></div><div><dt>理論張數</dt><dd id="best-copies">—</dd></div></dl></article>
@@ -59,7 +59,7 @@
           </section>
         </section>
         <aside class="sidebar" aria-label="進度與規則">
-          <section class="panel metrics" aria-labelledby="progress-heading"><span class="eyebrow">PERSONAL PROGRESS</span><h2 id="progress-heading">我的訓練進度</h2><p class="sidebar-caption">僅計算此瀏覽器已作答的題目</p><div class="metric-grid"><div><strong id="stat-total">0</strong><span>已完成題數</span></div><div><strong id="stat-perfect">—</strong><span>牌效率最佳率</span></div><div><strong id="stat-same">—</strong><span>未增加向聽率</span></div><div><strong id="stat-seconds">—</strong><span>平均作答時間</span></div></div><div class="privacy-note">紀錄僅保存在此裝置瀏覽器，不會同步到其他裝置。</div><button class="text-btn" id="clear-stats" type="button">清除本機練習紀錄</button></section>
+          <section class="panel metrics" aria-labelledby="progress-heading"><span class="eyebrow">PERSONAL PROGRESS</span><h2 id="progress-heading">我的訓練進度</h2><p class="sidebar-caption">僅計算此瀏覽器已作答的題目</p><div class="metric-grid"><div><strong id="stat-total">0</strong><span>已完成題數</span></div><div><strong id="stat-perfect">—</strong><span>牌效率最佳率</span></div><div><strong id="stat-same">—</strong><span>未增加向聽率</span></div><div><strong id="stat-seconds">—</strong><span>平均作答時間</span></div></div><div class="privacy-note">目前僅保存 V0.1 答題統計，不包含可重播題目快照；紀錄只存在此裝置，不會跨裝置同步。</div><p id="storage-status" class="storage-status" role="status" aria-live="polite" hidden></p><button class="text-btn" id="clear-stats" type="button">清除本機練習紀錄</button></section>
           <section class="panel rules" aria-labelledby="rules-heading"><span class="eyebrow">HOW IT WORKS</span><h2 id="rules-heading">看懂三個指標</h2><dl><div><dt>向聽數</dt><dd>距離一般五面子一將眼還差多少步；0 代表聽牌。</dd></div><div><dt>有效進張</dt><dd>摸到後能讓向聽數降低的牌種。</dd></div><div><dt>理論張數</dt><dd>扣除手上已知牌後的有效牌數；尚未扣除其他玩家的明牌或河牌。</dd></div></dl></section>
         </aside>
       </div>
