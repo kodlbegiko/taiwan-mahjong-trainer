@@ -12,7 +12,7 @@ const removeOnce = (hand, discard) => {
   return result;
 };
 
-test('ranking covers distinct discards and gradeAnswer uses exact public scoring contract', () => {
+test('rankings obey public discard conservation and gradeAnswer contract', () => {
   const rng = makeRng(0x12345678);
   for (let n = 0; n < 15; n++) {
     const hand = dealLegalHand(rng);
@@ -23,7 +23,7 @@ test('ranking covers distinct discards and gradeAnswer uses exact public scoring
     assert.deepEqual(ranking, sorted);
     for (const item of ranking) {
       const after = removeOnce(hand, item.tile);
-      assert.deepEqual(item, { tile: item.tile, ...improvingDraws(after, visible) });
+      assert.deepEqual(item, { tile: item.tile, ...improvingDraws(after, [...visible, item.tile]) });
       assert.equal(item.draws.reduce((sum, draw) => sum + draw.count, 0), item.copies);
       assert.equal(item.draws.length, item.kinds);
       const graded = gradeAnswer(ranking, item.tile);

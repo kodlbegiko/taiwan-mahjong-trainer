@@ -6,6 +6,7 @@
  */
 import { performance } from 'node:perf_hooks';
 import { readFile, writeFile } from 'node:fs/promises';
+import { cpus, totalmem, release } from 'node:os';
 import { shanten } from '../src/shanten.js';
 import { rankDiscards } from '../src/practice.js';
 import { dealLegalHand, makeRng } from '../tests/fixtures/seeded-hands.js';
@@ -59,18 +60,32 @@ async function main() {
   const shantenResult = runTimed(shanten, hands);
   const rankingResult = runTimed(rankDiscards, ranks);
   const report = {
-    schema: 1,
+    schema: 2,
     seed: opts.seed,
     requestedCases: opts.cases,
-    environment: { node: process.version, platform: process.platform, arch: process.arch, cpuNote: 'Record machine model externally for cross-machine comparison' },
+    environment: {
+      node: process.version, platform: process.platform, arch: process.arch,
+      osRelease: release(), cpuModel: cpus()[0]?.model ?? 'unknown',
+      logicalCores: cpus().length, ramGiB: Number((totalmem() / (1024 ** 3)).toFixed(2)),
+      execPath: process.execPath, execArgv: process.execArgv,
+      runnerName: process.env.RUNNER_NAME || null, ci: process.env.CI === 'true',
+      gitSha: process.env.GITHUB_SHA || null,
+    },
+    invocation: { command: 'node scripts/benchmark-suite.js', argv: process.argv.slice(2),
+      warmupHands: Math.min(50, hands.length), warmupRanks: Math.min(2, ranks.length),
+      timing: 'performance.now milliseconds; sequential one Node process' },
     shanten: shantenResult,
     rankDiscards: rankingResult,
-    caveat: 'Time is environment-dependent; compare on the same runner, Node version and seed. Use stable p50/p95 and inspect noise.',
+    caveat: 'Timing is machine, load, runtime and JIT dependent. Never compare runs across different hardware; use identical runner, Node, seed and cases. A threshold is heuristic and must be investigated.',
   };
   if (opts.baseline) {
     const base = JSON.parse(await readFile(opts.baseline, 'utf8'));
-    if (base.seed !== opts.seed || base.requestedCases !== opts.cases || base.environment?.node !== process.version) {
-      throw new Error('baseline seed/cases/Node version differ; cannot compare');
+    const comparable = base.schema === report.schema &&
+      base.seed === opts.seed && base.requestedCases === opts.cases &&
+      ['node','platform','arch','osRelease','cpuModel','logicalCores']
+        .every(field => base.environment?.[field] === report.environment[field]);
+    if (!comparable) {
+      throw new Error('baseline incompatible: schema, seed/cases, Node, OS or CPU identity differ; cross-machine regressions are forbidden');
     }
     report.regressions = {};
     for (const name of ['shanten', 'rankDiscards']) {
