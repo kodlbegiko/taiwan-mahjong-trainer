@@ -77,3 +77,7 @@ tests/                  Node 內建測試
 ## 貢獻
 
 歡迎回報錯誤牌例，請附上完整手牌、預期向聽數、實際結果及使用的家規。程式採 MIT License。
+
+## V0.2 整合狀態（開發中）
+
+五個工程分支的功能尚未合併到 `main`，因此本 README 所述可使用功能仍以 **v0.1** 為準。整合者的 [API Contract](docs/API_CONTRACT.md)、[合併計畫](docs/INTEGRATION_PLAN.md) 與 [品質報告](docs/quality/V0.2_INTEGRATION_REPORT.md) 在文件 PR 中審查，**文件存在不代表功能發布**。核心正確性與統一進張計分是 V0.2 的阻擋門檻。
