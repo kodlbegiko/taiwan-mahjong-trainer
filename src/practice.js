@@ -44,12 +44,15 @@ export function generateHand(level = 'intermediate', rng = Math.random) {
 
 export function rankDiscards(hand17, visible = []) {
   if (hand17.length !== 17) throw new RangeError('題目必須提供 17 張手牌');
-  toCounts(hand17);
+  // visible consists solely of physical tiles outside the original 17-tile hand.
+  // Reject an impossible union before evaluating any candidate.
+  toCounts([...hand17, ...visible]);
   const unique = [...new Set(hand17)];
   return unique.map(tile => {
     const hand16 = [...hand17];
     hand16.splice(hand16.indexOf(tile), 1);
-    const analysis = improvingDraws(hand16, visible);
+    // The discarded physical tile is no longer drawable. Add it exactly once.
+    const analysis = improvingDraws(hand16, [...visible, tile]);
     return { tile, ...analysis };
   }).sort((a, b) =>
     a.shanten - b.shanten || b.copies - a.copies || b.kinds - a.kinds || a.tile - b.tile

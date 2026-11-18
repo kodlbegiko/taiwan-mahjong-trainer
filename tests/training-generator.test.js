@@ -4,8 +4,8 @@ import { toCounts } from '../src/tiles.js';
 import { shanten, improvingDraws } from '../src/shanten.js';
 import { generateHand, gradeAnswer, rankDiscards } from '../src/practice.js';
 import { createSeededRandom, dealRandomHand, randomInt } from '../src/training/random.js';
-import { createExercise, validateExercise, generateExerciseBank } from '../src/training/exercises.js';
-import { winningTiles, isWinningHand, generateTenpaiHand } from '../src/training/waits.js';
+import { createExercise, validateExercise, replayExercise, generateExerciseBank, SCORING_VERSION, EXERCISE_SCHEMA_VERSION } from '../src/training/exercises.js';
+import { winningTiles, trainingWinningTiles, trainingWaitsToCoreDraws, coreDrawsToTrainingWaits, isWinningHand, generateTenpaiHand } from '../src/training/waits.js';
 
 test('固定種子、均勻牌牆抽樣與邊界驗證', () => {
   assert.deepEqual(dealRandomHand(createSeededRandom('wall-test')), dealRandomHand(createSeededRandom('wall-test')));
@@ -54,7 +54,9 @@ test('三種 Exercise 資料契約均可用 seed 重建並核對完整答案', (
     const options = { seed: 'seed-2026', index: 13, taskType, level: 'intermediate' };
     const exercise = createExercise(options);
     assert.deepEqual(exercise, createExercise(options));
-    assert.equal(exercise.schemaVersion, 2);
+    assert.equal(exercise.schemaVersion, EXERCISE_SCHEMA_VERSION);
+    assert.equal(exercise.answerRules.version, SCORING_VERSION);
+    assert.deepEqual(replayExercise(exercise), exercise);
     assert.equal(exercise.estimatedDifficulty.humanValidated, false);
     assert.ok(validateExercise(exercise));
     if (taskType === 'multi_wait') assert.ok(exercise.answer.winningTiles.length >= 2);
@@ -81,5 +83,57 @@ test('可重現至少 200 題，所有題目具有有效答案且不重複', { t
   assert.equal(bank.length, 200);
   assert.equal(new Set(bank.map(x => x.id)).size, 200);
   assert.deepEqual(bank[0], createExercise({ seed: 'tmt-v02-public-bank', index: 0, taskType: 'discard', level: 'beginner' }));
-  for (const exercise of bank) assert.ok(validateExercise(exercise));
+  for (const exercise of bank) {
+    assert.ok(validateExercise(exercise));
+    assert.deepEqual(replayExercise(exercise), exercise);
+    assert.equal(exercise.answerRules.version, SCORING_VERSION);
+    assert.equal(exercise.schemaVersion, 3);
+  }
+});
+
+const regressionHand = [0,0,0,0,1,2,9,10,11,18,19,20,27,27,27,28,28];
+
+test('Q-002 棄牌 0 後剩餘張數應是 6，且剛棄掉的牌不重複計入', () => {
+  const original = [...regressionHand];
+  const ranking = rankDiscards(regressionHand);
+  assert.deepEqual(regressionHand, original);
+  const discardedZero = ranking.find(row => row.tile === 0);
+  assert.equal(discardedZero.copies, 6);
+  assert.equal(discardedZero.kinds, 2);
+  assert.deepEqual(discardedZero.draws, [{ tile: 3, count: 4 }, { tile: 28, count: 2 }]);
+  const withVisible = rankDiscards(regressionHand, [3]);
+  assert.equal(withVisible.find(row => row.tile === 0).copies, 5);
+  assert.equal(gradeAnswer(ranking, 0).grade, 'acceptable');
+  // Caller contract: external visible tiles must not duplicate hand17's physical tiles.
+  assert.throws(() => rankDiscards(regressionHand, [0]), /超過四張/);
+});
+
+test('每一候選與逐張物理牌的獨立計算一致（含其他已見牌）', () => {
+  for (let seed = 0; seed < 8; seed++) {
+    const hand = generateHand('intermediate', createSeededRandom('cross-' + seed));
+    const owned = toCounts(hand);
+    const external = Array.from({ length: 34 }, (_, tile) => tile).find(tile => owned[tile] < 4);
+    for (const visible of [[], [external]]) {
+      const rows = rankDiscards(hand, visible);
+      for (const row of rows) {
+        const remaining = [...hand];
+        remaining.splice(remaining.indexOf(row.tile), 1);
+        const oracle = improvingDraws(remaining, [...visible, row.tile]);
+        assert.deepEqual({ shanten: row.shanten, kinds: row.kinds, copies: row.copies, draws: row.draws }, oracle);
+        assert.equal(gradeAnswer(rows, row.tile).grade === 'perfect',
+          row.shanten === rows[0].shanten && row.copies === rows[0].copies);
+      }
+    }
+  }
+});
+
+test('訓練 winningTiles 與核心 count 資料形狀有顯式轉接', () => {
+  const hand = generateTenpaiHand(createSeededRandom('waits-contract'), { multiple: true });
+  const wins = winningTiles(hand);
+  assert.deepEqual(trainingWinningTiles(hand), wins);
+  const coreForm = trainingWaitsToCoreDraws(wins);
+  assert.deepEqual(coreForm, improvingDraws(hand).draws);
+  assert.deepEqual(coreDrawsToTrainingWaits(coreForm), wins);
+  assert.ok(coreForm.every(w => 'count' in w && !('copies' in w)));
+  assert.throws(() => trainingWaitsToCoreDraws([{ tile: 1, copies: 9 }]), /無效/);
 });
