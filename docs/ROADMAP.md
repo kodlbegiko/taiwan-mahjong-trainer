@@ -122,3 +122,16 @@
 **牌效率正確性 → 可解釋教學 → 個人化訓練 → 攻防判斷 → 牌局複盤 → 實戰模擬 → 開放策略評估。**
 
 每個里程碑都應形成獨立可使用、可測試、可重現的成果，而非只增加功能選單。
+
+## 11. V0.2 整合查核（2026-11-19）
+
+- [x] 確認五個工程分支及 Pull Request（#1 core、#2 benchmark、#3 explain、#5 training、#4 UI）；各分支 CI success 只代表個別分支檢查。
+- [x] 建立待審 `docs/API_CONTRACT.md`、`docs/INTEGRATION_PLAN.md`、`docs/quality/V0.2_INTEGRATION_REPORT.md`。
+- [ ] 修復 Q-001：四組槓子向聽錯誤，取消 TODO 失敗標記。
+- [ ] 修復 Q-002：何切捨牌必須扣除可摸數，統一 ranking/評分/解說與題目版本。
+- [ ] 10,000 題獨立 oracle 對整合 HEAD 交叉驗證，所有 `npm run check` 回歸通過。
+- [ ] 接通 v2 DecisionRecord 的 UI，並驗證 v1 localStorage 保留與匯入／匯出；若尚未接線須在 release notes 列未完成。
+- [ ] 手機答題、鍵盤操作、主流程、PWA 安裝／離線的實際驗收；manifest 並不等於離線 PWA。
+- [ ] 按整合驗證結果更新 README、CHANGELOG 與最終合併 PR / SHA；不得先標記 V0.2 完成。
+
+註：以上勾選僅是整合審查／契約文件已建立，不是功能實作已併入正式版。
