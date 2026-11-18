@@ -1,9 +1,10 @@
 import { toCounts } from '../tiles.js';
 import { gradeAnswer } from '../practice.js';
-import { EXERCISE_SCHEMA_VERSION, validateExercise } from './exercises.js';
+import { validateExercise } from './exercises.js';
 import { hashSeed } from './random.js';
 
-export const RECORD_SCHEMA_VERSION = 2;
+export const RECORD_SCHEMA_VERSION = 3;
+export const LEGACY_RECORD_SCHEMA_VERSION = 2;
 const SCORES = { perfect: 1, acceptable: 0.5, improve: 0 };
 
 function evaluate(exercise, choice) {
@@ -61,7 +62,7 @@ export function createDecisionRecord(exercise, choice, { durationMs, timestamp, 
   const identity = `${exercise.id}|${timestamp}|${durationMs}|${JSON.stringify(selected)}`;
   return {
     schemaVersion: RECORD_SCHEMA_VERSION,
-    id: attemptId ?? `dr2-${hashSeed(identity).toString(16).padStart(8, '0')}`,
+    id: attemptId ?? `dr3-${hashSeed(identity).toString(16).padStart(8, '0')}`,
     exerciseId: exercise.id,
     taskType: exercise.taskType,
     timestamp,
@@ -79,7 +80,8 @@ export function createDecisionRecord(exercise, choice, { durationMs, timestamp, 
 
 export function validateDecisionRecord(record, { verifyAnswers = true } = {}) {
   if (!record || typeof record !== 'object' || Array.isArray(record)) throw new TypeError('DecisionRecord 必須是物件');
-  if (record.schemaVersion !== RECORD_SCHEMA_VERSION || typeof record.id !== 'string' || !record.id) throw new RangeError('不支援的 DecisionRecord');
+  if (![RECORD_SCHEMA_VERSION, LEGACY_RECORD_SCHEMA_VERSION].includes(record.schemaVersion) ||
+      typeof record.id !== 'string' || !record.id) throw new RangeError('不支援的 DecisionRecord');
   if (typeof record.timestamp !== 'string' || !Number.isFinite(Date.parse(record.timestamp)) ||
     !Number.isFinite(record.durationMs) || record.durationMs < 0) throw new RangeError('無效紀錄時間');
   if (!['perfect', 'acceptable', 'improve'].includes(record.grade) ||

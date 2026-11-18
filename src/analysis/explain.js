@@ -1,5 +1,5 @@
 import { shanten } from '../shanten.js';
-import { rankDiscards } from '../practice.js';
+import { rankDiscards, gradeAnswer } from '../practice.js';
 import { sortTiles, tileLabel, toCounts } from '../tiles.js';
 
 export const EXPLANATION_SCHEMA_VERSION = '0.2.0';
@@ -68,7 +68,10 @@ export function analyzeStructure(hand, { maxDecompositions = 4 } = {}) {
 
   const minimum = score(0, 0, 0, 0);
   const official = shanten(hand);
-  if (minimum !== official) throw new Error('拆解分數與核心向聽數不一致');
+  // The decomposition witness is independent of the canonical shanten scorer.
+  // An algorithm-version mismatch must never be treated as proof that the
+  // canonical scorer is incorrect: label the witnesses as unverified instead.
+  const matchesCanonical = minimum === official;
 
   const results = [];
   const signatures = new Set();
@@ -107,10 +110,13 @@ export function analyzeStructure(hand, { maxDecompositions = 4 } = {}) {
   };
   collect(0, 0, 0, 0, []);
   return {
-    shanten: minimum,
+    shanten: official,
+    structuralShanten: minimum,
+    matchesCanonical,
     decompositions: results.slice(0, maxDecompositions),
     truncated: results.length > maxDecompositions,
-    /** A false truncated flag is conclusive only within this exhaustive search. */
+    // A mismatch means the witnesses illustrate a different structural score,
+    // not that the canonical shanten result is wrong.
   };
 }
 
@@ -155,32 +161,22 @@ export function explainDiscard(hand17, discard, options = {}) {
     throw new RangeError('捨牌必須是手牌中存在的牌碼');
   }
   const before = sortTiles(hand17);
-  // Current practice.rankDiscards() excludes the just-discarded tile from
-  // visible counts. Correct its draw counts without changing that public API.
-  // This is equivalent to improvingDraws(hand16, [...visibleTiles, discard]).
-  const corrected = rankDiscards(before, visibleTiles).map((raw, index) => {
-    const draws = raw.draws.map(draw => ({
-      tile: draw.tile,
-      count: draw.count - (draw.tile === raw.tile ? 1 : 0),
-    })).filter(draw => draw.count > 0);
-    return {
-      ...raw,
-      coreRank: index + 1,
-      rawCoreMetrics: { shanten: raw.shanten, kinds: raw.kinds, copies: raw.copies },
-      draws,
-      kinds: draws.length,
-      copies: draws.reduce((sum, draw) => sum + draw.count, 0),
-    };
-  }).sort((a, b) => a.shanten - b.shanten || b.copies - a.copies ||
-    b.kinds - a.kinds || a.tile - b.tile);
-  const candidates = corrected.map((rank, index) => {
+  // Canonical source: preserve the exact order and the exact metrics from
+  // practice.rankDiscards(). Do NOT subtract a discarded tile here: practice
+  // owns discard visibility and must include it exactly once (Q-002).
+  const canonicalRanking = rankDiscards(before, visibleTiles);
+  const candidates = canonicalRanking.map((rank, index) => {
     const after = withoutOne(before, rank.tile);
     const structure = analyzeStructure(after, { maxDecompositions });
-    if (structure.shanten !== rank.shanten) throw new Error('牌型與進張計算不一致');
+    if (structure.shanten !== rank.shanten) {
+      throw new Error('canonical rankDiscards 與 shanten 的向聽數不一致');
+    }
     return {
       rank: index + 1,
-      coreRank: rank.coreRank,
-      rawCoreMetrics: rank.rawCoreMetrics,
+      // Backwards-compatible aliases: identical to canonical values, not a
+      // second independently recomputed ranking.
+      coreRank: index + 1,
+      rawCoreMetrics: { shanten: rank.shanten, kinds: rank.kinds, copies: rank.copies },
       discard: { tile: rank.tile, label: tileLabel(rank.tile) },
       hand16: after,
       metrics: {
@@ -203,11 +199,19 @@ export function explainDiscard(hand17, discard, options = {}) {
     copiesDelta: selected.metrics.copies - best.metrics.copies,
     kindsDelta: selected.metrics.kinds - best.metrics.kinds,
   };
+  const evaluation = gradeAnswer(canonicalRanking, discard);
+  // Grade labels are distinct contracts; compare semantic outcomes explicitly.
+  // gradeAnswer currently treats equal shanten + copies as perfect, regardless
+  // of different kinds (which still determines the canonical tie-break order).
+  const gradeAdapter = {
+    perfect: 'optimal',
+    acceptable: 'same-shanten',
+    improve: 'higher-shanten',
+  };
+  const grade = gradeAdapter[evaluation.grade];
+  if (!grade) throw new RangeError(`未知訓練評分：${evaluation.grade}`);
   const equivalent = candidates.filter(c => c.metrics.shanten === selected.metrics.shanten &&
-    c.metrics.copies === selected.metrics.copies && c.metrics.kinds === selected.metrics.kinds)
-    .map(c => c.discard);
-  const optimal = comparison.shantenDelta === 0 && comparison.copiesDelta === 0 && comparison.kindsDelta === 0;
-  const grade = optimal ? 'optimal' : comparison.shantenDelta === 0 ? 'same-shanten' : 'higher-shanten';
+    c.metrics.copies === selected.metrics.copies).map(c => c.discard);
   const reasons = [
     { code: 'SHANTEN', message: `打出${selected.discard.label}後為${selected.metrics.shanten}向聽。`,
       evidence: { shanten: selected.metrics.shanten } },
@@ -226,26 +230,34 @@ export function explainDiscard(hand17, discard, options = {}) {
       message: `與捨${best.discard.label}同向聽，但少${-comparison.copiesDelta}張有效進張。`,
       evidence: comparison });
   } else if (comparison.kindsDelta < 0) {
-    reasons.push({ code: 'KIND_TRADEOFF',
-      message: `向聽數及有效進張張數相同，但比捨${best.discard.label}少${-comparison.kindsDelta}種進張。`,
-      evidence: comparison });
+    reasons.push({ code: 'KIND_TIE_BREAK',
+      message: `與捨${best.discard.label}的向聽數及有效進張張數相同，訓練仍評為「牌效率最佳」，但少${-comparison.kindsDelta}種有效進張，所以排名較後。`,
+      evidence: { ...comparison, trainingGrade: evaluation.grade } });
   } else {
     reasons.push({ code: 'MATCH_BEST',
-      message: `依向聽數、有效進張張數與種類，與最高排名方案同等。`,
-      evidence: { equivalentDiscards: equivalent } });
+      message: `向聽數、有效進張張數與種類均與最高排名方案相同，訓練評為「牌效率最佳」。`,
+      evidence: { equivalentDiscards: equivalent, trainingGrade: evaluation.grade } });
   }
+  reasons.push({
+    code: 'TRAINING_GRADE',
+    message: `訓練評分：${evaluation.title}（${evaluation.grade}）；教學等級：${grade}。`,
+    evidence: {
+      grade: evaluation.grade, teachingGrade: grade,
+      bestTile: evaluation.best.tile, selectedTile: evaluation.answer.tile,
+    },
+  });
 
   const retainedReference = selected.discard.tile === best.discard.tile ? null : {
     tile: best.discard.tile,
     label: best.discard.label,
     possibleRoles: participation(selected.structure, best.discard.tile),
-    basis: '僅限回傳的最優拆解樣本，其他同分拆解可能存在',
+    basis: '僅限已列出的候選拆解；若拆解分數與 canonical 不同，不能推翻正式向聽',
   };
   const discardedInstead = selected.discard.tile === best.discard.tile ? null : {
     tile: selected.discard.tile,
     label: selected.discard.label,
     possibleRoles: participation(best.structure, selected.discard.tile),
-    basis: '僅限回傳的最優拆解樣本，其他同分拆解可能存在',
+    basis: '僅限已列出的候選拆解；若拆解分數與 canonical 不同，不能推翻正式向聽',
   };
   const beginner = [
     `捨${selected.discard.label}後：${selected.metrics.shanten === 0 ? '已聽牌' : `${selected.metrics.shanten}向聽`}。`,
@@ -255,23 +267,30 @@ export function explainDiscard(hand17, discard, options = {}) {
   const advanced = [
     `比較基準：低向聽數 → 高有效進張張數 → 多有效進張種類（同分依牌碼排序）；僅評估一般五面子一將的結構效率。`,
     ...reasons.map(reason => `${reason.code}：${reason.message}`),
-    `最佳拆解列出${selected.structure.decompositions.length}種${selected.structure.truncated ? '（尚有未列出的同分拆解）' : '（已列出所有同分拆解）'}；任何一種都不是唯一解的主張。`,
+    `${selected.structure.matchesCanonical ? '最佳結構拆解' : '未與正式向聽對齊的候選拆解'}列出${selected.structure.decompositions.length}種${selected.structure.truncated ? '（尚有未列出的同分拆解）' : '（已列出所有同分拆解）'}；不宣稱只有一種解。`,
+    ...(selected.structure.matchesCanonical ? [] : [
+      `拆解顯示分數 ${selected.structure.structuralShanten} 與 canonical 向聽 ${selected.structure.shanten} 不同；只提供牌組候選，不據此否定正式向聽。`,
+    ]),
   ];
   if (retainedReference) {
-    advanced.push(`在已列出的選擇方案最優拆解中，保留${retainedReference.label}的角色：${retainedReference.possibleRoles.join('、') || '未分類'}；不代表實戰中必須保留。`);
+    advanced.push(`在已列出的選擇方案候選拆解中，保留${retainedReference.label}的角色：${retainedReference.possibleRoles.join('、') || '未分類'}；不代表實戰中必須保留。`);
   }
   return {
     schemaVersion: EXPLANATION_SCHEMA_VERSION,
     scope: { rules: 'taiwan-16-standard-five-meld-one-eye', concealed: true, flowerTiles: false,
       openMeldsSupported: false, model: 'structural-efficiency',
-      remainingCopies: '四張減去16張手牌、額外公開牌及本次捨出的牌；不等於摸牌機率',
-      rankingNote: '修正現行 rankDiscards 尚未扣除本次捨牌的進張；coreRank 保留原排名供整合對照' },
+      remainingCopies: '來自 rankDiscards，應由其實作扣除手牌、額外公開牌及本次捨牌；非摸牌機率（Q-002 修復前可能高估）',
+      rankingSource: 'practice.rankDiscards',
+      gradingSource: 'practice.gradeAnswer',
+      rankingNote: '無二次扣牌或重新排序；coreRank 與 rank 相同。若 Q-002 尚未合併，需等待修正後 canonical ranking 才能宣稱物理剩餘張數正確。' },
     input: { hand17: before, discard: selected.discard, visibleTiles: sortTiles(visibleTiles) },
     originalStructure: analyzeStructure(before, { maxDecompositions }),
     selected,
     candidates,
     decision: {
       grade,
+      trainingGrade: evaluation.grade,
+      trainingTitle: evaluation.title,
       rank: selected.rank,
       equivalentDiscards: equivalent,
       comparison,

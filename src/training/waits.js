@@ -118,3 +118,24 @@ export function generateMeldSeededHand(rng = Math.random, meldCount = 2) {
   }
   return sortTiles(hand);
 }
+
+/** Explicit aliases/adapters: training={tile,copies}; core={tile,count}. */
+export { winningTiles as trainingWinningTiles };
+export function trainingWaitsToCoreDraws(waits) {
+  if (!Array.isArray(waits)) throw new TypeError('waits 必須為陣列');
+  return waits.map(({ tile, copies }) => {
+    if (!Number.isInteger(tile) || tile < 0 || tile > 33 || !Number.isInteger(copies) || copies < 0 || copies > 4) {
+      throw new RangeError('無效的訓練聽張資料');
+    }
+    return { tile, count: copies };
+  });
+}
+export function coreDrawsToTrainingWaits(draws) {
+  if (!Array.isArray(draws)) throw new TypeError('draws 必須為陣列');
+  return draws.map(({ tile, count }) => {
+    if (!Number.isInteger(tile) || tile < 0 || tile > 33 || !Number.isInteger(count) || count < 0 || count > 4) {
+      throw new RangeError('無效的核心聽張資料');
+    }
+    return { tile, copies: count };
+  });
+}

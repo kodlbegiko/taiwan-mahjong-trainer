@@ -1,10 +1,12 @@
 import { validateExercise } from '../training/exercises.js';
 import { validateDecisionRecord } from '../training/records.js';
 
-export const ARCHIVE_SCHEMA_VERSION = 2;
+export const ARCHIVE_SCHEMA_VERSION = 3;
+export const LEGACY_ARCHIVE_SCHEMA_VERSION = 2;
 export const ARCHIVE_FORMAT = 'taiwan-mahjong-training-archive';
 export const LEGACY_SESSION_KEY = 'tw-mahjong-trainer:session:v1';
-export const ARCHIVE_STORAGE_KEY = 'tw-mahjong-trainer:archive:v2';
+export const ARCHIVE_STORAGE_KEY = 'tw-mahjong-trainer:archive:v3';
+export const V2_ARCHIVE_STORAGE_KEY = 'tw-mahjong-trainer:archive:v2';
 const MAX_JSON_LENGTH = 20 * 1024 * 1024;
 const MAX_ENTRIES = 10000;
 
@@ -59,13 +61,18 @@ export function validateArchive(archive, { verifyAnswers = true } = {}) {
   return true;
 }
 
-/** Explicit v1 -> v2 migration. Unknown future versions are rejected, not downgraded. */
+/** v1/v2 -> v3 migration wraps the archive; Exercise and DecisionRecord snapshots are NOT rescored. */
 export function migrateArchive(input) {
   if (Array.isArray(input)) return { ...emptyArchive(), legacySessions: legacySessions(input) };
   if (!input || typeof input !== 'object') throw new TypeError('封存資料必須為 JSON 物件或舊版陣列');
   if (input.schemaVersion === 1) {
     const sessions = input.sessions ?? input.stats;
     return { ...emptyArchive(), legacySessions: legacySessions(sessions) };
+  }
+  if (input.schemaVersion === LEGACY_ARCHIVE_SCHEMA_VERSION && input.format === ARCHIVE_FORMAT) {
+    const migrated = { ...structuredClonePortable(input), schemaVersion: ARCHIVE_SCHEMA_VERSION };
+    validateArchive(migrated); // Historical v2 exercise and record validators retain v1 scoring semantics.
+    return migrated;
   }
   if (input.schemaVersion !== ARCHIVE_SCHEMA_VERSION) throw new RangeError('未知的 schemaVersion，不能直接匯入');
   validateArchive(input);
