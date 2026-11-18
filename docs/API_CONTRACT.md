@@ -74,3 +74,23 @@
 ### F.1 瀏覽器 API Consumer 實證（同樣不代表已發布）
 
 在隔離 staging SHA `808e245ec99ec7512a544ae6beac1ee77f4b40cb` 的 [Chromium #44359395885](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44359395885)，桌面/手機模擬均完成 V0.1 的 `generateHand → rankDiscards → gradeAnswer` 互動與 v1 localStorage 讀寫/重載。**此證據只驗證 UI 能運作舊 API，未證明排名數學正確、解說接線或 V0.2 storage schema 已整合**。同 SHA 的 [Verify #44359395424](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44359395424) 因 Q-001/Q-002/I-003 仍失敗。
+
+## G. 第三輪核實的 main API 狀態（2026-11-19）
+
+> 本文件起始的 `ff177b8e` 與第 F 節的 `53981149` 均為當時歷史查核基準，**不得改稱最新 main**。第三輪 API 查核時 main 是 `ed47593c0f209d295e9e0da941f0d0d1aa6b5638`。
+
+**#1 / Q-001 已合併：** `calculateShanten` 使用合法終局 target overlap，逐種牌最多四張，四組字牌槓子須 `4` 向聽；保留 `shanten(tiles)`、`improvingDraws(hand16,visible=[])` 的同步介面與 `{shanten,draws:[{tile,count}],kinds,copies}` 形狀。
+
+**#5 / Q-002 已合併：** `rankDiscards(hand17,visible=[])` 正確將候選捨出的牌加入額外已知不可摸牌一次；`gradeAnswer(ranking,chosen)` 保留 `perfect/acceptable/improve`。Exercise schema v3、`SCORING_VERSION='efficiency-v2'`、`ALGORITHM_VERSION='five-meld-one-pair-v2-discard-visible'`；舊 schema v2 和 `efficiency-v1` 作答的完整 snapshot 不得重新評分或靜默覆蓋。Archive 版本 3，v1/v2 key 保留；新 v3 key 由 adapter 管理，但 UI 尚未連接。
+
+**#3 / I-003 已合併：** `explainDiscard` 從同一 `practice.rankDiscards` 取得 ranking 與 `practice.gradeAnswer` 取得正式分數，`optimal/same-shanten/higher-shanten` 有明示 adapter；不再自行二次扣除棄牌。拆解若與 canonical exact shanten 不一致，回傳 `matchesCanonical:false`、`structuralShanten` 並明示**未驗證的拆解候選**；不能把該 witness 當正式得分結論。
+
+**名稱辨識：** `src/shanten.js::winningTiles` 對外 `[{tile,count}]`；`src/training/waits.js::winningTiles` 對外 `[{tile,copies}]`，仍應透過模組別名或顯式轉換，不可直接互換。這是尚未消除的跨模組資料格式風險。
+
+**驗證：** [staging Verify #44365221250](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44365221250) 於 `7564f0c840129c8bc20b4ca86c74aa253f12f4b3` 的 81 項完整測試 0 fail、0 TODO、1 opt-in skip，含 10,000 題數值級獨立 oracle 和所有 P0 強制 cross-module tests。這是**隔離 staging 的特定 SHA**，不是未來每次 main 更新都可直接引用的成功結果。
+
+### G.1 前端 consumer 的最新驗證與版本狀態
+
+PR #4 `a7836da22ce2f7dfa602b87b87bc7cf2eb47fb40` 經過相依 #1/#5/#3 同版整合後，合併 main SHA `fa1646111178c668ee2744b72546692ff148e850`。同來源組合的 staging `7564f0c840129c8bc20b4ca86c74aa253f12f4b3` [Verify #44365221250](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44365221250) 81/80 pass/0 fail/0 TODO/1 opt-in skip；[Chromium browser #44365221412](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44365221412) 完成 desktop 1440、mobile emulation 390、`generateHand → rankDiscards → gradeAnswer` 互動、v1 localStorage 保留／重載。正式 main push [Verify #44366663851](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44366663851) 75/74 pass/0 fail/0 TODO/1 skip。
+
+**仍不符合「完整 V0.2 UI 契約」：** 現有 `src/app.js` 只進行 V0.1 何切與 v1 session 總結寫入，沒有接入新版 `Exercise` 的 `tenpai/multi_wait` 題型、`explainDiscard` 逐步可核對的完整教學視圖或 `DecisionRecord v3` 的本地儲存。此為 [Issue #12](https://github.com/kodlbegiko/taiwan-mahjong-trainer/issues/12) 的功能／驗收缺口，並非缺少底層函式。尚未取得 iOS/Android 實機、Service Worker 離線 PWA 安裝證據。
