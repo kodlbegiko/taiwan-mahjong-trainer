@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0c2227" />
+  <meta name="description" content="台灣十六張麻將牌效率訓練：練習何切、向聽數與有效進張。" />
+  <title>台麻練習所 · Taiwan Mahjong Trainer</title>
+  <link rel="stylesheet" href="./style.css" />
+  <script type="module" src="./src/app.js"></script>
+</head>
+<body>
+  <div class="layout">
+    <header class="topbar">
+      <div class="wordmark"><div class="brand-mark">麻</div><div><strong>台麻練習所</strong><span>TAIWAN MAHJONG TRAINER</span></div></div>
+      <span class="version">OPEN SOURCE · v0.1</span>
+    </header>
+    <main>
+      <section class="intro">
+        <span class="eyebrow">16 張台麻 · 牌效率特訓</span>
+        <h1>每一張捨牌，<br /><em>都應該有理由。</em></h1>
+        <p>選一張你認為最該打出的牌，系統會比較向聽數、有效進張和所有候選打法。不是背答案，而是練好每一次判斷。</p>
+      </section>
+      <div class="columns">
+        <section class="panel exercise" aria-labelledby="practice-heading">
+          <div class="section-top"><div><span class="eyebrow">TRAINING / 01</span><h2 id="practice-heading">何切練習</h2></div>
+            <label class="select-wrap">難度 <select id="difficulty"><option value="beginner">入門</option><option selected value="intermediate">進階</option><option value="advanced">挑戰</option></select></label>
+          </div>
+          <div class="instruction">你的手牌 <span>17 張 · 摸牌後</span></div>
+          <div class="table-surface"><div id="hand" class="hand" aria-label="選擇要捨棄的牌"></div></div>
+          <div class="exercise-bottom"><p id="exercise-status" role="status" class="status">請選一張你認為最適合捨棄的牌</p><div class="button-row"><button class="secondary" id="skip" type="button">換一題</button><button class="primary" id="next" type="button" hidden>下一題 <span aria-hidden="true">→</span></button></div></div>
+          <div id="answer" class="answer" hidden>
+            <div class="answer-heading"><div><span class="eyebrow">RESULT / 解析</span><h3>出牌比較</h3></div></div>
+            <p class="answer-summary">你選擇 <strong id="chosen-tile"></strong> · 最高牌效率捨牌 <strong id="best-tiles"></strong></p>
+            <p id="feedback" class="feedback"></p>
+            <div class="table-scroll"><table><thead><tr><th>排序</th><th>捨牌</th><th>向聽</th><th>進張種類</th><th>理論張數</th></tr></thead><tbody id="rankings"></tbody></table></div>
+            <p id="draw-details" class="detail"></p>
+          </div>
+        </section>
+        <aside class="sidebar">
+          <section class="panel metrics" aria-labelledby="progress-heading"><span class="eyebrow">PERSONAL PROGRESS</span><h2 id="progress-heading">練習統計</h2><div class="metric-grid"><div><strong id="stat-total">0</strong><span>已完成題數</span></div><div><strong id="stat-perfect">—</strong><span>牌效率最佳率</span></div><div><strong id="stat-same">—</strong><span>不增加向聽率</span></div><div><strong id="stat-seconds">—</strong><span>平均作答時間</span></div></div><button class="text-btn" id="clear-stats">清除練習紀錄</button></section>
+          <section class="panel rules"><span class="eyebrow">HOW IT WORKS</span><h2>這題怎麼算？</h2><dl><div><dt>向聽數</dt><dd>離一般胡牌結構還差多少步；0 代表聽牌。</dd></div><div><dt>有效進張</dt><dd>摸到後可以降低向聽數的牌種。</dd></div><div><dt>理論張數</dt><dd>扣除自己手牌後，未知牌中最多還有幾張有效進張。</dd></div></dl></section>
+        </aside>
+      </div>
+      <section class="roadmap"><span class="eyebrow">UP NEXT</span><h2>接下來的訓練科目</h2><div class="roadmap-grid"><article><span>02</span><h3>聽牌與多面聽</h3><p>辨認各種聽牌形狀與等待張數。</p></article><article><span>03</span><h3>攻防決策</h3><p>加入巡目、明牌、對手副露與風險情境。</p></article><article><span>04</span><h3>牌局複盤</h3><p>重現完整牌局並檢查決策的品質。</p></article></div></section>
+    </main>
+    <footer>一般 5 面子 + 1 將眼牌型 · 目前不計公開副露、特殊胡法、台數或放槍風險。此站提供訓練與研究用途，不涉及金錢賭博。</footer>
+  </div>
+</body>
+</html>
