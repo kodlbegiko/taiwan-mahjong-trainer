@@ -141,7 +141,7 @@ function submitAnswer(tile) {
     </tr>`;
   }).join('');
   $('#draw-details').textContent = `你捨棄 ${TILE_LABELS[tile]} 後的有效進張：${drawList(result.answer.draws)}。`;
-  $('#answer-heading').focus({ preventScroll: true });
+  $('#answer-heading').focus();
 }
 
 // Delegated handlers keep selection stable when the hand is regenerated.
@@ -155,7 +155,9 @@ $('#hand').addEventListener('keydown', event => {
   if (!button || button.disabled) return;
   const buttons = [...$('#hand').querySelectorAll('button[data-tile]')];
   const current = buttons.indexOf(button);
-  const offsets = { ArrowRight: 1, ArrowLeft: -1, ArrowDown: 9, ArrowUp: -9 };
+  const offsets = window.matchMedia('(min-width: 1280px)').matches
+    ? { ArrowRight: 1, ArrowLeft: -1 }
+    : { ArrowRight: 1, ArrowLeft: -1, ArrowDown: 9, ArrowUp: -9 };
   let target = null;
   if (Object.hasOwn(offsets, event.key)) target = Math.max(0, Math.min(buttons.length - 1, current + offsets[event.key]));
   if (event.key === 'Home') target = 0;
