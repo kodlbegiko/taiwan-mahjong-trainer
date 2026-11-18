@@ -88,3 +88,9 @@
 **名稱辨識：** `src/shanten.js::winningTiles` 對外 `[{tile,count}]`；`src/training/waits.js::winningTiles` 對外 `[{tile,copies}]`，仍應透過模組別名或顯式轉換，不可直接互換。這是尚未消除的跨模組資料格式風險。
 
 **驗證：** [staging Verify #44365221250](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44365221250) 於 `7564f0c840129c8bc20b4ca86c74aa253f12f4b3` 的 81 項完整測試 0 fail、0 TODO、1 opt-in skip，含 10,000 題數值級獨立 oracle 和所有 P0 強制 cross-module tests。這是**隔離 staging 的特定 SHA**，不是未來每次 main 更新都可直接引用的成功結果。
+
+### G.1 前端 consumer 的最新驗證與版本狀態
+
+PR #4 `a7836da22ce2f7dfa602b87b87bc7cf2eb47fb40` 經過相依 #1/#5/#3 同版整合後，合併 main SHA `fa1646111178c668ee2744b72546692ff148e850`。同來源組合的 staging `7564f0c840129c8bc20b4ca86c74aa253f12f4b3` [Verify #44365221250](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44365221250) 81/80 pass/0 fail/0 TODO/1 opt-in skip；[Chromium browser #44365221412](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44365221412) 完成 desktop 1440、mobile emulation 390、`generateHand → rankDiscards → gradeAnswer` 互動、v1 localStorage 保留／重載。正式 main push [Verify #44366663851](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44366663851) 75/74 pass/0 fail/0 TODO/1 skip。
+
+**仍不符合「完整 V0.2 UI 契約」：** 現有 `src/app.js` 只進行 V0.1 何切與 v1 session 總結寫入，沒有接入新版 `Exercise` 的 `tenpai/multi_wait` 題型、`explainDiscard` 逐步可核對的完整教學視圖或 `DecisionRecord v3` 的本地儲存。此為 [Issue #12](https://github.com/kodlbegiko/taiwan-mahjong-trainer/issues/12) 的功能／驗收缺口，並非缺少底層函式。尚未取得 iOS/Android 實機、Service Worker 離線 PWA 安裝證據。
