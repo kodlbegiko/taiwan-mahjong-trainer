@@ -92,3 +92,10 @@ Staging `808e245ec99ec7512a544ae6beac1ee77f4b40cb` 的 [Chromium CI #44359395885
 - PR #4 的真正 Chromium desktop/mobile（本次 staging SHA）與 localStorage／鍵盤 smoke 結果必須 PASS；同 SHA full Verify 必須成功；PR4 HEAD SHA 不能移動。合併前再次核實 main；合併後核實確切 main push SHA CI 並更新品質報告與 CHANGELOG。
 - 後續 docs-only PR 只在當下 HEAD 的 CI success 後合併；該 PR 不能將未完成的 v3 UI 訓練進度、實機手機、離線 PWA 和 branch rulesets 寫成完成。
 - rollback 優先逐 PR revert 真正 merge SHA（#1/#5/#3/#4）；不 force-push main，不以覆蓋整檔解 conflict。
+
+### 最後一個功能 PR 與主線 CI 結果（後續追加）
+
+- PR #4 source HEAD `a7836da22ce2f7dfa602b87b87bc7cf2eb47fb40` [Verify #44365062359](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44365062359) SUCCESS；與已合併 #1/#5/#3 的 exact blob 疊合後，staging `7564f0c840129c8bc20b4ca86c74aa253f12f4b3` [Verify #44365221250](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44365221250) SUCCESS 81 total/80 pass/0 fail/0 TODO/1 opt-in skip，且在同 SHA 的 [Chromium #44365221412](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44365221412) success：1440px desktop/390px mobile emulation，作答、數值、鍵盤、下一題、v1 localStorage 與 legacy 資料載入。Artifacts `v02-browser-smoke-images` ID `14457335506`。
+- PR #4 在 source SHA 未移動、main `ed47593c` 未漂移、source CI＋staging 全部 success 後，squash merge SHA `fa1646111178c668ee2744b72546692ff148e850`，主線 [Verify #44366663851](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44366663851) SUCCESS 75 total/74 pass/0 fail/0 TODO/1 opt-in skip。
+- Draft #10 在四個功能 PR 都進入 main 後，重新以 `main=fa1646111178c668ee2744b72546692ff148e850` 建立 base tree，只保留四個**未進入 main** 的整合測試與 browser smoke 腳本/workflow，沒有重複疊加已合併的功能 blob；新 staging HEAD `b607fe666ef3b4e8379023aacf6edb31ec22a874`，維持 Draft、未合併。該 HEAD 的 CI 須單獨核實，不能引用舊 SHA 冒充。
+- 已關閉 #7/#8/#9 三項 P0（含程式與整合回歸證據）；#12（尚未接線的 V0.2 UI / mobile actual device / offline PWA）與 #13（main branch protections）仍 OPEN。**發布仍 NO-GO**，不設 V0.2 release tag。
