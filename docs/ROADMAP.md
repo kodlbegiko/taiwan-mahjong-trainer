@@ -136,7 +136,8 @@
 - [x] 固定 seed 的 10,000 題數值級獨立 Oracle 在整合 SHA `4f673f97` 通過（不代表所有邊界牌型均正確）。
 - [ ] 整合 HEAD 的 `npm run check` 全綠、Q-001/Q-002 強制回歸無 TODO、跨模組一致性及主線回歸通過。
 - [ ] 接通 v2 DecisionRecord 的 UI，並驗證 v1 localStorage 保留與匯入／匯出；若尚未接線須在 release notes 列未完成。
-- [ ] 手機答題、鍵盤操作、主流程、PWA 安裝／離線的實際驗收；manifest 並不等於離線 PWA。
+- [x] Staging `808e245e` 的 [Chromium browser smoke #44359395885](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44359395885) 在桌面 1440px 與手機模擬 390px 完成答題、鍵盤、既有 localStorage 重載，並上傳視覺截圖。
+- [ ] iOS/Android 實機、人眼視覺驗收、v2 DecisionRecord UI 接線、PWA 安裝／離線；manifest 並不等於離線 PWA。
 - [ ] 按整合驗證結果更新 README、CHANGELOG 與最終合併 PR / SHA；不得先標記 V0.2 完成。
 
 註：以上勾選僅是整合審查／契約文件已建立，不是功能實作已併入正式版。
