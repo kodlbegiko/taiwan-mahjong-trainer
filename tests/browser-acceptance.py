@@ -143,6 +143,7 @@ def main():
         corrupt.close()
         blocked = boot(browser, 390, blocked=True)
         assert blocked.locator('#storage-status').is_visible()
+        assert '無法儲存到瀏覽器' in blocked.locator('#storage-status').inner_text()
         verify_flow(blocked)
         blocked.close()
         print('PASS corrupted/blocked localStorage simulation: safe in-memory fallback and original corrupt string preserved')

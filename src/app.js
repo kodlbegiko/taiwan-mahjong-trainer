@@ -14,9 +14,15 @@ let choice = null;
 let startTime = 0;
 
 function loadStats() {
+  let raw;
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw === null) return [];
+    raw = localStorage.getItem(STORAGE_KEY);
+  } catch {
+    storageHealth = 'blocked';
+    return [];
+  }
+  if (raw === null) return [];
+  try {
     const stored = JSON.parse(raw);
     if (!Array.isArray(stored)) {
       storageHealth = 'corrupt';
@@ -131,8 +137,10 @@ function submitAnswer(tile) {
   try {
     result = gradeAnswer(ranking, tile);
     const candidate = ranking.find(item => item.tile === tile);
-    if (!candidate || !result?.answer || !result?.best
-      || result.answer.tile !== candidate.tile || result.best.tile !== ranking[0].tile
+    const matches = (a, b) => a?.tile === b?.tile && a?.shanten === b?.shanten
+      && a?.kinds === b?.kinds && a?.copies === b?.copies
+      && JSON.stringify(a?.draws) === JSON.stringify(b?.draws);
+    if (!candidate || !matches(result.answer, candidate) || !matches(result.best, ranking[0])
       || !['perfect', 'acceptable', 'improve'].includes(result.grade)) {
       throw new Error('練習評分與候選排序契約不一致');
     }
