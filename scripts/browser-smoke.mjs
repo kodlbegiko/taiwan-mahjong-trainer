@@ -29,7 +29,7 @@ async function runScenario(name, viewport, mobile) {
   await page.locator('#answer').waitFor({ state: 'visible' });
   assert.ok((await page.locator('#rankings tr').count()) > 0, `${name}: missing alternatives`);
   for (const target of ['#chosen-shanten','#chosen-kinds','#chosen-copies','#best-shanten','#best-kinds','#best-copies']) {
-    assert.match(await page.locator(target).innerText(), /^\\d+$/, `${name}: missing numeric data at ${target}`);
+    assert.match(await page.locator(target).innerText(), /^\d+$/, `${name}: missing numeric data at ${target}`);
   }
   assert.equal(await page.locator('#stat-total').innerText(), '1');
   const record = await page.evaluate(key => JSON.parse(localStorage.getItem(key)), key);
