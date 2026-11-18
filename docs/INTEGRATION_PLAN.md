@@ -79,3 +79,16 @@ GitHub API 查到 `main.protected=false`，Repository Rulesets API 回傳空陣�
 Staging `808e245ec99ec7512a544ae6beac1ee77f4b40cb` 的 [Chromium CI #44359395885](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44359395885) **success**：真實 headless Chromium 測桌面 1440px、手機模擬 390px、17 張點牌、方案/評分、下一題、方向鍵/Enter、舊 localStorage 保存/重載、手機牌按鈕尺寸與整頁水平溢出，四張 screenshot 上傳 artifact `v02-browser-smoke-images`。但相同 SHA 的 [Verify #44359395424](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44359395424) 仍因三項 P0 **failure**。
 
 沒有 iOS/Android 實機、PWA Service Worker 離線安裝或 v2 DecisionRecord UI 接線的驗收。**相同 commit 的瀏覽器 pass 與核心 fail 應並列展示，絕不能合成一個綠燈。**
+
+## 第三輪實際合併／回退／驗證日誌（2026-11-19）
+
+1. PR #16（獨立 Golden Q-001），目標分支 `feat/core-accuracy`，CI #44363174991 pass，測試合併 SHA `b0ca3393cb7a351902e847978bd664b04f52de8d`，沒有直接把會讓舊 main 紅燈的測試先合併 main。隨後 PR #1 於 source HEAD `b0ca3393` 的 Verify #44363300567 success 後 squash 合併 `f15e8fc3404ec380b65bc1493a87e76da6b4a1c2`，main push Verify #44363444102 success（45 total /43 pass /0 fail /1 skip /1 當時尚未修的 Q002 TODO）。
+2. PR #5 在 PR #1 後，以最新 main tree + 題庫分支所有 18 個精確 blob 安全重新整合，保留 source commit 為 parent、最新 main 為 second parent，以 expected SHA lease 更新分支；PR #17 強制 Golden Q-002 CI #44363792218 pass，測試合併到 `feat/training-system` 為 `7f01afb906777109838de911a72a6b96692eb688`；此 feature HEAD Verify #44364359687 success（64 total /63 pass /0 fail /1 skip /0 TODO），然後 PR #5 merge SHA `9f74e528291e3a2a945ed5d63b99fdaa3eba5d35`，main push Verify #44364507850 success（64/63/0/1 skip/0 TODO）。
+3. PR #3 以 main `9f74e528` 作為 base tree、保留解說三個原有 blob 並用雙 parent 安全整合後，feature HEAD `c6e48209ab469ff6c01bc88bc1878e2b5ef1818e` Verify #44364699503 success（75 total /74 pass /0 fail /1 skip /0 TODO），合併 PR #3 SHA `ed47593c0f209d295e9e0da941f0d0d1aa6b5638`，main Verify #44364857547 success（75/74/0/1 skip/0 TODO）。
+4. PR #4 以 main `ed47593c` base tree 加上原 UI 六個精確 blob 安全更新後，HEAD `a7836da22ce2f7dfa602b87b87bc7cf2eb47fb40` Verify #44365062359 success；Draft staging PR #10 使用最新 main + 該 UI blob 與獨立整合測試，HEAD `7564f0c840129c8bc20b4ca86c74aa253f12f4b3` Verify #44365221250 success（81 total /80 pass /0 fail /1 skip /0 TODO）。**本節寫入時 #4 仍須其最新 staging Chromium browser CI #44365221412 結果與正式 main push gate，沒有提前合併。**
+
+### 下一次合併的嚴格門檻
+
+- PR #4 的真正 Chromium desktop/mobile（本次 staging SHA）與 localStorage／鍵盤 smoke 結果必須 PASS；同 SHA full Verify 必須成功；PR4 HEAD SHA 不能移動。合併前再次核實 main；合併後核實確切 main push SHA CI 並更新品質報告與 CHANGELOG。
+- 後續 docs-only PR 只在當下 HEAD 的 CI success 後合併；該 PR 不能將未完成的 v3 UI 訓練進度、實機手機、離線 PWA 和 branch rulesets 寫成完成。
+- rollback 優先逐 PR revert 真正 merge SHA（#1/#5/#3/#4）；不 force-push main，不以覆蓋整檔解 conflict。
