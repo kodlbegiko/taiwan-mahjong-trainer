@@ -1,0 +1,20 @@
+{
+  "format": "taiwan-mahjong-seeded-bank",
+  "schemaVersion": 3,
+  "generatorVersion": "2.0.0",
+  "scoringVersion": "efficiency-v2",
+  "algorithmVersion": "five-meld-one-pair-v2-discard-visible",
+  "seed": "tmt-v02-public-bank",
+  "count": 200,
+  "tasks": [
+    "discard",
+    "tenpai",
+    "multi_wait"
+  ],
+  "levels": [
+    "beginner",
+    "intermediate",
+    "advanced"
+  ],
+  "note": "200 deterministic exercises; all generated answers verified against corrected discarded-tile visibility. Synthetic difficulty only. To rebuild: generateExerciseBank({seed, count, tasks, levels, schemaVersion:3})."
+}

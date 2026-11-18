@@ -1,0 +1,463 @@
+{
+  "format": "taiwan-mahjong-training-archive",
+  "schemaVersion": 3,
+  "exercises": [
+    {
+      "schemaVersion": 3,
+      "id": "ex3-50ae31c6-0",
+      "seed": "tmt-v02-public-bank",
+      "index": 0,
+      "taskType": "discard",
+      "sampleSource": "constructed-tenpai-plus-wall",
+      "requestedLevel": "beginner",
+      "estimatedDifficulty": {
+        "label": "beginner",
+        "method": "min-discard-shanten-v1",
+        "humanValidated": false
+      },
+      "generatorVersion": "2.0.0",
+      "ruleVersion": "taiwan-16-standard-v1",
+      "algorithmVersion": "five-meld-one-pair-v2-discard-visible",
+      "hand": [
+        0,
+        1,
+        2,
+        16,
+        16,
+        16,
+        19,
+        21,
+        21,
+        21,
+        22,
+        23,
+        30,
+        30,
+        30,
+        31,
+        31
+      ],
+      "visibleTiles": [],
+      "answerRules": {
+        "version": "efficiency-v2",
+        "metric": "min-shanten-then-max-ukeire-copies",
+        "acceptsTies": true
+      },
+      "answer": {
+        "optimalTiles": [
+          19
+        ],
+        "ranking": [
+          {
+            "tile": 19,
+            "shanten": 0,
+            "copies": 7,
+            "kinds": 3,
+            "draws": [
+              {
+                "tile": 21,
+                "count": 1
+              },
+              {
+                "tile": 24,
+                "count": 4
+              },
+              {
+                "tile": 31,
+                "count": 2
+              }
+            ]
+          },
+          {
+            "tile": 21,
+            "shanten": 0,
+            "copies": 4,
+            "kinds": 1,
+            "draws": [
+              {
+                "tile": 20,
+                "count": 4
+              }
+            ]
+          },
+          {
+            "tile": 22,
+            "shanten": 1,
+            "copies": 28,
+            "kinds": 9,
+            "draws": [
+              {
+                "tile": 18,
+                "count": 4
+              },
+              {
+                "tile": 19,
+                "count": 3
+              },
+              {
+                "tile": 20,
+                "count": 4
+              },
+              {
+                "tile": 21,
+                "count": 1
+              },
+              {
+                "tile": 22,
+                "count": 3
+              },
+              {
+                "tile": 23,
+                "count": 3
+              },
+              {
+                "tile": 24,
+                "count": 4
+              },
+              {
+                "tile": 25,
+                "count": 4
+              },
+              {
+                "tile": 31,
+                "count": 2
+              }
+            ]
+          },
+          {
+            "tile": 23,
+            "shanten": 1,
+            "copies": 24,
+            "kinds": 8,
+            "draws": [
+              {
+                "tile": 18,
+                "count": 4
+              },
+              {
+                "tile": 19,
+                "count": 3
+              },
+              {
+                "tile": 20,
+                "count": 4
+              },
+              {
+                "tile": 21,
+                "count": 1
+              },
+              {
+                "tile": 22,
+                "count": 3
+              },
+              {
+                "tile": 23,
+                "count": 3
+              },
+              {
+                "tile": 24,
+                "count": 4
+              },
+              {
+                "tile": 31,
+                "count": 2
+              }
+            ]
+          },
+          {
+            "tile": 0,
+            "shanten": 1,
+            "copies": 18,
+            "kinds": 6,
+            "draws": [
+              {
+                "tile": 0,
+                "count": 3
+              },
+              {
+                "tile": 3,
+                "count": 4
+              },
+              {
+                "tile": 20,
+                "count": 4
+              },
+              {
+                "tile": 21,
+                "count": 1
+              },
+              {
+                "tile": 24,
+                "count": 4
+              },
+              {
+                "tile": 31,
+                "count": 2
+              }
+            ]
+          },
+          {
+            "tile": 31,
+            "shanten": 1,
+            "copies": 18,
+            "kinds": 6,
+            "draws": [
+              {
+                "tile": 18,
+                "count": 4
+              },
+              {
+                "tile": 19,
+                "count": 3
+              },
+              {
+                "tile": 20,
+                "count": 4
+              },
+              {
+                "tile": 21,
+                "count": 1
+              },
+              {
+                "tile": 24,
+                "count": 4
+              },
+              {
+                "tile": 31,
+                "count": 2
+              }
+            ]
+          },
+          {
+            "tile": 1,
+            "shanten": 1,
+            "copies": 14,
+            "kinds": 5,
+            "draws": [
+              {
+                "tile": 1,
+                "count": 3
+              },
+              {
+                "tile": 20,
+                "count": 4
+              },
+              {
+                "tile": 21,
+                "count": 1
+              },
+              {
+                "tile": 24,
+                "count": 4
+              },
+              {
+                "tile": 31,
+                "count": 2
+              }
+            ]
+          },
+          {
+            "tile": 2,
+            "shanten": 1,
+            "copies": 14,
+            "kinds": 5,
+            "draws": [
+              {
+                "tile": 2,
+                "count": 3
+              },
+              {
+                "tile": 20,
+                "count": 4
+              },
+              {
+                "tile": 21,
+                "count": 1
+              },
+              {
+                "tile": 24,
+                "count": 4
+              },
+              {
+                "tile": 31,
+                "count": 2
+              }
+            ]
+          },
+          {
+            "tile": 16,
+            "shanten": 1,
+            "copies": 12,
+            "kinds": 5,
+            "draws": [
+              {
+                "tile": 16,
+                "count": 1
+              },
+              {
+                "tile": 20,
+                "count": 4
+              },
+              {
+                "tile": 21,
+                "count": 1
+              },
+              {
+                "tile": 24,
+                "count": 4
+              },
+              {
+                "tile": 31,
+                "count": 2
+              }
+            ]
+          },
+          {
+            "tile": 30,
+            "shanten": 1,
+            "copies": 12,
+            "kinds": 5,
+            "draws": [
+              {
+                "tile": 20,
+                "count": 4
+              },
+              {
+                "tile": 21,
+                "count": 1
+              },
+              {
+                "tile": 24,
+                "count": 4
+              },
+              {
+                "tile": 30,
+                "count": 1
+              },
+              {
+                "tile": 31,
+                "count": 2
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schemaVersion": 3,
+      "id": "ex3-38dad097-1",
+      "seed": "tmt-v02-public-bank",
+      "index": 1,
+      "taskType": "tenpai",
+      "sampleSource": "constructed-tenpai",
+      "requestedLevel": "intermediate",
+      "estimatedDifficulty": {
+        "label": "intermediate",
+        "method": "winning-tile-count-v1",
+        "humanValidated": false
+      },
+      "generatorVersion": "2.0.0",
+      "ruleVersion": "taiwan-16-standard-v1",
+      "algorithmVersion": "five-meld-one-pair-v2-discard-visible",
+      "hand": [
+        3,
+        4,
+        9,
+        9,
+        9,
+        14,
+        15,
+        16,
+        21,
+        21,
+        21,
+        24,
+        24,
+        24,
+        27,
+        27
+      ],
+      "visibleTiles": [],
+      "answerRules": {
+        "version": "efficiency-v2",
+        "metric": "exact-winning-tile-set",
+        "acceptsTies": false
+      },
+      "answer": {
+        "winningTiles": [
+          {
+            "tile": 2,
+            "copies": 4
+          },
+          {
+            "tile": 5,
+            "copies": 4
+          }
+        ],
+        "expectedTiles": [
+          2,
+          5
+        ]
+      }
+    },
+    {
+      "schemaVersion": 3,
+      "id": "ex3-04a97e51-2",
+      "seed": "tmt-v02-public-bank",
+      "index": 2,
+      "taskType": "multi_wait",
+      "sampleSource": "constructed-tenpai",
+      "requestedLevel": "advanced",
+      "estimatedDifficulty": {
+        "label": "intermediate",
+        "method": "winning-tile-count-v1",
+        "humanValidated": false
+      },
+      "generatorVersion": "2.0.0",
+      "ruleVersion": "taiwan-16-standard-v1",
+      "algorithmVersion": "five-meld-one-pair-v2-discard-visible",
+      "hand": [
+        4,
+        4,
+        4,
+        9,
+        9,
+        19,
+        20,
+        21,
+        24,
+        25,
+        27,
+        27,
+        27,
+        32,
+        32,
+        32
+      ],
+      "visibleTiles": [],
+      "answerRules": {
+        "version": "efficiency-v2",
+        "metric": "exact-winning-tile-set",
+        "acceptsTies": false
+      },
+      "answer": {
+        "winningTiles": [
+          {
+            "tile": 23,
+            "copies": 4
+          },
+          {
+            "tile": 26,
+            "copies": 4
+          }
+        ],
+        "expectedTiles": [
+          23,
+          26
+        ]
+      }
+    }
+  ],
+  "records": [],
+  "legacySessions": []
+}
