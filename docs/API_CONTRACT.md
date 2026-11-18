@@ -57,3 +57,16 @@
 - Q-002 棄牌可見例：`[0,0,0,0,1,2,9,10,11,18,19,20,27,27,27,28,28]` 捨出 `0` 時，`rankDiscards(...).copies` 必須是 `6` 而不是 `7`。
 - 獨立 oracle 的 10,000 題以上固定 seed 跨模組回歸，失配不得忽略；Benchmark 紀錄同機器及 Node 版本，不跨機器硬設延遲門檻。
 - 實際答題：出題 → 選牌 → 計分 → 數值/說明一致 → 下一題；手機、鍵盤、舊 localStorage 需驗收，PWA manifest 不代表離線可安裝。
+
+## F. 2026-11-19 第二輪 API 相容與版本審查（未發布）
+
+本文件開頭的 `ff177b8e9dc59f3ad796f78d6dab9420ab677a7c` 是建立契約時的**歷史 v0.1 基準**，不是持續變動的最新 main。此次重新讀取時 main 為 `53981149d5f632db8d8dbbf3bd11fbd0999d48e3`。
+
+- #1 / #3 / #5 最新 head 仍分別為 `abf8b997` / `4781f136` / `1aa1746b`；沒有新的修復 commit。#4 仍為 `e1193d6f`。
+- Q-001：核心 DFS 仍計算四組字牌槓子為 `2` 而非 `4`，不可使用隨機樣本的 zero mismatch 取代 golden 邊界測試。
+- Q-002：`src/practice.js` 仍呼叫 `improvingDraws(hand16, visible)`，未使用 `visible + discarded`；必須保持舊 API 簽名，但修正所有 candidate 的物理張數。
+- I-003：`explainDiscard` 仍自行從 `rankDiscards` 的 `draw.count` 減去棄牌，造成解說／評分獨立計算；修正 #5 後若不改此處，還有**二次扣減**風險。必須以唯一 canonical ranking 派生 `decision` 與說明。
+- #5 `SCORING_VERSION='efficiency-v1'`、`ALGORITHM_VERSION='five-meld-one-pair-v1'` 未提升；修正輸出語意須明確升版並重建經驗證 200 題資料，保留舊 version 的歷史作答快照。
+- `winningTiles` 仍有 `{tile,count}` 與 `{tile,copies}` 的 namespace/shape 衝突；整合呼叫端必須匯入明確別名或使用 adapter，不得誤認相容。
+
+[隔離 CI #44358617174](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44358617174) 針對 `4f673f97a137a886d6e0b14617a42e889a59d391` 的 67 項測試顯示 3 項 P0 失敗；但固定種子 10,000 個合法 16／17 張牌的**數值級** oracle cross-check 通過。此結果只對該 SHA 有效。
