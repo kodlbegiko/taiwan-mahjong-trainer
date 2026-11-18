@@ -70,3 +70,7 @@
 - `winningTiles` 仍有 `{tile,count}` 與 `{tile,copies}` 的 namespace/shape 衝突；整合呼叫端必須匯入明確別名或使用 adapter，不得誤認相容。
 
 [隔離 CI #44358617174](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44358617174) 針對 `4f673f97a137a886d6e0b14617a42e889a59d391` 的 67 項測試顯示 3 項 P0 失敗；但固定種子 10,000 個合法 16／17 張牌的**數值級** oracle cross-check 通過。此結果只對該 SHA 有效。
+
+### F.1 瀏覽器 API Consumer 實證（同樣不代表已發布）
+
+在隔離 staging SHA `808e245ec99ec7512a544ae6beac1ee77f4b40cb` 的 [Chromium #44359395885](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44359395885)，桌面/手機模擬均完成 V0.1 的 `generateHand → rankDiscards → gradeAnswer` 互動與 v1 localStorage 讀寫/重載。**此證據只驗證 UI 能運作舊 API，未證明排名數學正確、解說接線或 V0.2 storage schema 已整合**。同 SHA 的 [Verify #44359395424](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44359395424) 因 Q-001/Q-002/I-003 仍失敗。
