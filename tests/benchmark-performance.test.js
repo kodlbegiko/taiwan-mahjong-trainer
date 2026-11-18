@@ -21,7 +21,7 @@ test('shanten benchmark smoke: finite positive durations and deterministic check
 /** A real Node CLI smoke benchmark on the CI runner, not a latency gate. */
 test('benchmark CLI reports machine identity, invocation and p50/p95 via Node child process', t => {
   const command = fileURLToPath(new URL('../scripts/benchmark-suite.js', import.meta.url));
-  const result = spawnSync(process.execPath, [command, '--cases', '100', '--seed', '20261119'], {
+  const result = spawnSync(process.execPath, [command, '--cases', '500', '--seed', '20261119'], {
     encoding: 'utf8', timeout: 60_000, maxBuffer: 1024 * 1024,
   });
   assert.equal(result.error, undefined, result.error?.message);
@@ -29,7 +29,7 @@ test('benchmark CLI reports machine identity, invocation and p50/p95 via Node ch
   const report = JSON.parse(result.stdout);
   assert.equal(report.schema, 2);
   assert.equal(report.seed, 20261119);
-  assert.equal(report.requestedCases, 100);
+  assert.equal(report.requestedCases, 500);
   assert.equal(report.environment.node, process.version);
   assert.equal(report.environment.platform, process.platform);
   assert.equal(report.environment.arch, process.arch);
