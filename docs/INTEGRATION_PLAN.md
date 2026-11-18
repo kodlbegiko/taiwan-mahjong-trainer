@@ -73,3 +73,9 @@ GitHub API 查到 `main.protected=false`，Repository Rulesets API 回傳空陣�
 5. 以無害測試 PR 實際驗證 failing check 被拒絕合併、pass check 可合併；記錄 ruleset ID / 驗證證據，再關閉 Issue #13。
 
 上述是**待執行設定項**，不是已完成操作。
+
+### 獨立瀏覽器驗證（已執行，不替代 P0 gate）
+
+Staging `808e245ec99ec7512a544ae6beac1ee77f4b40cb` 的 [Chromium CI #44359395885](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44359395885) **success**：真實 headless Chromium 測桌面 1440px、手機模擬 390px、17 張點牌、方案/評分、下一題、方向鍵/Enter、舊 localStorage 保存/重載、手機牌按鈕尺寸與整頁水平溢出，四張 screenshot 上傳 artifact `v02-browser-smoke-images`。但相同 SHA 的 [Verify #44359395424](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44359395424) 仍因三項 P0 **failure**。
+
+沒有 iOS/Android 實機、PWA Service Worker 離線安裝或 v2 DecisionRecord UI 接線的驗收。**相同 commit 的瀏覽器 pass 與核心 fail 應並列展示，絕不能合成一個綠燈。**
