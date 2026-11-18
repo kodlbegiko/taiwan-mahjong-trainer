@@ -1,0 +1,15 @@
+{
+  "id": "../",
+  "name": "台麻練習所 · Taiwan Mahjong Trainer",
+  "short_name": "台麻練習所",
+  "description": "台灣十六張麻將何切與牌效率訓練",
+  "lang": "zh-Hant",
+  "start_url": "../",
+  "scope": "../",
+  "display": "standalone",
+  "background_color": "#102c2b",
+  "theme_color": "#102c2b",
+  "icons": [
+    { "src": "./icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
