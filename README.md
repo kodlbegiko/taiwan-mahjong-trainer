@@ -80,4 +80,6 @@ tests/                  Node 內建測試
 
 ## V0.2 整合狀態（開發中）
 
-整合文件 PR #6 與獨立測試 PR #2 已合併至 `main`，但**四個功能 PR（#1、#3、#4、#5）仍未合併**，本 README 可使用功能仍以 **v0.1** 為準。隔離 [PR #10](https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/10) 的 66 項整合測試有 3 項失敗（Q-001／Q-002／I-003），因此 V0.2 不可發布。整合者的 [API Contract](docs/API_CONTRACT.md)、[合併計畫](docs/INTEGRATION_PLAN.md) 與 [品質報告](docs/quality/V0.2_INTEGRATION_REPORT.md) 在文件 PR 中審查，**文件存在不代表功能發布**。核心正確性與統一進張計分是 V0.2 的阻擋門檻。
+整合文件 PR #6、獨立測試 PR #2 及品質報告 PR #11 已合併至 `main`，但**四個功能 PR（#1、#3、#4、#5）仍未合併**，本 README 可使用功能仍以 **v0.1** 為準。隔離 [PR #10](https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/10) 重新同步最新 main 並在 [CI #44358617174](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44358617174) 執行 67 項測試：61 通過、3 失敗、1 skipped、2 TODO；新增的固定種子 10,000 題數值級 Oracle 測試通過，但 Q-001／Q-002／I-003 均未修復。因此 V0.2 不可發布。整合者的 [API Contract](docs/API_CONTRACT.md)、[合併計畫](docs/INTEGRATION_PLAN.md) 與 [品質報告](docs/quality/V0.2_INTEGRATION_REPORT.md) 在文件 PR 中審查，**文件存在不代表功能發布**。核心正確性與統一進張計分是 V0.2 的阻擋門檻。
+
+> 2026-11-19 第二輪稽核：最新已核實正式版基線 SHA `53981149d5f632db8d8dbbf3bd11fbd0999d48e3`。隔離分支的測試不代表功能已在正式版提供；以 [正式品質報告](docs/quality/V0.2_INTEGRATION_REPORT.md) 最新稽核章節為準。
