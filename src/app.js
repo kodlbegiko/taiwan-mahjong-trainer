@@ -64,7 +64,7 @@ function tileMarkup(tile, index, { disabled = false, picked = false } = {}) {
   const label = TILE_LABELS[tile];
   const suit = tile < 9 ? '萬' : tile < 18 ? '筒' : tile < 27 ? '索' : '字';
   return `<button type="button" class="tile ${tileClass(tile)}${picked ? ' picked' : ''}"
-    data-tile="${tile}" aria-label="第 ${index + 1} 張：${label}${disabled ? '' : '；按下立即捨牌並查看結果'}"
+    data-tile="${tile}" data-index="${index}" aria-label="第 ${index + 1} 張：${label}${disabled ? '' : '；按下立即捨牌並查看結果'}"
     ${disabled ? 'disabled' : ''}${picked ? ' data-picked="true"' : ''}>
     <span aria-hidden="true">${tile < 27 ? label.slice(0, 1) : label}</span>
     <small aria-hidden="true">${suit}</small>
@@ -131,7 +131,7 @@ function drawList(draws) {
   return draws.map(draw => `${TILE_LABELS[draw.tile]} × ${draw.count}`).join('、');
 }
 
-function submitAnswer(tile) {
+function submitAnswer(tile, chosenIndex) {
   if (choice !== null || !ranking.length) return;
   let result;
   try {
@@ -157,7 +157,7 @@ function submitAnswer(tile) {
   saveStats();
   updateStats();
 
-  $('#hand').innerHTML = hand.map((value, i) => tileMarkup(value, i, { disabled: true, picked: value === tile })).join('');
+  $('#hand').innerHTML = hand.map((value, i) => tileMarkup(value, i, { disabled: true, picked: i === chosenIndex })).join('');
   const status = $('#exercise-status');
   status.textContent = result.title;
   status.className = `status ${result.grade}`;
@@ -198,7 +198,7 @@ function submitAnswer(tile) {
 // Delegated handlers keep selection stable when the hand is regenerated.
 $('#hand').addEventListener('click', event => {
   const button = event.target.closest('button[data-tile]');
-  if (button && !button.disabled) submitAnswer(Number(button.dataset.tile));
+  if (button && !button.disabled) submitAnswer(Number(button.dataset.tile), Number(button.dataset.index));
 });
 
 $('#hand').addEventListener('keydown', event => {

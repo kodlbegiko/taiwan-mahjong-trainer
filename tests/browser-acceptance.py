@@ -99,6 +99,7 @@ def verify_flow(page):
     assert page.locator('#draw-details').inner_text().strip()
     assert page.locator('.explanation-slot .soon').inner_text() == '未開放'
     assert page.locator('#stat-total').inner_text() == '1'
+    assert page.locator('.tile.picked').count() == 1, 'only the clicked physical tile is highlighted'
     # UI uses exactly the chosen candidate's rank values, not its own copied arithmetic.
     chosen_row = page.locator('#rankings tr.chosen')
     assert chosen_row.count() == 1
@@ -135,6 +136,19 @@ def main():
             restored.close()
             page.close()
             print(f'PASS {width}px: full hand, no page overflow, focus/keys, grading, next, mock storage restore; {metrics}')
+        # Deterministic duplicate-tile fixture with two equally best discards.
+        tie = boot(browser, 390)
+        tie.evaluate('''() => {
+          generateHand = () => [0,0,0,0,1,2,9,10,11,18,19,20,27,27,27,28,28];
+          drawNewHand();
+        }''')
+        tie.locator('#hand button[data-tile="9"]').click()
+        assert tie.locator('.tile.picked').count() == 1
+        assert tie.locator('.pill.green').count() == 2, 'two optimal candidates expected'
+        assert '1筒' in tie.locator('#best-tiles').inner_text()
+        assert '1索' in tie.locator('#best-tiles').inner_text()
+        tie.close()
+        print('PASS deterministic duplicate/tie: exactly one picked physical tile, two equal best options')
         key = 'tw-mahjong-trainer:session:v1'
         corrupt = boot(browser, 390, store={key:'{{broken-json'})
         assert corrupt.locator('#storage-status').is_visible()
