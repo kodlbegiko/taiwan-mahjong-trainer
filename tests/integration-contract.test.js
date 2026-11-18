@@ -43,7 +43,9 @@ test('P0 I-003: explanations and graded answers must agree on per-discard metric
 });
 
 test('v0.1 synchronous imports and result shape remain usable in integrated branch', () => {
-  const generated = generateHand('beginner', () => 0.42);
+  let seed = 2654435761;
+  const rng = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 0x100000000; };
+  const generated = generateHand('beginner', rng);
   assert.equal(generated.length, 17);
   const rank = rankDiscards(generated);
   assert.ok(rank.length > 0);
