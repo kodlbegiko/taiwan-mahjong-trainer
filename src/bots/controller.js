@@ -2,7 +2,7 @@
  * Rules-authoritative bot orchestration. The adapter holds GameState privately.
  * Bots receive only PlayerView, and submission returns are intentionally ignored.
  */
-import { readPlayerView } from '../strategy/view.js';
+import { readBotView } from './view.js';
 import { chooseBotAction, validateBotDecision } from './decision.js';
 
 const copy = value => JSON.parse(JSON.stringify(value));
@@ -14,20 +14,22 @@ const assertSeat = s => { if (!Number.isInteger(s) || s < 0 || s > 3) throw new 
  */
 export async function runBotTurn({ bot, playerView, submitAction }) {
   if (typeof submitAction !== 'function') throw new TypeError('submitAction callback required');
-  const { view } = readPlayerView(playerView);
+  const { view } = readBotView(playerView);
+  const startMs = typeof performance !== 'undefined' ? performance.now() : Date.now();
   const decision = chooseBotAction(bot, view);
+  const decisionMs = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - startMs;
   validateBotDecision(bot, view, decision);
-  if (decision.status !== 'ready') return { status: decision.status, decision };
+  if (decision.status !== 'ready') return { status: decision.status, decision, decisionMs };
   try {
     await submitAction({
       actorSeat: decision.actorSeat,
       actionId: decision.actionId,
       expectedRevision: decision.expectedRevision,
     });
-    return { status: 'acted', decision };
+    return { status: 'acted', decision, decisionMs };
   } catch {
     // Fail closed; no fallback, no retry using the same revision.
-    return { status: 'submission-rejected', decision };
+    return { status: 'submission-rejected', decision, decisionMs };
   }
 }
 
@@ -38,10 +40,12 @@ export async function runBotTurn({ bot, playerView, submitAction }) {
  */
 export function createBotController({
   bots, humanSeat = 0, getActingSeat, getPlayerView, submitAction,
-  checkpoint = null,
+  checkpoint = null, maxRevision = 2048,
   yieldControl = () => new Promise(resolve => setTimeout(resolve, 0)),
 } = {}) {
   assertSeat(humanSeat);
+  if (!Number.isInteger(maxRevision) || maxRevision < 1 || maxRevision > 100000)
+    throw new RangeError('maxRevision must be 1..100000');
   if (!Array.isArray(bots) || bots.length !== 3 ||
       bots.some(bot => !bot || bot.seat === humanSeat ||
         !Number.isInteger(bot.seat) || bot.seat < 0 || bot.seat > 3) ||
@@ -57,7 +61,7 @@ export function createBotController({
   let paused = checkpoint?.paused ?? false, busy = false, lastAttempt = null;
   const decisions = [];
   async function readSeat(seat) {
-    const { view } = readPlayerView(await getPlayerView(seat));
+    const { view } = readBotView(await getPlayerView(seat));
     if (view.audienceSeat !== seat) throw new RangeError('Authoritative view seat mismatch');
     return view;
   }
@@ -73,27 +77,69 @@ export function createBotController({
     if (decisions.length > 512) decisions.shift();
   }
 
+  /**
+   * R3 publishes outstanding responders as separate seat-specific LegalActions.
+   * Search PlayerViews, never GameState.extensions.tw16.window.decisions.
+   * Ordered inspection is only scheduling; Rules adjudicates all priorities.
+   */
+  async function selectActor() {
+    const preferred = await getActingSeat();
+    if (preferred === null || preferred === undefined)
+      return {status:'no-scheduled-actor'};
+    assertSeat(preferred);
+    const initial = await readSeat(preferred);
+    if (initial.round.phase === 'settled') return {status:'settled'};
+    if (initial.asOfEventSeq > maxRevision)
+      return {status:'unsupported',reason:'max-event-budget-exceeded'};
+    if (initial.round.phase !== 'claim_window') {
+      if (!initial.legalActions.length)
+        return {status:'unsupported',reason:'no-Rules-LegalAction-for-phase',
+          phase:initial.round.phase};
+      return {seat:preferred,view:initial};
+    }
+    if (initial.ruleRef.profileId !== 'tw16-configurable-table' ||
+        initial.ruleRef.ruleVersion !== 'experimental-full-v1')
+      return {status:'claim-adjudication-unavailable'};
+    for (let i = 0; i < 4; i++) {
+      const seat = (preferred+i)%4;
+      const v = seat===preferred ? initial : await readSeat(seat);
+      if (v.gameId !== initial.gameId ||
+          v.asOfEventSeq !== initial.asOfEventSeq ||
+          v.round.phase !== 'claim_window' ||
+          v.ruleRef.profileId !== initial.ruleRef.profileId ||
+          v.ruleRef.ruleVersion !== initial.ruleRef.ruleVersion)
+        return {status:'unsupported',reason:'inconsistent-Rules-revision-in-claim-window'};
+      if (v.legalActions.length) {
+        if (!v.legalActions.some(a=>a.kind==='pass'))
+          return {status:'unsupported',reason:'claim-response-without-pass'};
+        return {seat,view:v};
+      }
+    }
+    return {status:'unsupported',reason:'claim-window-deadlock-no-responders'};
+  }
+
   async function tick() {
-    if (busy) return { status: 'busy' };
-    if (paused) return { status: 'paused' };
+    if (busy) return {status:'busy'};
+    if (paused) return {status:'paused'};
     busy = true;
     try {
-      const seat = await getActingSeat();
-      if (seat === null || seat === undefined) return { status: 'no-scheduled-actor' };
-      assertSeat(seat);
-      if (seat === humanSeat) return { status: 'human-turn', seat };
-      const view = await readSeat(seat);
-      // Pending claim collisions require a dedicated Rules arbitration API.
-      if (view.round.phase === 'claim_window') return { status: 'claim-adjudication-unavailable' };
-      if (lastAttempt && lastAttempt.seat === seat &&
-          lastAttempt.gameId === view.gameId && lastAttempt.revision === view.asOfEventSeq)
-        return { status: 'duplicate-revision-blocked', seat };
-      lastAttempt = { seat, revision: view.asOfEventSeq, gameId: view.gameId };
-      const result = await runBotTurn({ bot: bySeat.get(seat), playerView: view, submitAction });
+      const scheduled = await selectActor();
+      if (scheduled.status) return scheduled;
+      const {seat,view} = scheduled;
+      if (seat === humanSeat) return {status:'human-turn',seat};
+      if (lastAttempt && lastAttempt.seat===seat &&
+          lastAttempt.gameId===view.gameId &&
+          lastAttempt.revision===view.asOfEventSeq)
+        return {status:'duplicate-revision-blocked',seat};
+      lastAttempt={seat,revision:view.asOfEventSeq,gameId:view.gameId};
+      const result=await runBotTurn({
+        bot:bySeat.get(seat),playerView:view,submitAction,
+      });
       record(result.decision);
-      return { status: result.status, seat, decision: result.decision };
+      return {status:result.status,seat,decision:result.decision,
+        decisionMs:result.decisionMs};
     } finally {
-      busy = false;
+      busy=false;
     }
   }
   async function runUntilHuman({ maxActions = 32 } = {}) {
@@ -109,20 +155,35 @@ export function createBotController({
     }
     return { status: 'action-budget-reached', actions };
   }
-  async function submitHumanAction({ actionId, expectedRevision }) {
-    if (paused || busy) return { status: paused ? 'paused' : 'busy' };
-    const seat = await getActingSeat();
-    if (seat !== humanSeat) return { status: 'not-human-turn' };
-    const view = await readSeat(humanSeat);
-    if (view.round.phase === 'claim_window') return { status: 'claim-adjudication-unavailable' };
-    const found = view.legalActions.find(a => a.actionId === actionId &&
-      a.expectedRevision === expectedRevision && a.actorSeat === humanSeat);
-    if (!found) return { status: 'illegal-or-stale-action' };
+  async function submitHumanAction({actionId,expectedRevision}) {
+    if (paused || busy) return {status:paused?'paused':'busy'};
+    // In R3 claim windows, any pending responder may submit in any order.
+    // In normal phases, only Rules.currentSeat is the authorized actor.
+    const preferred=await getActingSeat();
+    if (preferred===null || preferred===undefined) return {status:'no-scheduled-actor'};
+    assertSeat(preferred);
+    const primary=await readSeat(preferred);
+    if (primary.round.phase==='settled') return {status:'settled'};
+    if (primary.asOfEventSeq>maxRevision)
+      return {status:'unsupported',reason:'max-event-budget-exceeded'};
+    const isClaim=primary.round.phase==='claim_window' &&
+      primary.ruleRef.profileId==='tw16-configurable-table' &&
+      primary.ruleRef.ruleVersion==='experimental-full-v1';
+    if (primary.round.phase==='claim_window' && !isClaim)
+      return {status:'claim-adjudication-unavailable'};
+    if (!isClaim && preferred!==humanSeat) return {status:'not-human-turn'};
+    const view=preferred===humanSeat?primary:await readSeat(humanSeat);
+    if (view.gameId!==primary.gameId || view.asOfEventSeq!==primary.asOfEventSeq ||
+        view.round.phase!==primary.round.phase)
+      return {status:'unsupported',reason:'inconsistent-human-revision'};
+    const found=view.legalActions.find(a=>a.actionId===actionId &&
+      a.expectedRevision===expectedRevision && a.actorSeat===humanSeat);
+    if (!found) return {status:'illegal-or-stale-action'};
     try {
-      await submitAction({ actorSeat: humanSeat, actionId, expectedRevision });
-      return { status: 'acted' };
+      await submitAction({actorSeat:humanSeat,actionId,expectedRevision});
+      return {status:'acted'};
     } catch {
-      return { status: 'submission-rejected' };
+      return {status:'submission-rejected'};
     }
   }
   return Object.freeze({
