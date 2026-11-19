@@ -37,7 +37,7 @@ function dueList(data, compact=false) {
   if (!items.length) return empty('目前沒有已到期的 V0.2 複習題；新紀錄才會產生複習排程。');
   return '<div class="academy-stack">'+items.slice(0,compact?3:12).map(item=>'<article class="academy-queue-row"><div><strong>'
     +safe(TASK_NAMES[item.taskType]??'無法辨識的題型')+'</strong><small>到期 '+safe(fmt(item.dueAt))+' · SM-2-inspired（未校準）</small></div>'
-    +(item.available && TASK_NAMES[item.taskType] ? actionButton('重做原題','review','data-id="'+encodeURIComponent(item.exerciseId)+'" data-mode="'+safe(item.taskType)+'"','secondary') : '<span class="academy-muted">題目快照不可用</span>')+'</article>').join('')+'</div>'
+    +(item.available && TASK_NAMES[item.taskType] ? actionButton('重做原題','review','data-id="'+encodeURIComponent(item.exerciseId)+'" data-task="'+safe(item.taskType)+'"','secondary') : '<span class="academy-muted">題目快照不可用</span>')+'</article>').join('')+'</div>'
     +(items.length>(compact?3:12)?'<p class="academy-muted">另有 '+(items.length-(compact?3:12))+' 題到期。</p>':'');
 }
 function todayView(data) {
@@ -54,7 +54,7 @@ function todayView(data) {
     +metric(data.stats.attempts?percent(data.stats.perfectRate):'—','完整答對率','歷史已作答題型')
     +'</div><div class="academy-feature-grid"><article class="academy-hero-card"><span class="academy-tag">TODAY’S PICK · '+safe(rec.kind==='review'?'已到期複習':'可用正式訓練')+'</span>'
     +'<h2>'+safe(TASK_NAMES[rec.taskType])+'</h2><p>'+safe(rec.reason)+'</p>'
-    +actionButton(rec.kind==='review'?'重新挑戰原題':'開始今日訓練','launch','data-mode="'+safe(rec.taskType)+'"'+(rec.exerciseId?' data-id="'+encodeURIComponent(rec.exerciseId)+'"':''))
+    +actionButton(rec.kind==='review'?'重新挑戰原題':'開始今日訓練','launch','data-task="'+safe(rec.taskType)+'"'+(rec.exerciseId?' data-id="'+encodeURIComponent(rec.exerciseId)+'"':''))
     +'</article><article class="academy-info-card"><span class="academy-tag">RECENT EVIDENCE</span><h2>近期表現</h2>'
     +(data.trend?'<p>最近 5 題平均得分 '+percent(data.trend.currentMean)+'；前 5 題 '+percent(data.trend.previousMean)+'。</p><small>僅為各種題型混合樣本的描述統計，不代表能力提升或顯著差異。</small>'
     :'<p>目前可比較的完整 v3 題數不足 10 題，暫不產生進步曲線。</p>')
@@ -68,7 +68,7 @@ function trainingView() {
   return title('牌效率學院','V0.2 / CANONICAL TRAINING',
     '下方沿用原本三題型、正式評分、可解說的歷史紀錄及匯出機制。請從訓練模式選題。')
     +'<div class="academy-course-grid">'+ACADEMY_LESSONS.map((l,i)=>'<article class="academy-course-card"><span class="academy-tag">0'+(i+1)+' · '+safe(l.level)+'</span><h2>'+safe(TASK_NAMES[l.mode])+'</h2><p>'+safe(l.objectives[0])+'</p>'
-      +actionButton('進入'+TASK_NAMES[l.mode],'launch','data-mode="'+safe(l.mode)+'"','secondary')+'</article>').join('')+'</div>';
+      +actionButton('進入'+TASK_NAMES[l.mode],'launch','data-task="'+safe(l.mode)+'"','secondary')+'</article>').join('')+'</div>';
 }
 function lessonsView() {
   const current = ACADEMY_LESSONS.find(x=>x.id===lessonId)??ACADEMY_LESSONS[0];
@@ -78,7 +78,7 @@ function lessonsView() {
     +'<h3>學習目標</h3><ul>'+current.objectives.map(x=>'<li>'+safe(x)+'</li>').join('')+'</ul><h3>教學重點</h3>'
     +current.content.map(x=>'<p>'+safe(x)+'</p>').join('')
     +'<p class="academy-caption">證據來源：現有 V0.2 canonical Exercise v3 / efficiency-v2；不延伸到未驗證的完整四人台麻桌規。</p>'
-    +actionButton('開始正式題型練習','launch','data-mode="'+safe(current.mode)+'"')+'</article></div>';
+    +actionButton('開始正式題型練習','launch','data-task="'+safe(current.mode)+'"')+'</article></div>';
 }
 function strategyView() {
   const fixture = projectScenarioForUI(getScenarioLayoutFixture());
@@ -153,8 +153,8 @@ root?.addEventListener('click',event=>{
   if(!button) return;
   if(button.dataset.action==='page') show(button.dataset.page);
   if(button.dataset.action==='lesson') {lessonId=button.dataset.id;show('lessons',false);}
-  if(button.dataset.action==='launch') launch(button.dataset.mode,button.dataset.id?decodeURIComponent(button.dataset.id):null);
-  if(button.dataset.action==='review') launch(button.dataset.mode,decodeURIComponent(button.dataset.id));
+  if(button.dataset.action==='launch') launch(button.dataset.task,button.dataset.id?decodeURIComponent(button.dataset.id):null);
+  if(button.dataset.action==='review') launch(button.dataset.task,decodeURIComponent(button.dataset.id));
 });
 window.addEventListener('academy:legacy-changed',()=>render());
 window.addEventListener('storage',event=>{

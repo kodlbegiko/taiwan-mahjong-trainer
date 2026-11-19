@@ -23,7 +23,7 @@ def run(output):
             require(not page.locator('#practice').is_visible(),'old app overlaps Today')
             require(page.evaluate('document.body.scrollWidth <= innerWidth+1'),'390px overflow')
             page.screenshot(path=str(output/'academy-390-today.png'),full_page=True)
-            page.locator('[data-action="launch"][data-mode="discard"]').first.click()
+            page.locator('[data-action="launch"][data-task="discard"]').first.click()
             require(page.locator('#hand button[data-tile]').count()==17,'canonical hand unavailable')
             require(page.locator('#hand .tile-face-image').count()==17,'SVG tile assets missing')
             page.locator('#hand button[data-tile]').first.click()
