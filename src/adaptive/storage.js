@@ -9,6 +9,7 @@ import { validateScoredRecord, makeRecordRef, normalizeRecordEntries } from './r
 import { buildAbilityProfile } from './ability.js';
 import { buildReviewPlan } from './review.js';
 import { validateAbilityProfile, validateReviewPlan, validateTrainingSession } from './validate.js';
+import { createLearningProvenance, validateProvenanceLinks, validateLearningProvenance } from './provenance.js';
 
 export const ACADEMY_STORAGE_KEY = 'tw-mahjong-master-academy:state:v1';
 export const ACADEMY_STATE_FORMAT = 'taiwan-mahjong-master-academy-sidecar';
@@ -26,7 +27,7 @@ export class AcademyStorageError extends Error {
 export function emptyAcademyState() {
   return {
     ...V1, format: ACADEMY_STATE_FORMAT, revision: 0,
-    academyRecords: [], academyQuestions: [], abilityProfile: null, reviewPlan: null, trainingSessions: [],
+    academyRecords: [], academyQuestions: [], provenanceLinks: [], abilityProfile: null, reviewPlan: null, trainingSessions: [],
   };
 }
 export function validateAcademyState(state, { validateAcademyDecisionRecord } = {}) {
@@ -39,6 +40,8 @@ export function validateAcademyState(state, { validateAcademyDecisionRecord } = 
     state.trainingSessions.length > MAX_SESSIONS) {
     throw new RangeError('Invalid Academy collection sizes');
   }
+  if (state.provenanceLinks !== undefined && (!Array.isArray(state.provenanceLinks) ||
+    state.provenanceLinks.length > MAX_RECORDS)) throw new RangeError('Invalid provenance collection');
   const questions = new Map();
   for (const question of state.academyQuestions) {
     requireV1(question, 'AcademyQuestion snapshot');
@@ -93,7 +96,7 @@ export function migrateAcademyState(input, { migrations = {}, validateAcademyDec
  */
 export function createAcademyStore(storage, {
   key = ACADEMY_STORAGE_KEY, validateAcademyDecisionRecord,
-  registry, validateAcademyQuestion, profileId = 'local-academy-profile', timezone = 'Asia/Taipei',
+  registry, validateAcademyQuestion, learning, profileId = 'local-academy-profile', timezone = 'Asia/Taipei',
   migrations = {},
 } = {}) {
   if (key === ARCHIVE_STORAGE_KEY || key === LEGACY_SESSION_KEY ||
@@ -120,7 +123,15 @@ export function createAcademyStore(storage, {
     let parsed;
     try { parsed = JSON.parse(bytes); }
     catch (cause) { throw new AcademyStorageError('CORRUPT_JSON', 'Academy JSON is corrupt; original bytes kept', cause); }
-    return migrateAcademyState(parsed, { migrations, validateAcademyDecisionRecord });
+    const state = migrateAcademyState(parsed, { migrations, validateAcademyDecisionRecord });
+    validatePersistedProvenance(state);
+    return state;
+  }
+  function validatePersistedProvenance(state) {
+    if (!(state.provenanceLinks?.length)) return true;
+    const { archive, hasCanonicalV3 } = readLegacy();
+    if (!hasCanonicalV3) throw new AcademyStorageError('ORPHAN_PROVENANCE', 'Missing canonical archive:v3');
+    return validateProvenanceLinks(state.provenanceLinks, archive.records.filter(r => r.schemaVersion === 3));
   }
   function loadStatus() {
     try { return { ok: true, durable: present, state: load() }; }
@@ -129,6 +140,7 @@ export function createAcademyStore(storage, {
   function save(state) {
     const next = cloneJson(state);
     validateAcademyState(next, { validateAcademyDecisionRecord });
+    validatePersistedProvenance(next);
     const bytes = JSON.stringify(next);
     if (bytes.length > MAX_BYTES) throw new AcademyStorageError('OVERSIZE', 'Academy state too large');
     if (!present) {
@@ -168,13 +180,23 @@ export function createAcademyStore(storage, {
   function derive(state, asOf, assessmentRefs = [], questionCatalog = [], reservedQuestionRefs = []) {
     const legacy = readLegacy();
     const records = verifiedEntries(state, legacy);
+    const provenanceLinks = state.provenanceLinks ?? [];
+    const verifiedLinks = [];
+    for (const link of provenanceLinks) {
+      if (!learning) continue;
+      try {
+        const record = legacy.archive.records.find(r => r.id === link.recordRef.id);
+        validateLearningProvenance(link, record, learning);
+        verifiedLinks.push(link);
+      } catch { /* unavailable/moved Learning versions cannot count as verified curriculum evidence */ }
+    }
     const profile = buildAbilityProfile({
       records, registry, asOf, profileId, legacySessions: legacy.archive.legacySessions,
-      assessmentRefs, validateAcademyDecisionRecord,
+      assessmentRefs, validateAcademyDecisionRecord, provenanceLinks: verifiedLinks,
     });
     const reviewPlan = buildReviewPlan({
       profile, records, asOf, timezone, questionCatalog, reservedQuestionRefs,
-      validateAcademyDecisionRecord, validateAcademyQuestion,
+      provenanceLinks, learning, validateAcademyDecisionRecord, validateAcademyQuestion,
     });
     return { profile, reviewPlan, records };
   }
@@ -237,6 +259,55 @@ export function createAcademyStore(storage, {
         errorCode: error.code ?? 'DERIVE_FAILED', message: error.message };
     }
   }
+  /**
+   * Canonical v3 bytes must already be durable. Commit validated provenance to
+   * the independent sidecar BEFORE rebuilding any derived abilities/review.
+   * The raw record always survives a sidecar quota exception or crash.
+   */
+  function persistLearningProvenance({ recordRef, record, academyQuestionRef, sessionId },
+    { asOf, assessmentRefs = [], questionCatalog = [], reservedQuestionRefs = [] } = {}) {
+    requireUtc(asOf);
+    const legacy = readLegacy();
+    const stored = legacy.archive.records.find(r => r.schemaVersion === 3 && r.id === recordRef?.id);
+    if (!legacy.hasCanonicalV3 || !stored || canonicalJson(stored) !== canonicalJson(record)) {
+      throw new AcademyStorageError('LEGACY_NOT_DURABLE', 'Canonical v3 answer must be persisted and read back first');
+    }
+    const link = createLearningProvenance({ record: stored, recordRef, academyQuestionRef, learning, sessionId });
+    let state = load();
+    const links = state.provenanceLinks ?? [];
+    const previous = links.find(p => p.recordRef.kind === recordRef.kind && p.recordRef.id === recordRef.id);
+    if (previous && canonicalJson(previous) !== canonicalJson(link)) {
+      throw new RangeError('Conflicting immutable provenance RecordRef');
+    }
+    if (!previous) {
+      const first = save({ ...state, revision: state.revision + 1,
+        provenanceLinks: [...links, link].sort((a,b)=>a.recordRef.id.localeCompare(b.recordRef.id)) });
+      if (!first.durable) return { recordRef, durable: false, provenanceDurable: false,
+        derivedFresh: false, errorCode: 'STORAGE_UNAVAILABLE' };
+      state = first.state;
+    }
+    try {
+      const { profile, reviewPlan } = derive(state, asOf, assessmentRefs, questionCatalog, reservedQuestionRefs);
+      const next = save({ ...state, revision: state.revision + 1,
+        abilityProfile: profile, reviewPlan });
+      if (!next.durable) return { recordRef, durable: false,
+        provenanceDurable: false, derivedFresh: false, errorCode: 'STORAGE_UNAVAILABLE' };
+      return { recordRef, durable: true, provenanceDurable: true,
+        derivedFresh: true, state: next.state };
+    } catch (error) {
+      return { recordRef, durable: true, provenanceDurable: true,
+        derivedFresh: false, errorCode: error.code ?? 'DERIVE_FAILED', message: error.message };
+    }
+  }
+  function getProvenance(recordRef) {
+    const state = load();
+    return state.provenanceLinks?.find(p => p.recordRef.kind === recordRef?.kind &&
+      p.recordRef.id === recordRef?.id) ?? null;
+  }
+  function getSession(sessionId) {
+    requireId(sessionId, 'sessionId');
+    return load().trainingSessions.find(s => s.sessionId === sessionId) ?? null;
+  }
   function saveSession(session) {
     validateTrainingSession(session);
     const state = load();
@@ -267,7 +338,8 @@ export function createAcademyStore(storage, {
     return save({ ...state, revision: state.revision + 1,
       trainingSessions: [...sessions, cloneJson(session)].sort((a,b) => a.sessionId.localeCompare(b.sessionId)) });
   }
-  return { load, loadStatus, saveSession, persistScoredRecord, rebuild,
+  return { load, loadStatus, saveSession, getSession, getProvenance,
+    persistScoredRecord, persistLearningProvenance, rebuild,
     readLegacy, exportJSON: () => JSON.stringify(load()),
     importJSON: json => save(migrateAcademyState(JSON.parse(json), { migrations, validateAcademyDecisionRecord })),
   };
