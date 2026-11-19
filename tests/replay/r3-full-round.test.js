@@ -167,7 +167,9 @@ test('R3 discard-win settlement remains experimental; all source mutation and un
   const win=api.getPlayerDecision(manifest.replayId,
     s.events.find(e=>e.type==='claim'&&e.visibility==='seat-private').seq);
   assert.equal(win.kind,'win');
-  assert.equal(win.endEventSeq,s.revision-1,'last response resolves win and settle');
+  assert.equal(win.endEventSeq,win.eventSeq,'the win declaration is a single private event');
+  assert.equal(s.events.at(-1).causedByActionId,s.events.at(-2).causedByActionId,
+    'last response owns the atomic win-and-settle group');
   const archived=createReplayArchive(s,{ownerSeat:1,disclosurePolicy:'settled-public-only'});
   const forged=clone(archived);
   forged.events[1].turnEvent.payload.tileId='t:9:0';
