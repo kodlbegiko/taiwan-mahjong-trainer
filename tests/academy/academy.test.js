@@ -141,3 +141,22 @@ test('manifest exactly matches the 100 immutable metadata specifications',()=>{
  assert.deepEqual(data.questions,BANK_SPEC.map(x=>({...x})));
  assert.equal(new Set(data.questions.map(x=>x.seed)).size,100);
 });
+
+test('non-perfect answers use canonical partial-credit rules and explain wrong alternatives',()=>{
+ let nonPerfect=0;
+ for(const s of BANK_SPEC.slice(0,15)){
+   const q=getFullQuestion(s.questionId);
+   const ex=getCanonicalExercise(s.questionId);
+   const choice=q.taskType==='discard'?ex.answer.ranking.at(-1).tile:[];
+   const record=createDecisionRecord(ex,choice,{timestamp:'2026-11-19T01:00:00.000Z',durationMs:10});
+   const result=gradeAcademyQuestion(ref(s.questionId),choice);
+   assert.equal(result.grade,record.grade);
+   assert.equal(result.score,record.score);
+   assert.deepEqual(result.errorTypeIds,record.errorTypes);
+   if(result.grade!=='perfect')nonPerfect++;
+   if(q.taskType!=='discard'){
+     assert.ok(result.explanation.alternatives.some(x=>x.reason.includes('仍不能完成')));
+   }
+ }
+ assert.ok(nonPerfect>=10,'Need actually exercise non-perfect canonical grading paths');
+});
