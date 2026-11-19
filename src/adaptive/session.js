@@ -4,7 +4,8 @@ import {
   V1, SESSION_ALGORITHM_VERSION, requireV1, requireUtc, requireId,
   requireObject, stableId, canonicalJson, localDayKey, uniqueRefs, validateRegistry,
 } from './core.js';
-import { normalizeRecordEntries } from './records.js';
+import { normalizeRecordEntries, makeRecordRef } from './records.js';
+import { validateLearningProvenance } from './provenance.js';
 
 const MINUTES = [10, 20, 30, 60];
 const SECTIONS = ['weakness-review', 'focused-practice', 'mixed-practice', 'mistake-recap'];
@@ -16,7 +17,7 @@ const clone = value => JSON.parse(JSON.stringify(value));
  * independently injected question validator, never a naked 'available' flag.
  */
 export function buildAnswerableCatalog({
-  records = [], questionCatalog = [], reservedQuestionRefs = [], registry,
+  records = [], questionCatalog = [], reservedQuestionRefs = [], provenanceLinks = [], learning, registry,
   validateAcademyDecisionRecord, validateAcademyQuestion,
 } = {}) {
   const normalized = normalizeRecordEntries(records, { validateAcademyDecisionRecord });
@@ -27,11 +28,28 @@ export function buildAnswerableCatalog({
     requireId(ref.questionId); requireId(ref.questionVersion);
     return ref.questionId + '@' + ref.questionVersion;
   }));
+  if (!Array.isArray(provenanceLinks)) throw new TypeError('provenanceLinks must be an array');
+  const links = new Map(provenanceLinks.map(link => [link.recordRef.kind + ':' + link.recordRef.id, link]));
+  if (links.size !== provenanceLinks.length) throw new RangeError('Duplicate learning provenance');
   const candidates = [];
   for (const entry of normalized) {
     if (entry.kind !== 'legacy-v3') continue;
     const exercise = entry.record.exerciseSnapshot;
     try { replayExercise(exercise); } catch { continue; }
+    const link = links.get('legacy-v3:' + entry.record.id);
+    if (link) {
+      if (!learning) continue;
+      try { validateLearningProvenance(link, entry.record, learning); } catch { continue; }
+      candidates.push({
+        questionId: link.academyQuestionRef.questionId,
+        questionVersion: link.academyQuestionRef.questionVersion,
+        taskType: exercise.taskType, ruleRef: link.ruleRef,
+        seed: link.seed, generatorVersion: link.generatorVersion,
+        source: 'academy-linked-v3', available: true, estimatedMinutes: 3,
+        questionSnapshot: link.publicQuestion, skillTagIds: link.skillTagIds,
+      });
+      continue;
+    }
     candidates.push({
       questionId: exercise.id, questionVersion: LEGACY_QUESTION_VERSION,
       taskType: exercise.taskType, ruleRef: {
@@ -54,6 +72,20 @@ export function buildAnswerableCatalog({
           item.generatorVersion !== item.questionSnapshot.generatorVersion ||
           item.ruleRef?.ruleVersion !== item.questionSnapshot.ruleVersion) continue;
       } catch { continue; }
+    } else if (item.source === 'academy-linked-v3') {
+      // Public Question alone is insufficient: require a persisted, verified
+      // canonical answer provenance mapping before scheduling Academy review.
+      const linksForQuestion = provenanceLinks.filter(link =>
+        link.academyQuestionRef.questionId === item.questionId &&
+        link.academyQuestionRef.questionVersion === item.questionVersion);
+      if (!learning || !linksForQuestion.length) continue;
+      const matched = normalized.find(entry => entry.kind === 'legacy-v3' &&
+        linksForQuestion.some(link => link.recordRef.id === entry.record.id));
+      if (!matched) continue;
+      try { validateLearningProvenance(linksForQuestion[0], matched.record, learning); }
+      catch { continue; }
+      if (!canonicalJson(item.questionSnapshot) ||
+        canonicalJson(item.questionSnapshot) !== canonicalJson(linksForQuestion[0].publicQuestion)) continue;
     } else if (item.source === 'academy-v1') {
       const question = item.questionSnapshot;
       if (!question || question.status !== 'validated' ||
@@ -76,7 +108,7 @@ export function buildAnswerableCatalog({
     const key = candidate.questionId + '@' + candidate.questionVersion;
     // Unseen variants inherit only validated AcademyQuestion tags or explicitly
     // registry-mapped legacy task tags; never infer concepts from hand patterns.
-    const tagIds = candidate.source === 'academy-v1'
+    const tagIds = ['academy-v1', 'academy-linked-v3'].includes(candidate.source)
       ? candidate.questionSnapshot.skillTagIds
       : (registry?.legacyMappings?.taskTypes?.[candidate.taskType] ?? []);
     if (!Array.isArray(tagIds) || tagIds.some(tag => typeof tag !== 'string' ||
@@ -106,7 +138,7 @@ export function buildAnswerableCatalog({
 /** Select only verified, replayable source questions; no simulated Bot or placeholder scenario. */
 export function planDailyTraining({
   profile, reviewPlan, records = [], questionCatalog = [], reservedQuestionRefs = [],
-  registry, validateAcademyDecisionRecord, validateAcademyQuestion,
+  provenanceLinks = [], learning, registry, validateAcademyDecisionRecord, validateAcademyQuestion,
   minutes = 30, seed, asOf, ruleRef,
 } = {}) {
   requireV1(profile, 'AbilityProfile');
@@ -116,7 +148,7 @@ export function planDailyTraining({
   requireId(String(seed ?? ''), 'seed');
   const generatedAsOf = requireUtc(asOf);
   const catalog = buildAnswerableCatalog({
-    records, questionCatalog, reservedQuestionRefs, registry,
+    records, questionCatalog, reservedQuestionRefs, provenanceLinks, learning, registry,
     validateAcademyDecisionRecord, validateAcademyQuestion,
   });
   if (ruleRef !== undefined) {

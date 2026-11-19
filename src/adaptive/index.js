@@ -18,3 +18,7 @@ export {
 } from './storage.js';
 
 export { validateAbilityProfile, validateReviewPlan, validateTrainingSession } from './validate.js';
+
+export { PROVENANCE_VERSION, createLearningProvenance, validateProvenanceShape,
+  validateLearningProvenance, validateProvenanceLinks } from './provenance.js';
+export { createAdaptiveLearningAdapter } from './learning-adapter.js';

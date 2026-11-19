@@ -6,11 +6,14 @@ import { normalizeRecordEntries, makeRecordRef } from './records.js';
 
 const MIN_ESTIMATE_ATTEMPTS = 5;
 
-function mappedTags(entry, registry, registryById) {
+function mappedTags(entry, registry, registryById, links) {
   let ids = [];
   if (entry.kind === 'academy-v1') {
     // The semantic scoring validator has already checked the Academy record.
     ids = entry.record.skillTagIds;
+  } else if (links.has(recordKey(makeRecordRef(entry.kind, entry.record)))) {
+    // These tags were verified against the authoritative AI3 question and lesson.
+    ids = links.get(recordKey(makeRecordRef(entry.kind, entry.record))).skillTagIds;
   } else {
     // Only explicit, Learning Academy-approved mappings. Never guess from error strings.
     const mapping = registry.legacyMappings;
@@ -38,7 +41,7 @@ function mappedTags(entry, registry, registryById) {
  */
 export function buildAbilityProfile({
   records = [], registry, asOf, profileId = 'local-academy-profile',
-  legacySessions = [], assessmentRefs = [], validateAcademyDecisionRecord,
+  legacySessions = [], assessmentRefs = [], provenanceLinks = [], validateAcademyDecisionRecord,
 } = {}) {
   requireId(profileId, 'profileId');
   const updatedAt = requireUtc(asOf);
@@ -53,6 +56,15 @@ export function buildAbilityProfile({
   const normalized = normalizeRecordEntries(records, { validateAcademyDecisionRecord });
   if (normalized.some(x => Date.parse(x.record.timestamp) > Date.parse(updatedAt))) {
     throw new RangeError('Future record cannot be used in an asOf ability snapshot');
+  }
+  if (!Array.isArray(provenanceLinks)) throw new TypeError('provenanceLinks must be verified entries');
+  const valid = new Set(normalized.map(x => recordKey(makeRecordRef(x.kind, x.record))));
+  const links = new Map();
+  for (const link of provenanceLinks) {
+    const key = recordKey(link.recordRef);
+    if (!valid.has(key) || links.has(key) || link.recordRef.kind !== 'legacy-v3')
+      throw new RangeError('Invalid or duplicate verified provenance evidence');
+    links.set(key, link);
   }
   const assessment = new Set();
   for (const ref of assessmentRefs) {
@@ -69,13 +81,15 @@ export function buildAbilityProfile({
   const seenPracticeQuestions = new Set(), seenAssessmentQuestions = new Set();
   for (const entry of normalized) {
     const ref = makeRecordRef(entry.kind, entry.record);
-    const questionKey = entry.kind === 'academy-v1'
+    const linked = links.get(recordKey(ref));
+    const questionKey = linked ? linked.academyQuestionRef.questionId + '@' +
+      linked.academyQuestionRef.questionVersion : entry.kind === 'academy-v1'
       ? entry.record.questionRef.questionId + '@' + entry.record.questionRef.questionVersion
       : entry.record.exerciseId + '@legacy-exercise-v3';
     const isAssessment = assessment.has(recordKey(ref));
     const trulyUnseen = isAssessment && !seenPracticeQuestions.has(questionKey) &&
       !seenAssessmentQuestions.has(questionKey);
-    const tags = mappedTags(entry, registry, byTag);
+    const tags = mappedTags(entry, registry, byTag, links);
     for (const tagId of tags) {
       const bucket = buckets.get(tagId);
       bucket.attempts++;
@@ -83,7 +97,8 @@ export function buildAbilityProfile({
       if (entry.record.score === 1) bucket.correct++;
       bucket.totalDuration += entry.record.durationMs;
       bucket.evidenceRefs.push(ref);
-      const questionId = entry.kind === 'academy-v1' ? entry.record.questionRef.questionId : entry.record.exerciseId;
+      const questionId = linked ? linked.academyQuestionRef.questionId :
+        entry.kind === 'academy-v1' ? entry.record.questionRef.questionId : entry.record.exerciseId;
       bucket.questionIds.add(questionId);
       if (isAssessment) {
         bucket.assessmentAttempts++;
@@ -116,7 +131,7 @@ export function buildAbilityProfile({
     legacyImported: legacySessions.length > 0,
     extensions: { 'adaptive.evidence': {
       legacyAggregateCount: legacySessions.length,
-      unmappedRecordCount: normalized.filter(x => mappedTags(x, registry, byTag).length === 0).length,
+      unmappedRecordCount: normalized.filter(x => mappedTags(x, registry, byTag, links).length === 0).length,
       skillBreakdown: [...buckets.values()].map(b => ({
         tagId: b.tagId, practiceAttempts: b.practiceAttempts,
         assessmentAttempts: b.assessmentAttempts,

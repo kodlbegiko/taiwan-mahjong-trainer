@@ -35,7 +35,7 @@ def run(browser, url, app_dir, output):
     page = context.new_page()
     errors = []
     page.on('pageerror', lambda error: errors.append(str(error)))
-    page.goto(url, wait_until='domcontentloaded')
+    page.goto(url + '?academy=training', wait_until='domcontentloaded')
     page.wait_for_function('navigator.serviceWorker?.ready !== undefined')
     page.evaluate('() => navigator.serviceWorker.ready')
     page.reload(wait_until='domcontentloaded')
@@ -73,7 +73,7 @@ def run(browser, url, app_dir, output):
     # Offline must open even a *new browser tab*, not merely an already loaded DOM.
     context.set_offline(True)
     offline_tab = context.new_page()
-    offline_tab.goto(url, wait_until='domcontentloaded')
+    offline_tab.goto(url + '?academy=training', wait_until='domcontentloaded')
     offline_tab.locator('#hand button').first.wait_for()
     require(offline_tab.locator('#hand button').count()==17, 'offline fresh-tab app not usable')
     require(offline_tab.locator('#hand').evaluate('(e)=>getComputedStyle(e).display') != 'none',
