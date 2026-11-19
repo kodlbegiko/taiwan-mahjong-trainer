@@ -248,3 +248,21 @@ test('Rejects a stale expectedRevision even if the actionId and owned tile are o
   assert.throws(()=>validatePlayerView(stale),/expectedRevision/);
   assert.throws(()=>analyzePlayerView(stale,{samples:0}),/expectedRevision/);
 });
+
+
+test('Analysis identity is insensitive to JSON object key order, including nested PlayerView fields',()=>{
+  const reorder=value=>Array.isArray(value)
+    ? value.map(reorder)
+    : value && typeof value==='object'
+      ? Object.fromEntries(Object.keys(value).reverse().map(k=>[k,reorder(value[k])]))
+      : value;
+  const original=makePlayerView({public28:true});
+  const permuted=reorder(original);
+  for (const samples of [0,5]) {
+    const a=analyzePlayerView(original,{samples,seed:'key-order-regression',maxSimulatedRoutes:2});
+    const b=analyzePlayerView(permuted,{samples,seed:'key-order-regression',maxSimulatedRoutes:2});
+    assert.equal(a.analysisId,b.analysisId);
+    assert.deepEqual(a.recommendations,b.recommendations);
+    assert.equal(a.status,b.status);
+  }
+});
