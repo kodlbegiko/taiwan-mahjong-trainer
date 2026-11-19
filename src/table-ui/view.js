@@ -140,9 +140,45 @@ export function TableView(snapshot, { selection = null, busy = false, error = ''
       '</p></section>') +
     '<p class="table-muted">吃／碰／槓／胡與結算必須由正式 Rules Engine 開放。' +
     (replayConnected ? '已連接正式 Replay Provider。' : '目前沒有正式 Replay Provider。') +
-    '</p>' +
+    '</p>' + RoundSummary(snapshot.result) +
     '<div class="table-footer-controls"><button type="button" class="secondary" data-show-replay>查看牌局複盤</button>' +
     '<button type="button" class="secondary" data-return-academy>返回課程學院</button></div>';
+}
+/**
+ * Official end-of-round summary only. Unknown or unverified results do not
+ * become wins, tai, scores or settlement merely because the UI can display them.
+ */
+export function RoundSummary(result) {
+  const summary = result?.verified === true ? result.publicSummary : null;
+  if (!summary || typeof summary !== 'object') return '';
+  const winners = Array.isArray(summary.winnerSeats) ? summary.winnerSeats
+    .filter(s => Number.isInteger(s) && s >= 0 && s <= 3).map(s => SEATS[s]) : [];
+  return '<section class="table-round-summary" aria-label="官方局後結果">' +
+    '<h2>本局結果 · 正式來源</h2>' +
+    '<p>結果：' + escapeHtml(summary.outcome ?? '未提供結算結果') + '</p>' +
+    '<p>胡牌玩家：' + escapeHtml(winners.join('、') || '未提供') + '</p>' +
+    (Array.isArray(summary.settlements) ?
+      '<div class="table-settlements">' + summary.settlements.map(row =>
+        '<p>' + escapeHtml(row.label ?? '結算') + '：' +
+        escapeHtml(row.value ?? '未提供') + '</p>').join('') + '</div>' : '') +
+    '</section>';
+}
+/** Render historical PlayerView's open information, not today's game state. */
+function ReplayPublicTable(view) {
+  if (!view || !Array.isArray(view.opponents) || view.opponents.length !== 3 ||
+    view.opponents.some(p => Object.hasOwn(p, 'concealed')) || !view.self ||
+    !Array.isArray(view.self.concealed)) return '<p>當時牌桌資訊無法驗證。</p>';
+  const opponents = new Map(view.opponents.map(p => [p.seat, p]));
+  if (![1, 2, 3].every(s => opponents.has(s))) return '<p>當時座位資料不完整。</p>';
+  return '<div class="table-grid table-history-grid" aria-label="歷史各家公開牌河與副露">' +
+    OpponentSeat(opponents.get(2), view.round?.currentSeat, view.round?.dealerSeat) +
+    OpponentSeat(opponents.get(3), view.round?.currentSeat, view.round?.dealerSeat) +
+    '<div class="table-felt"><strong>歷史事件 ' + escapeHtml(view.asOfEventSeq) +
+    '</strong><small>僅展示 Replay API 的歷史快照</small></div>' +
+    OpponentSeat(opponents.get(1), view.round?.currentSeat, view.round?.dealerSeat) +
+    '</div><section class="table-replay-self"><h3>當時你的公開牌河、副露與花牌</h3>' +
+    riverSection(view.self.river ?? []) + meldSection(view.self.melds ?? []) +
+    flowersSection(view.self.flowers ?? []) + '</section>';
 }
 export function ReplayControls(timeline, index) {
   if (!timeline?.verified || !Array.isArray(timeline.frames)) {
@@ -162,7 +198,7 @@ export function ReplayControls(timeline, index) {
       '>#' + (f.event?.seq ?? i) + ' ' + escapeHtml(f.event?.type ?? '狀態') + '</option>').join('') +
     '</select></label><button type="button" data-replay-next ' +
     (index === timeline.frames.length - 1 ? 'disabled' : '') + '>下一巡</button></div>' +
-    '<h3>當時你的手牌</h3><div class="table-hand table-replay-hand">' +
+    ReplayPublicTable(frame.view) + '<h3>當時你的手牌</h3><div class="table-hand table-replay-hand">' +
     own.map(t => tileSpan(t)).join('') + '</div>' +
     '<h3>當時官方合法選項</h3><p>' +
     (options.length ? options.map(actionName).map(escapeHtml).join('、') : '無可用的合法選項') + '</p>' +
