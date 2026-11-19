@@ -2,7 +2,7 @@ import { TILE_LABELS, tileClass } from './tiles.js';
 import { tileFaceMarkup, tileAccessibleName, installTileFaceFallback } from './tile-visuals.js';
 import { gradeAnswer } from './practice.js';
 import { explainDiscard, analyzeStructure } from './analysis/explain.js';
-import { createExercise, EXERCISE_SCHEMA_VERSION, SCORING_VERSION } from './training/exercises.js';
+import { createExercise, validateExercise, EXERCISE_SCHEMA_VERSION, SCORING_VERSION } from './training/exercises.js';
 import { createDecisionRecord, RECORD_SCHEMA_VERSION } from './training/records.js';
 import { createLocalTrainingStore } from './storage/local.js';
 import { ARCHIVE_STORAGE_KEY, LEGACY_SESSION_KEY, emptyArchive, importTrainingJSON } from './storage/archive.js';
@@ -30,6 +30,7 @@ let archive = emptyArchive();
 let legacyOriginal = [];
 let pendingWorker = null;
 let installPrompt = null;
+let pendingAcademyReplay = null;
 
 const newId = () => globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const tileName = tile => TILE_LABELS[tile] ?? '未知牌';
@@ -110,6 +111,7 @@ function updateProgress() {
   $('#stat-seconds').textContent = total ? `${(seconds.reduce((a, b) => a + b, 0) / total).toFixed(1)}s` : '—';
   displayStorageCondition();
   renderHistory();
+  window.dispatchEvent(new Event('academy:legacy-changed'));
 }
 
 function renderHistory() {
@@ -167,7 +169,10 @@ function renderWaitPicker() {
 
 function generateQuestion({ focusHand = false } = {}) {
   try {
-    exercise = createExercise({ seed: newId(), index: 0, taskType: mode, level: difficulty });
+    const pending = pendingAcademyReplay;
+    pendingAcademyReplay = null;
+    exercise = pending ?? createExercise({ seed: newId(), index: 0, taskType: mode, level: difficulty });
+    if (pending) validateExercise(exercise); // Never replay tampered historical snapshots.
     if (exercise.schemaVersion !== EXERCISE_SCHEMA_VERSION || exercise.answerRules.version !== SCORING_VERSION) {
       throw new Error('題目版本不是最新已驗證的版本');
     }
@@ -384,6 +389,30 @@ function switchMode(nextMode) {
 }
 
 function registerEvents() {
+  // Academy sends only a public task type and optional saved exercise ID.
+  // Legacy app alone owns the full private Exercise, canonical scorer and v3 writer.
+  window.addEventListener('academy:open-legacy', event => {
+    const { taskType, exerciseId } = event.detail ?? {};
+    if (!MODES[taskType]) return;
+    if (exerciseId) {
+      try {
+        const saved = archive.exercises.find(item => item.id === exerciseId)
+          ?? archive.records.find(item => item.exerciseId === exerciseId)?.exerciseSnapshot;
+        if (!saved || saved.taskType !== taskType) throw new Error('找不到可重播的原題');
+        validateExercise(saved);
+        pendingAcademyReplay = saved;
+      } catch (error) {
+        $('#exercise-status').textContent = '原題無法安全重播；保留既有紀錄。';
+        console.warn('Rejected academy replay:', error);
+        return;
+      }
+    }
+    if (taskType === mode) generateQuestion({ focusHand: true });
+    else {
+      switchMode(taskType);
+      (taskType === 'discard' ? $('#hand button') : $('#wait-options button:not(:disabled)'))?.focus();
+    }
+  });
   // Capture image load failures before dynamically inserting any hand/wait SVGs.
   installTileFaceFallback($('#hand'));
   installTileFaceFallback($('#wait-options'));

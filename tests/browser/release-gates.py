@@ -156,7 +156,7 @@ def run_view(browser, url, output, width):
     page = context.new_page()
     failures = []
     page.on('pageerror', lambda error: failures.append(str(error)))
-    page.goto(url, wait_until='domcontentloaded')
+    page.goto(url + '?academy=training', wait_until='domcontentloaded')
     page.locator('#hand button').first.wait_for()
     require(page.locator('#hand button').count() == 17, 'initial exercise unavailable')
     require(page.locator('#answer').is_hidden(), 'result visible before answering')

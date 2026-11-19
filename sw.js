@@ -1,7 +1,7 @@
 /* Offline-first, atomic shell for GitHub Pages root or /repo/ deployments.
  * IMPORTANT: change CACHE_VERSION whenever any precached file changes.
  * The install event only succeeds if the entire listed release is cached. */
-const CACHE_VERSION = 'tmt-v02-realistic-tiles-20261119-r1';
+const CACHE_VERSION = 'tmt-v02-realistic-tiles-master-academy-20261119-r2';
 const SHELL_CACHE = `tmt-shell-${CACHE_VERSION}`;
 const BASE = new URL('./', self.location.href);
 const SHELL = [
@@ -43,10 +43,44 @@ const SHELL = [
   './public/tiles/32.svg',
   './public/tiles/33.svg',
   './src/tile-visuals.js', './src/app.js', './src/tiles.js', './src/practice.js', './src/shanten.js',
+  './src/academy-ui/main.js', './src/academy-ui/academy.css',
+  './src/academy-ui/public-facade.js', './src/academy-ui/scenario.js',
+  './src/academy-ui/academy-bridge.js', './src/academy-ui/academy-live.js',
   './src/core/efficiency.js', './src/analysis/explain.js',
   './src/training/exercises.js', './src/training/waits.js',
   './src/training/random.js', './src/training/records.js',
   './src/training/progress.js', './src/storage/local.js', './src/storage/archive.js',
+  // Actual combined Master Academy runtime graph (no fixture-only provider).
+  './src/integration/master-academy-facade.js',
+  './src/academy/index.js',
+  './src/academy/catalog.js',
+  './src/academy/lessons.js',
+  './src/academy/question-internal.js',
+  './src/academy/questions.js',
+  './src/academy/records.js',
+  './src/academy/registry.js',
+  './src/academy/scenario-scorers.js',
+  './src/academy/provenance.js',
+  './src/adaptive/index.js',
+  './src/adaptive/core.js',
+  './src/adaptive/records.js',
+  './src/adaptive/ability.js',
+  './src/adaptive/review.js',
+  './src/adaptive/session.js',
+  './src/adaptive/storage.js',
+  './src/adaptive/validate.js',
+  './src/adaptive/learning-adapter.js',
+  './src/adaptive/provenance.js',
+  './src/rules/index.js',
+  './src/rules/tile-constants.js',
+  './src/rules/tile-identity.js',
+  './src/rules/profiles.js',
+  './src/rules/engine.js',
+  './src/strategy/index.js',
+  './src/strategy/view.js',
+  './src/strategy/structure.js',
+  './src/strategy/simulate.js',
+  './data/academy/manifest-v1.json',
 ].map(path => new URL(path, BASE).href);
 const SHELL_PATHS = new Set(SHELL.map(url => new URL(url).pathname));
 

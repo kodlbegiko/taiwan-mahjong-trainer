@@ -64,7 +64,7 @@ def exercise_flow(browser, base, width, shots):
     page = context.new_page()
     errors = []
     page.on('pageerror', lambda error: errors.append(str(error)))
-    page.goto(base, wait_until='domcontentloaded')
+    page.goto(base + '?academy=training', wait_until='domcontentloaded')
     page.locator('#hand button').first.wait_for()
     check(page.locator('#hand button').count() == 17, 'discard not 17')
     check_dimensions(page, width)
@@ -127,7 +127,7 @@ def exercise_flow(browser, base, width, shots):
 def legacy_and_corruption(browser, base):
     context = browser.new_context()
     page = context.new_page()
-    page.goto(base)
+    page.goto(base + '?academy=training')
     legacy = json.dumps([{'grade':'perfect','seconds':2.2,'difficulty':'beginner','date':'2026-11-01T00:00:00.000Z'}])
     page.evaluate('(v) => localStorage.setItem("tw-mahjong-trainer:session:v1", v)', legacy)
     page.reload()
@@ -140,7 +140,7 @@ def legacy_and_corruption(browser, base):
 
     context = browser.new_context()
     page = context.new_page()
-    page.goto(base)
+    page.goto(base + '?academy=training')
     page.evaluate('localStorage.setItem("tw-mahjong-trainer:archive:v3", "{bad")')
     page.reload()
     check(page.locator('#storage-status').is_visible(), 'corrupt archive warning absent')
@@ -154,7 +154,7 @@ def legacy_and_corruption(browser, base):
        Storage.prototype.setItem = function() { throw new DOMException('blocked', 'QuotaExceededError'); };
     })()''')
     page = context.new_page()
-    page.goto(base)
+    page.goto(base + '?academy=training')
     page.locator('#hand button').first.click()
     page.locator('#answer:visible').wait_for()
     check(page.locator('#storage-status').is_visible(), 'quota warning absent')
@@ -164,7 +164,7 @@ def legacy_and_corruption(browser, base):
 def offline_and_update(browser, base, app_dir):
     context = browser.new_context()
     page = context.new_page()
-    page.goto(base)
+    page.goto(base + '?academy=training')
     page.wait_for_function('Boolean(navigator.serviceWorker?.controller)', timeout=20000)
     page.reload()
     page.locator('#hand button').first.wait_for()
