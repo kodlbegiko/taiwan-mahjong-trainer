@@ -1,7 +1,7 @@
 /* Offline-first, atomic shell for GitHub Pages root or /repo/ deployments.
  * IMPORTANT: change CACHE_VERSION whenever any precached file changes.
  * The install event only succeeds if the entire listed release is cached. */
-const CACHE_VERSION = 'tmt-v02-realistic-tiles-master-academy-phase3-ui-20261120-r1';
+const CACHE_VERSION = 'tmt-v02-realistic-tiles-master-academy-phase3-integrated-experimental-20261120-r2';
 const SHELL_CACHE = `tmt-shell-${CACHE_VERSION}`;
 const BASE = new URL('./', self.location.href);
 const SHELL = [
@@ -82,6 +82,10 @@ const SHELL = [
   './src/strategy/view.js',
   './src/strategy/structure.js',
   './src/strategy/simulate.js',
+  // Phase 3 staged runtime dependencies; experimental-only, NOT full game.
+  './src/rules/complete-engine.js', './src/rules/scoring.js',
+  './src/bots/index.js', './src/bots/decision.js', './src/bots/controller.js',
+  './src/replay/index.js', './src/replay/internal.js', './src/scenario/index.js',
   './data/academy/manifest-v1.json',
 ].map(path => new URL(path, BASE).href);
 const SHELL_PATHS = new Set(SHELL.map(url => new URL(url).pathname));
