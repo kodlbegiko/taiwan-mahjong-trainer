@@ -11,7 +11,8 @@ const gradeNames = {perfect:'完全正確',acceptable:'部分正確',improve:'�
 const safe = s => String(s ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt = timestamp => new Date(timestamp).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
 const percent = n => Number.isFinite(n) ? Math.round(100*n)+'%' : '—';
-let page = 'today';
+// Public deep link used for legacy regression and for bookmarks to the canonical trainer.
+let page = new URLSearchParams(window.location.search).get('academy') === 'training' ? 'training' : 'today';
 let lessonId = ACADEMY_LESSONS[0].id;
 
 function storage() { try { return window.localStorage; } catch { return null; } }

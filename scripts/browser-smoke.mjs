@@ -11,7 +11,7 @@ async function runScenario(name, viewport, mobile) {
   const page = await context.newPage();
   const uncaught = [];
   page.on('pageerror', err => uncaught.push(err.message));
-  await page.goto(root, { waitUntil: 'networkidle' });
+  await page.goto(root + '?academy=training', { waitUntil: 'networkidle' });
   const hand = page.locator('#hand button[data-tile]');
   await hand.first().waitFor({ timeout: 30000 });
   assert.equal(await hand.count(), 17, `${name}: initial hand must contain 17 physical tiles`);
