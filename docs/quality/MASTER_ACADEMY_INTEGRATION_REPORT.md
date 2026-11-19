@@ -3,7 +3,7 @@
 > **Phase 0 基線稽核｜2026-11-19（Asia/Taipei）｜MASTER ACADEMY 尚未整合完成。**
 > 契約 `master-academy/1.0.0` 已經由 [PR #32](https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/32) 合併。這是具有精確 GitHub 證據的階段快照，不是最終產品驗收或 v0.2.0 發布授權。完整契約：[MASTER_ACADEMY_V1.md](../contracts/MASTER_ACADEMY_V1.md)，依賴圖：[MASTER_ACADEMY_ARCHITECTURE.md](../MASTER_ACADEMY_ARCHITECTURE.md)。
 
-> **最新狀態請優先看第 11 節。** 五個來源 PR 均已建立；本報告前述「來源尚未出現」僅代表 Phase 0 歷史快照，不是目前事實。
+> **最新狀態請優先看第 12 節。** 五個來源 PR 均已建立；本報告前述「來源尚未出現」僅代表 Phase 0 歷史快照，不是目前事實。
 
 ## 1. 最新 GitHub 主線與版本界線
 
@@ -205,3 +205,23 @@
 - **Academy 專屬 HTTPS 固定 SHA 預發布**尚未有真實可驗證網址，因此 `BLOCKED`，不能使用舊 [V0.2 GitHub Pages](https://kodlbegiko.github.io/taiwan-mahjong-trainer/) 當新學院網站。只有獨立 HTTPS、明確 commit SHA、`release:false`、真實 live browser/source/offline 證據後才能標 `PREVIEW_DEPLOYED`。
 - `package.json` 仍 `0.1.0`；沒有 `v0.2.0` Tag/GitHub Release，main 保護未降低，PR #33 **Draft** 未合併。
 - **工程判定**：僅「結構題 V1 Learning＋Adaptive＋實驗性 Rules/Strategy 公開界線＋Chromium 的 12 步」範圍具 `CI_PASS/BROWSER_PASS`；**整體 Master Academy 正式工程整合仍為 NO-GO**（專屬預覽、正式 Session、完整四人玩法／scenario scorer 未達），不得發行或關閉品質 gate。
+
+
+---
+
+## 12. 2026-11-19 Academy 專屬固定 SHA HTTPS 預發布（最新驗證，覆蓋第 11 節「預覽未完成」）
+
+### 12.1 獨立站點及身份
+
+- **正式可連線的隔離預發布網址**：[Master Academy V1 Preview](https://taiwan-mahjong-academy-prerelease-5evl29gv1-sign2.vercel.app/)。獨立 Vercel 專案：`taiwan-mahjong-academy-prerelease`，`projectId=prj_g97hP1dgD7paAvavqJBuLgFVo71k`，固定 **preview deployment ID `dpl_13TrpQ3amFrtiH1w7VHRJ4prybCc`**，平台 `READY`。
+- 這個部署在 Vercel GitSource **明確鎖定 `0f37a23fd0ada293fd4d54b961d0405ad7bf5ace`**，而不是會隨分支滑動的 HEAD。這個 Git commit 的程式碼與已全綠的 `a06505c8579cf817440822692854786c9bd330bf` 完全相同，後續只有品質報告與預發布聲明這兩類非 runtime 檔案。
+- **公開、自述且 machine-readable 的 `release:false`**：[`/__academy_acceptance.json`](https://taiwan-mahjong-academy-prerelease-5evl29gv1-sign2.vercel.app/__academy_acceptance.json) 實際 HTTPS 可讀，明確宣告 `release:false`、`master-academy/1.0.0`、`verifiedApplicationCommit=a06505c...`、原始紀錄及 provenance 權威 key、既有 CI run IDs、未完成功能清單。這是可讀的 scope 聲明，**非加密簽章**；真正固定部署 SHA 另依 Vercel API 部署來源核對。
+- 仍維持正式 GitHub main `25870862b6499f7e699967aa76429ae5dcfc5db4`，未觸碰 V0.2 GitHub Pages 原部署、[PR #26](https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/26) 的固定 `SOURCE_SHA`，也**沒有建立 Tag、GitHub Release 或修改 `package.json` 版本**。
+- Vercel 站點與原 V0.2 GitHub Pages 站為不同 origin；**使用者 localStorage 不會共用或自動跨站遷移**。本輪保存測試是在 Academy 預發布自己的 origin，不能把此說成原 V0.2 使用者已升版完成。裝置／既有站資料搬遷另須明確安排，不得偷改原始資料。
+
+### 12.2 真人可見 HTTPS 網站與整合 E2E 證據
+
+- [獨立 live browser #9b46ae83](https://agent.tinyfish.ai/runs/9b46ae83-f882-4563-9c5b-87f1155fc367) **COMPLETED**：在同一 Vercel 專案、相同測試程式碼的前一個 pinned snapshot `b738dc55edf2ae3785b202a2d2caabab4ff66ad5` 之 HTTPS 網址，實際操作 5 層／20 堂真實 Lesson、`academy-l1-01` → `academy-q-001` → 17 張實牌選擇 → 提交正式 v3 評分。此次選八萬，被正式 scorer 判 `improve / 0%`，解說最佳為一筒，顯示正式 RecordRef；重新整理後 Lesson 進度仍 `1/5`、可以繼續。
+- 新的 **`0f37a23fd0ada293fd4d54b961d0405ad7bf5ace`** preview deployment `READY`，公開 HTTP(S) 首頁、`src/integration/master-academy-facade.js` 及 `/__academy_acceptance.json` 均成功實際取得，並非只有 Vercel 的就緒宣告。新站與實際完成 live browser 的站只有上方靜態 `release:false` 宣告／品質報告差異，原程式碼仍為已通過 390/1440 Chromium 以及 offline new tab 的同一 tree。
+- **整合程式碼 HEAD `a065...` 的所有適用 CI 已經全部成功**，包含 [Verify #44562519930](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44562519930) 207/206/0/1、[Real combined #44562520086](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44562520086)、[Academy UI #44562519917](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44562519917)、[Tile #44562519997](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44562519997)、[Independent UI #44562519987](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44562519987)、[V0.2 Browser/PWA #44562519844](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44562519844)；V0.2 staging-only smoke 被 CI 工作流正常略過（非失敗）。`0f37...` 本身只新增 acceptance.json，不變更任何必要 JS、CSS、SW、SVG 或測試。
+- 現階段 Academy 專屬預發布 Gate 為 **`PREVIEW_DEPLOYED`**，但 **不是正式 Release GO**：完整四人桌規、驗證過的情境 scorer、Bot、計台、每日正式 TrainingSession UI、自動跨 origin 舊資料遷移尚未完成；實體 iOS/Android、VoiceOver/TalkBack、裝置升版為 `NOT_RUN`，Issue #12 繼續 Open、PR #33 繼續 Draft。
