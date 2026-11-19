@@ -18,7 +18,7 @@ def check(condition, message):
         raise AssertionError(message)
 
 def live_ready(page):
-    page.locator('#go-lessons').click()
+    page.locator('#academy-navigation [data-academy-nav="lessons"]').click()
     page.wait_for_function(
         "() => document.querySelectorAll('[data-live-action=\"select-lesson\"]').length === 20",
         timeout=45000,
