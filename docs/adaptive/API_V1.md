@@ -25,7 +25,7 @@
 | `buildAnswerableCatalog({records,questionCatalog,validateAcademyQuestion,...})` | legacy 可回放快照；Academy 須獨立驗證 question | 實際可作答且鎖定來源/種子的題目清單 |
 | `planDailyTraining({profile,reviewPlan,records,questionCatalog,minutes,seed,asOf,ruleRef,...})` | minutes=10/20/30/60，預設 30 | `{session:TrainingSession V1,sections,availableQuestionCount}` |
 | `transitionTrainingSession(session,status,{at,recordRefs,reason})` | 僅 planned→active→completed/aborted | 驗證合法轉移後的新 Session |
-| `createAcademyStore(storage,{registry,validateAcademyDecisionRecord,profileId,timezone,migrations})` | 例如 localStorage | `load/loadStatus/persistScoredRecord/rebuild/saveSession/importJSON/exportJSON/readLegacy` |
+| `createAcademyStore(storage,{registry,validateAcademyDecisionRecord,validateAcademyQuestion,profileId,timezone,migrations})` | 例如 localStorage | `load/loadStatus/persistScoredRecord/rebuild/saveSession/importJSON/exportJSON/readLegacy` |
 
 ## 整合範例
 
@@ -59,11 +59,11 @@ if (!status.ok) {
 
 **舊 v3 正確寫入順序**：舊 UI 使用 `createLocalTrainingStore.addDecision` 寫原本 `archive:v3` → 讀回確認 bytes 與 record → 呼叫 `store.persistScoredRecord({kind:'legacy-v3',record},{asOf})`。若原本 API 在私密模式/Quota 中只寫入記憶體，Adaptive 會回報 `LEGACY_NOT_DURABLE`，不會捏造永久保存成功。
 
-**Academy V1 寫入順序**：`persistScoredRecord({kind:'academy-v1',record},{asOf})` 先將 raw record 寫入唯一 sidecar key，驗證讀回，再存衍生 profile/review。第二階段失敗會回傳 `{durable:true,derivedFresh:false,errorCode}`，原始紀錄仍在，下次用 `rebuild({asOf})` 恢復；第一階段 quota/denied 拋出 `AcademyStorageError`。如果沒有 browser storage，`loadStatus().durable=false`，不能顯示「已永久保存」。`saveSession` 只接受實際已持久化的 record refs。
+**Academy V1 寫入順序**：`persistScoredRecord({kind:'academy-v1',record,question},{asOf})` 必須提供對應已驗證的 **AcademyQuestion 私有不可變快照**。第一階段將 raw record 與 question snapshot 一起寫入唯一 sidecar key、經語意驗證與讀回核對，再存衍生 profile/review。第二階段失敗會回傳 `{durable:true,derivedFresh:false,errorCode}`，原始紀錄仍在，下次用 `rebuild({asOf})` 恢復；第一階段 quota/denied 拋出 `AcademyStorageError`。如果沒有 browser storage，`loadStatus().durable=false`，不能顯示「已永久保存」。`saveSession` 只接受實際已持久化的 record refs。
 
 ## 本機版本、回退與不可變來源
 
-- **新增且唯一 sidecar**：`tw-mahjong-master-academy:state:v1`，不覆寫原 `session:v1`、`archive:v2`、`archive:v3`。未知/未授權 schema、重複 ID、JSON 損壞、quota、讀寫被封鎖皆 fail closed。
+- **新增且唯一 sidecar**：`tw-mahjong-master-academy:state:v1` 保存 `academyRecords[]`、`academyQuestions[]`、能力/複習快照與 Session，情境紀錄和原始題目版本一對一核對。此空間屬使用者私有本機儲存，題目私有答案不得直接輸出至 UI。**切勿把 localStorage 誤當為抗作弊的安全秘密庫**。不覆寫原 `session:v1`、`archive:v2`、`archive:v3`。未知/未授權 schema、重複 ID、JSON 損壞、quota、讀寫被封鎖皆 fail closed。
 - `migrateAcademyState(input,{migrations})` 僅支援**有實際明確轉換函式的**來源 schema；目前沒有已發布的 Academy v0，絕不幻想自動遷移未知歷史格式。所有 migrator 輸出仍要通過 V1 驗證。
 - Interval 使用既有 `buildReviewQueue/advanceReview` 的 SM-2-inspired 規則，轉換為 IANA 日曆日；非正式人類遺忘曲線模型。無法重播的題目不刪除，ReviewPlan 保留 reason code `unavailable:*`，今日推薦排除它們。
 - `TrainingSession.questionRefs` 保持選取順序；`extensions['adaptive.plan'].orderedSources` 附每題來源、section、seed、generatorVersion、估計分鐘數。題庫不足時保留不足分鐘數，不填入不存在 Bot 對局/未評分 scenario；Session status 只有實際作答且寫入 raw record 後才能引用 recordRef。
