@@ -3,6 +3,8 @@
 > **Phase 0 基線稽核｜2026-11-19（Asia/Taipei）｜MASTER ACADEMY 尚未整合完成。**
 > 契約 `master-academy/1.0.0` 已經由 [PR #32](https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/32) 合併。這是具有精確 GitHub 證據的階段快照，不是最終產品驗收或 v0.2.0 發布授權。完整契約：[MASTER_ACADEMY_V1.md](../contracts/MASTER_ACADEMY_V1.md)，依賴圖：[MASTER_ACADEMY_ARCHITECTURE.md](../MASTER_ACADEMY_ARCHITECTURE.md)。
 
+> **最新狀態請優先看第 10 節。** 五個來源 PR 均已建立；本報告前述「來源尚未出現」僅代表 Phase 0 歷史快照，不是目前事實。
+
 ## 1. 最新 GitHub 主線與版本界線
 
 | 項目 | 觀察值與證據 |
@@ -136,6 +138,7 @@
 - [整合 Verify #44538204653](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44538204653)，HEAD `9b7e9bab2a2d321865f6bf5b4cc154c4dd78eec5`：**146 tests／145 pass／0 fail／0 TODO／1 opt-in skipped**。兩套必要 10k Oracle 與 Q-001/Q-002/I-003 仍 PASS；Learning/Adaptive 來源獨立測試及四項全新整合測試 PASS。
 - [整合 Independent UI/PWA #44538204663](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44538204663) 同 HEAD：Chrome UI/real offline PWA 及 Node API/P0 兩個 jobs 都 **SUCCESS**。**它只驗證既有 V0.2 UI 和 SW**，不能宣稱 Master Academy 新學院介面已離線／實機可用。
 - 此階段沒有新增任何由瀏覽器直接 import 的 Academy 模組：原 V0.2 `sw.js` 沒有因隔離的 Node integration test 擅自升版。將來 UI 真正引入新模組時必須在其來源 PR 中更新全部新 JS/JSON 快取並原子提升 `CACHE_VERSION`。
+- **額外發現 L-01/A-01 正式課程回放缺口**：Learning 的 AcademyQuestion ID 為 `academy-q-*`，官方 v3 DecisionRecord 保存的是底層 `ex3-*` exerciseId；Adaptive ReviewPlan 按底層 exerciseId 排程，缺少跨重載且可驗證的 `RecordRef + ex3-* → AcademyQuestionRef / LessonRef / SkillTagIds` 關聯。現階段可正式核對舊 v3 題目與能力 task/error 映射，但**不能宣稱已保有原 Academy Lesson 問題的完整作答／複習關聯**。已在來源 [#35](https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/35)、[#37](https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/37) 留下具體修改／同題重播測試要求；不得改寫舊 v3 紀錄。
 - **PR #33 必須保留 Draft；既有 V0.2 Pages PR #26 SOURCE_SHA 不變，舊 V0.2 網址不是 Academy 預覽。**
 
 ### 10.2 真正剩餘的品質 Gate
@@ -145,7 +148,7 @@
 | R-01 / R-02 | `BLOCKED` | #34 JSON key-order 重播與非法花牌 Profile 未修；Rules 不在隔離候選 |
 | S-01 | `CI_PASS_ONLY` | #36 來源測試通過，但真實 PlayerView 接合、策略防洩漏同 SHA 尚未完成 |
 | L-01 | `NODE_CROSS_PASS`（既有 v3 題型） | 100 題來源與公開題/評分檢查；情境題 verified scorer 仍為零 |
-| A-01 | `NODE_CROSS_PASS`（legacy-v3） | 真正 Learning→Adaptive 持久化／冪等／複習測試通過；academy-v1 情境證據因無 scorer 不可宣稱已正式使用 |
+| A-01 | `NODE_CROSS_PASS`（legacy-v3）／`CURRICULUM_LINK_BLOCKED` | 真正 Learning→Adaptive 持久化／冪等／複習測試通過；`academy-q-*` 與底層 `ex3-*` 的持久化 lesson 關聯尚未建立；academy-v1 情境證據因無 scorer 不可宣稱已正式使用 |
 | UI-01 | `BLOCKED` | #38 尚未導入 LessonPublic + Adaptive 公開 API，未有完整學習閉環 |
 | REG-01 | `PASS` | 整合 Draft 同 SHA Golden／雙 10k Oracle／三種既有模式 Node 回歸 |
 | REG-02 | `BASELINE_PASS` | 現有 34 SVG、Chromium desktop/mobile 模擬；不是五個新模組的 UI 驗收 |
