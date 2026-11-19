@@ -17,7 +17,8 @@ Never pass GameState, complete walls, opponents' concealed tiles, internal/priva
 | analyzePlayerView | Formal StrategyAnalysis V1, exact canonical discard priorities and labelled heuristic/estimated/unknown metrics |
 | analyzeEfficiencyRoutes | Canonical discard route, overlapping taatsu candidates and explicit assumptions |
 | analyzeTaatsuCandidates | Ryanmen, kanchan, penchan, eye and isolated tile candidates; not a second shanten scorer |
-| inspectClaimOptions | Only PlayerView-confirmed legal chi/pong/kong actions; post-claim impacts are unknown until verified |
+| inspectClaimOptions | Only PlayerView-confirmed legal chi/pong/kong actions; post-claim impacts are unknown without a follow-up public projection |
+| compareClaimProjections | Compares two public PlayerViews causally linked by a public claim/kong event, only after a verified legal claim; reports conditional exact structural changes and unknown scoring |
 | analyzeAttackDefense | Exact visible public meld count / own shanten and qualitative pressure, never invented deal-in percentages |
 | explainStrategy | Exact evidence, unknown information, alternatives, assumptions and risks; does not overwrite canonical |
 
@@ -68,3 +69,7 @@ Run npm run check. Do not remove the two required independent oracle suites, tes
 ## Explicitly not delivered
 
 A real opponent model, calibrated deal-in risk, a verified complete Taiwanese house-rule profile, real wall order, validated fan/tai advice, full claim strategy, MCTS search, human efficacy evidence, or a Mahjong master bot.
+
+## Conditional claim comparison
+
+compareClaimProjections(beforePlayerView, afterPlayerView, claimActionId) requires the action in before.legalActions, the same game, rule and audience, a later after.asOfEventSeq, a public claim/kong event with causedByActionId, the physical IDs of the resulting exposed meld, and valid after-phase legal discard actions. It returns before-phase canonical shanten/ukeire and post-claim *best legal discard* canonical shanten/ukeire, plus structural closure loss, overlapping candidate shapes, and explicit epistemic classifications. As the phases differ, it deliberately does not turn these numbers into a winning probability, tai difference, or an automatic recommendation to claim. Real rule-validity, claims and events must first be verified by Rules Engine; these fixtures do not stand in for formal source rule evidence.
