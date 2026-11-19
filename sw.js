@@ -1,7 +1,7 @@
 /* Offline-first, atomic shell for GitHub Pages root or /repo/ deployments.
  * IMPORTANT: change CACHE_VERSION whenever any precached file changes.
  * The install event only succeeds if the entire listed release is cached. */
-const CACHE_VERSION = 'tmt-v02-realistic-tiles-master-academy-phase3-integrated-daily-20261120-r3';
+const CACHE_VERSION = 'tmt-v02-realistic-tiles-master-academy-phase3-integrated-facade-20261120-r4';
 const SHELL_CACHE = `tmt-shell-${CACHE_VERSION}`;
 const BASE = new URL('./', self.location.href);
 const SHELL = [
@@ -54,6 +54,7 @@ const SHELL = [
   './src/training/progress.js', './src/storage/local.js', './src/storage/archive.js',
   // Actual combined Master Academy runtime graph (no fixture-only provider).
   './src/integration/master-academy-facade.js',
+  './src/integration/phase3-public-facade.js',
   './src/academy/index.js',
   './src/academy/catalog.js',
   './src/academy/lessons.js',
