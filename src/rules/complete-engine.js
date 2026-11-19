@@ -101,9 +101,14 @@ function exhaustIfNeeded(state,triggerActionId){
 export function completeCreateGame({
   gameId='game-complete-1',seed,profileId='tw16-configurable-table',
   ruleVersion='experimental-full-v1',dealerSeat=0,fixtureDeck=null,
+  handIndex=0,previousRoundRef=null,
 }={}){
   if(typeof gameId!=='string'||!/^[A-Za-z0-9_-]+$/.test(gameId))throw new TypeError('Invalid gameId');
   assertSeat(dealerSeat);
+  if(!Number.isInteger(handIndex)||handIndex<0)throw new RangeError('Invalid handIndex');
+  if(previousRoundRef!==null&&
+    (typeof previousRoundRef.gameId!=='string'||!Number.isInteger(previousRoundRef.revision)||
+    typeof previousRoundRef.roundId!=='string'))throw new RangeError('Invalid previousRoundRef');
   const profile=profileFor({profileId,ruleVersion});
   const shuffled=shuffleDeck(createDeck(profile),seed),rng=shuffled.rng;
   if(fixtureDeck!==null){
@@ -121,15 +126,16 @@ export function completeCreateGame({
   for(let seat=0;seat<4;seat++)players[seat].concealed=tiles.slice(index,index+=16);
   players[dealerSeat].concealed.push(tiles[index++]);
   const state={...V1,gameId,ruleRef:{profileId,ruleVersion},
-    round:{...V1,roundId:gameId+'-round-0',handIndex:0,dealerSeat,
+    round:{...V1,roundId:gameId+'-round-'+handIndex,handIndex,dealerSeat,
       currentSeat:dealerSeat,phase:'await_discard',lastPublicEventSeq:0},
     players,wall:tiles.slice(index),events:[],rng,revision:0,
     extensions:{tw16:{initialFlowers:true,pendingReplacement:false,
       window:null,afterClaim:null,passLocks:[false,false,false,false],
-      lastDraw:null,result:null}}},
+      lastDraw:null,result:null,previousRoundRef:clone(previousRoundRef)}}},
     counts=players.map(p=>p.concealed.length);
   event(state,'deal','system-private',undefined,{dealerSeat,countsBySeat:counts,
-    ...(fixtureDeck===null?{}:{fixtureDeck:clone(tiles)})});
+    ...(fixtureDeck===null?{}:{fixtureDeck:clone(tiles)}),
+    ...(previousRoundRef===null?{}:{previousRoundRef:clone(previousRoundRef)})});
   endInitialFlowers(state);
   completeValidateGameState(state,{replay:false});
   return state;
@@ -378,6 +384,8 @@ export function completeReplayGame(config){
     profileId:ref.profileId,ruleVersion:ref.ruleVersion,
     dealerSeat:config.dealerSeat??config.round?.dealerSeat,
     fixtureDeck:config.events[0]?.payload?.fixtureDeck??null,
+    handIndex:config.round?.handIndex??0,
+    previousRoundRef:config.events[0]?.payload?.previousRoundRef??null,
   });
   if(!same(config.events[0],state.events[0]))
     throw new RangeError('Replay mismatch: deal event');
@@ -408,8 +416,8 @@ export function completeValidateGameState(state,{replay=true}={}){
     !state.round||!state.rng||!state.extensions?.tw16)
     throw new RangeError('Invalid complete GameState schema');
   const profile=profileFor(state.ruleRef),e=ext(state);
-  if(!Number.isInteger(state.round.handIndex)||state.round.handIndex!==0||
-    state.round.roundId!==state.gameId+'-round-0'||state.round.schemaVersion!==1||
+  if(!Number.isInteger(state.round.handIndex)||state.round.handIndex<0||
+    state.round.roundId!==state.gameId+'-round-'+state.round.handIndex||state.round.schemaVersion!==1||
     state.round.contractVersion!==CONTRACT_VERSION||
     !['await_draw','await_discard','claim_window','replacement','settled'].includes(state.round.phase))
     throw new RangeError('Invalid complete RoundState');
@@ -496,4 +504,29 @@ export function completeValidateGameState(state,{replay=true}={}){
   if(replay&&!same(completeReplayGame(state),state))
     throw new RangeError('Deterministic complete replay mismatch');
   return true;
+}
+
+
+/**
+ * Start the NEXT separately replayable hand. This is a round-chain adapter,
+ * not an append to the previous hand's immutable TurnEvent ledger.
+ * A fresh explicit seed and unique gameId are mandatory.
+ */
+export function completeStartNextRound(previous,{seed,gameId}={}){
+  completeValidateGameState(previous);
+  if(previous.round.phase!=='settled'||!ext(previous).result)
+    throw new RangeError('Only a settled hand can advance');
+  if(typeof seed!=='string'||!seed||typeof gameId!=='string'||
+    !/^[A-Za-z0-9_-]+$/.test(gameId)||gameId===previous.gameId)
+    throw new RangeError('Explicit new seed and distinct gameId required');
+  const result=ext(previous).result;
+  const retain=result.reason==='exhaustive-draw'
+    ? policyOf(previous).dealerRetentionOnDraw
+    : result.winnerSeat===previous.round.dealerSeat;
+  const dealerSeat=retain?previous.round.dealerSeat:afterSeat(previous.round.dealerSeat);
+  return completeCreateGame({gameId,seed,profileId:previous.ruleRef.profileId,
+    ruleVersion:previous.ruleRef.ruleVersion,dealerSeat,
+    handIndex:previous.round.handIndex+1,
+    previousRoundRef:{gameId:previous.gameId,roundId:previous.round.roundId,
+      revision:previous.revision}});
 }
