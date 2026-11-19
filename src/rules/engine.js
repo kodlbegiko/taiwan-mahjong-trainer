@@ -9,6 +9,7 @@ import { getRuleProfile } from './profiles.js';
 import {
   completeCreateGame, completeListLegalActions, completeApplyAction,
   completeReplayGame, completeValidateGameState, completeCreatePlayerView,
+  completeStartNextRound,
 } from './complete-engine.js';
 const isCompleteRef=ref=>ref?.profileId==='tw16-configurable-table';
 
@@ -81,8 +82,9 @@ function actionFor(state, seat, kind, tileIds = []) {
 export function createGame({
   gameId = 'game-1', seed, profileId = 'tw16-four-player-sandbox',
   ruleVersion = 'experimental-move-v1', dealerSeat = 0, fixtureDeck = null,
+  handIndex = 0, previousRoundRef = null,
 } = {}) {
-  if(isCompleteRef({profileId})) return completeCreateGame({gameId,seed,profileId,ruleVersion,dealerSeat,fixtureDeck});
+  if(isCompleteRef({profileId})) return completeCreateGame({gameId,seed,profileId,ruleVersion,dealerSeat,fixtureDeck,handIndex,previousRoundRef});
   if (typeof gameId !== 'string' || !/^[A-Za-z0-9_-]+$/.test(gameId)) throw new TypeError('Invalid gameId');
   assertSeat(dealerSeat);
   const profile = getRuleProfile(profileId, ruleVersion);
@@ -342,4 +344,10 @@ export function validateGameState(state, { replay = true } = {}) {
     throw new RangeError('State does not match deterministic replay');
   }
   return true;
+}
+
+/** Only the experimental complete profile supports linked next-hand initialization. */
+export function startNextRound(previous,options){
+  if(!isCompleteRef(previous?.ruleRef))throw new RangeError('Next-hand API requires explicit experimental complete profile');
+  return completeStartNextRound(previous,options);
 }
