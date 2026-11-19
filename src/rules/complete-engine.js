@@ -86,7 +86,8 @@ function winning(player,tileId){
 }
 function flowerQueue(state){
   // Explicit fixed seat order for this experimental profile.
-  return [0,1,2,3].find(s=>state.players[s].concealed.some(isFlower));
+  return [0,1,2,3].map(i=>(state.round.dealerSeat+i)%4)
+    .find(seat=>state.players[seat].concealed.some(isFlower));
 }
 function endInitialFlowers(state){
   const pending=flowerQueue(state);
@@ -484,8 +485,16 @@ export function completeValidateGameState(state,{replay=true}={}){
       }else put(d.tileId);
     }
     const effective=p.concealed.length+3*p.melds.length;
-    if(effective<15||effective>17)
-      throw new RangeError('Invalid player effective tile count');
+    const phase=state.round.phase;
+    let expected=16;
+    if(e.initialFlowers&&seat===state.round.dealerSeat)expected=17;
+    else if(phase==='await_discard'&&seat===state.round.currentSeat)expected=17;
+    else if(phase==='replacement'&&seat===state.round.currentSeat&&
+      !e.pendingReplacement&&!e.initialFlowers)expected=17;
+    else if(phase==='settled'&&e.result?.via==='self-draw'&&seat===e.result.winnerSeat)
+      expected=17;
+    if(effective!==expected)
+      throw new RangeError('Invalid player effective tile count for phase: '+seat+' / '+phase);
   }
   for(const id of claimedRivers)if(claimed.get(id)!==1)
     throw new RangeError('Claim has no unique public meld owner');
