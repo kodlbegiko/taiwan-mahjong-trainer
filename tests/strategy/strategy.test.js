@@ -205,17 +205,32 @@ test('Public flower identities are separate from standard 0..33 and do not reduc
 });
 
 
-test('asOf may include a private event after the last public event, but no public event may exceed the public watermark',()=>{
+test('Rules Engine projected private draw and deal summaries are accepted, while secret tiles stay forbidden',()=>{
   const view=makePlayerView();
-  view.asOfEventSeq=5; // e.g. own private draw; round.lastPublicEventSeq remains 4
+  view.asOfEventSeq=5; // redacted private draw since last public discard seq=4
+  view.publicEvents=[{
+    schemaVersion:1,contractVersion:view.contractVersion,
+    eventId:'draw-redacted-5',gameId:view.gameId,seq:5,ruleRef:view.ruleRef,
+    type:'draw',visibility:'public',payload:{count:1},
+  }];
   assert.equal(validatePlayerView(view),true);
   const future=structuredClone(view);
-  future.publicEvents=[{
-    schemaVersion:1,contractVersion:future.contractVersion,
-    eventId:'public-event-5',gameId:future.gameId,seq:5,ruleRef:future.ruleRef,
-    type:'pass',visibility:'public',payload:{},
-  }];
+  future.publicEvents[0].seq=6;
   assert.throws(()=>validatePlayerView(future),/event.seq/);
+  const privateDraw=structuredClone(view);
+  privateDraw.publicEvents[0].payload={tileId:'t:8:2'};
+  assert.throws(()=>validatePlayerView(privateDraw),/不得曝光/);
+  const deal=makePlayerView();
+  deal.asOfEventSeq=1;deal.round.lastPublicEventSeq=0;
+  deal.publicEvents=[{
+    schemaVersion:1,contractVersion:deal.contractVersion,
+    eventId:'deal-1',gameId:deal.gameId,seq:1,ruleRef:deal.ruleRef,
+    type:'deal',visibility:'public',payload:{countsBySeat:[17,16,16,16]},
+  }];
+  assert.equal(validatePlayerView(deal),true);
+  const illegal=structuredClone(deal);
+  illegal.publicEvents[0].payload.countsBySeat=[17,16,16,16,1];
+  assert.throws(()=>validatePlayerView(illegal),/countsBySeat/);
 });
 test('Claimed river de-duplication must correspond to a public meld; cannot hide a duplicated ID in two rivers',()=>{
   const view=makePlayerView();
