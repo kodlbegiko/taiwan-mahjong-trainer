@@ -3,6 +3,7 @@ import { BANK_SPEC, QUESTION_REFS, getQuestionSpec } from './catalog.js';
 import { getFullQuestion, getCanonicalExercise, validateAcademyQuestion } from './question-internal.js';
 import { createDecisionRecord, validateDecisionRecord } from '../training/records.js';
 import { tileLabel } from '../tiles.js';
+import { createAcademyProvenance } from './provenance.js';
 import { getErrorType, CONTRACT_VERSION, SCHEMA_VERSION } from './registry.js';
 
 const clone=x=>JSON.parse(JSON.stringify(x));
@@ -131,5 +132,6 @@ export function submitAcademyAnswer(ref,choice,{durationMs,timestamp,attemptId}=
   if(durationMs===undefined || timestamp===undefined)
     throw new TypeError('正式作答必須提供 durationMs 與 timestamp');
   const {gradingResult,record}=grade(ref,choice,{durationMs,timestamp,attemptId});
-  return {gradingResult,record,recordRef:{kind:'legacy-v3',id:record.id}};
+  const provenance=createAcademyProvenance(record,ref);
+  return {gradingResult,record,recordRef:{kind:'legacy-v3',id:record.id},provenance};
 }
