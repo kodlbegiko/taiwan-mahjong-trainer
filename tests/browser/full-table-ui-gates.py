@@ -56,6 +56,21 @@ def run(out):
                     str(width)+'px horizontal overflow')
             require(page.locator('.table-hand button').first.get_attribute('aria-label'),
                     'tile button not accessible')
+            if width<=430:
+                button_width=page.locator('.table-hand button').first.bounding_box()['width']
+                require(button_width>=44, str(width)+'px touch tile width under 44px: '+str(button_width))
+            if width==375:
+                transition=page.locator('.table-hand button').first.evaluate(
+                    '(el) => getComputedStyle(el).transitionDuration')
+                require(transition in ('0s','0s, 0s'),'reduced motion transition still active')
+            if width==768:
+                keyboard=page.locator('.table-hand button[data-pick-action]').first
+                keyboard.focus()
+                require(keyboard.evaluate('(el)=>document.activeElement===el'), 'keyboard tile focus lost')
+                keyboard.press('Enter')
+                require(page.locator('[data-submit-action]').count()==1,
+                        'keyboard Enter did not select a legal discard')
+                page.locator('[data-clear-selection]').click()
             if width in [390,1440]:
                 page.screenshot(path=str(out/('table-'+str(width)+'-ready.png')),full_page=True)
             if width==390:
