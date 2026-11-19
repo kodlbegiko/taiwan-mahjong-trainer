@@ -19,12 +19,13 @@ const ctrl=storage=>createDailyTrainingController(storage,{
 });
 test('new user gets a real durable DailySession and no duplicate session on Taiwan-local same day',()=>{
   const s=new MemoryStorage();
-  s.setItem(LEGACY_SESSION_KEY,'{"preexisting":"v1-byte-for-byte"}');
+  const rawV1 = '[{"grade":"perfect","seconds":3.5,"difficulty":"beginner","date":"2026-11-19T00:00:00.000Z"}]';
+  s.setItem(LEGACY_SESSION_KEY,rawV1);
   const a=ctrl(s).ensureToday({asOf:A,minutes:10});
   assert.ok(a.questionRefs.length>0);
   assert.equal(a.status,'planned');
   assert.equal(a.extensions['adaptive.daily'].dayKey,'2026-11-20');
-  assert.equal(s.getItem(LEGACY_SESSION_KEY),'{"preexisting":"v1-byte-for-byte"}');
+  assert.equal(s.getItem(LEGACY_SESSION_KEY),rawV1);
   const b=ctrl(s).ensureToday({asOf:B,minutes:30});
   assert.deepEqual(a,b,'minutes choice must not create another same-day session');
   assert.equal(ctrl(s).readToday({asOf:B}).sessionId,a.sessionId);
