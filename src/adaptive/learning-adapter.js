@@ -50,8 +50,10 @@ export function createAdaptiveLearningAdapter(storage, {
   function attachToSession(sessionId, link, at) {
     const session = academy.getSession(sessionId);
     if (!session) throw new RangeError('Unknown persisted TrainingSession');
-    if (session.status === 'completed' || session.status === 'aborted')
+    if (session.status === 'completed' || session.status === 'aborted') {
+      if (session.recordRefs.some(ref => same(ref, link.recordRef))) return session;
       throw new RangeError('Cannot append to a terminal session');
+    }
     if (!session.questionRefs.some(q => same(q, link.academyQuestionRef)))
       throw new RangeError('Answer is not in session question order');
     const state = academy.load();
@@ -67,6 +69,13 @@ export function createAdaptiveLearningAdapter(storage, {
       next = { ...session, recordRefs: [...session.recordRefs, link.recordRef] };
     }
     if (!same(next, session)) academy.saveSession(next);
+    const allAnswered = next.questionRefs.length > 0 &&
+      next.questionRefs.every(q => (academy.load().provenanceLinks ?? []).some(p =>
+        p.sessionId === sessionId && same(p.academyQuestionRef, q)));
+    if (allAnswered && next.status === 'active') {
+      next = transitionTrainingSession(next, 'completed', { at });
+      academy.saveSession(next);
+    }
     return next;
   }
   function reconcileSession(sessionId, { asOf } = {}) {
@@ -154,8 +163,16 @@ export function createAdaptiveLearningAdapter(storage, {
     if (sessionId) {
       requireId(sessionId, 'sessionId');
       const session = academy.getSession(sessionId);
-      if (!session || !session.questionRefs.some(q => same(q, ref)) ||
-        ['completed', 'aborted'].includes(session.status)) throw new RangeError('Invalid active session reference');
+      if (!session || !session.questionRefs.some(q => same(q, ref))) {
+        throw new RangeError('Invalid active session reference');
+      }
+      if (['completed', 'aborted'].includes(session.status)) {
+        const prior = academy.getProvenance(graded.recordRef);
+        if (!prior || !session.recordRefs.some(r => same(r, graded.recordRef)) ||
+          !same(prior.academyQuestionRef, ref)) {
+          throw new RangeError('Terminal Session rejects new answer');
+        }
+      }
       const existing = (academy.load().provenanceLinks ?? []).filter(p =>
         p.sessionId === sessionId && same(p.academyQuestionRef, ref));
       if (existing.length && !same(existing[0].recordRef, graded.recordRef)) {
@@ -195,10 +212,15 @@ export function createAdaptiveLearningAdapter(storage, {
       }
     }
     return { ...step, gradingResult: graded.gradingResult,
-      sessionFresh: !sessionId || true };
+      sessionFresh: true };
   }
   function rebuild({ asOf, ...options } = {}) {
     const result = academy.rebuild({ asOf, ...options });
+    for (const session of result.state.trainingSessions) {
+      if ((result.state.provenanceLinks ?? []).some(p => p.sessionId === session.sessionId)) {
+        reconcileSession(session.sessionId, { asOf });
+      }
+    }
     const { abilityProfile, reviewPlan } = result.state;
     return {
       durable: result.durable, profile: toAbilityPublic(abilityProfile), reviewPlan,
