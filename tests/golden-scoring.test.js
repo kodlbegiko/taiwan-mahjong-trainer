@@ -12,7 +12,7 @@ const removeOnce = (hand, discard) => {
   return result;
 };
 
-test('rankings obey public discard conservation and gradeAnswer contract', () => {
+test('ranking covers distinct discards and gradeAnswer uses exact public scoring contract', () => {
   const rng = makeRng(0x12345678);
   for (let n = 0; n < 15; n++) {
     const hand = dealLegalHand(rng);
@@ -49,9 +49,7 @@ test('existing generator accepts a seeded RNG and returns legal exercises', () =
   }
 });
 
-test('a known discarded tile must not reappear as a hypothetical wall copy (upstream defect)', {
-  todo: 'rankDiscards misses the just-discarded tile in visible; see docs/quality/KNOWN_ISSUES.md',
-}, () => {
+test('a known discarded tile must not reappear as a hypothetical wall copy', () => {
   const ranked = rankDiscards(complete);
   const discarded = ranked.find(({ tile }) => tile === 0);
   const remaining = removeOnce(complete, 0);
