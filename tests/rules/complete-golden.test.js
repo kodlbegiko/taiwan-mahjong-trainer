@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   createGame,applyAction,listLegalActions,replayGame,createPlayerView,
-  validateGameState,createDeck,getRuleProfile,
+  validateGameState,createDeck,getRuleProfile,startNextRound,
 } from '../../src/rules/index.js';
 import {calculateShanten} from '../../src/core/efficiency.js';
 
@@ -230,4 +230,31 @@ test('R3-C private Golden fixture is never present in PlayerView; forged deck re
   // Replay by itself deterministically reconstructs the edited ledger; the
   // mandatory full-state validation is what detects the inconsistency.
   assert.throws(()=>validateGameState(tampered),/mismatch/);
+});
+
+
+test('R3-C next round: explicit linked seed/revision, dealer retains on self-win and rotates after discard-win',()=>{
+  const s=fixture({0:[...triplets(),...byType(5,2)]},[],'next-hand-self');
+  const settled=act(s,0,'win');
+  const second=startNextRound(settled,{gameId:'tw16-next-hand',seed:'new-hand-seed'});
+  assert.equal(second.round.handIndex,1);
+  assert.equal(second.round.dealerSeat,0);
+  assert.equal(second.round.roundId,'tw16-next-hand-round-1');
+  assert.deepEqual(second.extensions.tw16.previousRoundRef,{
+    gameId:settled.gameId,roundId:settled.round.roundId,revision:settled.revision,
+  });
+  assert.equal(validateGameState(second),true);
+  assert.deepEqual(replayGame(second),second);
+  assert.throws(()=>startNextRound(s,{gameId:'not-ended',seed:'x'}),/settled/);
+  assert.throws(()=>startNextRound(settled,{gameId:settled.gameId,seed:'x'}),/distinct/);
+  assert.throws(()=>startNextRound(settled,{gameId:'other'}),/seed/);
+
+  const ron=fixture({0:['t:5:1'],1:[...triplets(),'t:5:0']},[],'next-hand-ron');
+  const opened=act(ron,0,'discard','t:5:1');
+  const winner=resolve(opened,{1:{kind:'win',tile:'t:5:1'}});
+  const rotated=startNextRound(winner,{gameId:'next-hand-ron',seed:'next-hand-ron-seed'});
+  assert.equal(rotated.round.handIndex,1);
+  assert.equal(rotated.round.dealerSeat,1);
+  assert.equal(validateGameState(rotated),true);
+  assert.deepEqual(replayGame(rotated),rotated);
 });
