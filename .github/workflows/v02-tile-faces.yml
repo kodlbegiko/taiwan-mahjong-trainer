@@ -1,0 +1,52 @@
+name: V0.2 Realistic Tile Faces — Integration QA
+on:
+  pull_request:
+    paths:
+      - 'src/app.js'
+      - 'src/tile-visuals.js'
+      - 'style.css'
+      - 'sw.js'
+      - 'public/tiles/**'
+      - 'docs/tiles-preview.html'
+      - 'tests/tile-assets-integrity.test.js'
+      - 'tests/browser-tile-art-integration.py'
+      - '.github/workflows/v02-tile-faces.yml'
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  visual-and-offline:
+    name: Real Chromium 1440/768/390/320 + SVG/PWA
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Full existing Node gates plus SVG contract tests
+        run: npm run check
+      - name: Install real Chrome browser automation
+        run: |
+          python -m pip install 'playwright==1.56.0'
+          google-chrome --version
+          sudo apt-get update -qq
+          sudo apt-get install -y fonts-noto-cjk
+      - name: Real Chromium layouts, all SVGs, modes, offline/update and preservation
+        run: |
+          mkdir -p "$RUNNER_TEMP/tmt-tile-art"
+          python tests/browser-tile-art-integration.py --screenshots "$RUNNER_TEMP/tmt-tile-art" | tee "$RUNNER_TEMP/tmt-tile-art/test-results.txt"
+          echo "checked_out_sha=$GITHUB_SHA" >> "$RUNNER_TEMP/tmt-tile-art/environment.txt"
+          node --version >> "$RUNNER_TEMP/tmt-tile-art/environment.txt"
+          google-chrome --version >> "$RUNNER_TEMP/tmt-tile-art/environment.txt"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: v02-realistic-tiles-visual-offline-evidence
+          path: ${{ runner.temp }}/tmt-tile-art
+          retention-days: 14
