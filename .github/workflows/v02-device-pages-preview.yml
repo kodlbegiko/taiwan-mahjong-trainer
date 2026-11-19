@@ -1,4 +1,5 @@
 name: V0.2 Device Acceptance Pages Preview (NOT RELEASE)
+# 2026-11-19: authorized Pages environment settings recheck; no behavior change.
 
 on:
   push:
