@@ -103,6 +103,9 @@ export function buildReviewPlan({
         catalogEntry.questionSnapshot?.status === 'validated' &&
         catalogEntry.questionSnapshot.questionId === group.qref.questionId &&
         catalogEntry.questionSnapshot.questionVersion === group.qref.questionVersion &&
+        canonicalJson(catalogEntry.questionSnapshot.ruleRef) === canonicalJson(recent.record.ruleRef) &&
+        canonicalJson([...(catalogEntry.questionSnapshot.skillTagIds ?? [])].sort()) ===
+          canonicalJson([...recent.record.skillTagIds].sort()) &&
         catalogEntry.questionSnapshot.answerKey?.correctnessBasis !== 'unverified' &&
         typeof validateAcademyQuestion === 'function' &&
         validateAcademyQuestion(catalogEntry.questionSnapshot) === true);
