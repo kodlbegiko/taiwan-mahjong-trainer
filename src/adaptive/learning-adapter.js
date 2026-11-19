@@ -179,6 +179,20 @@ export function createAdaptiveLearningAdapter(storage, {
         throw new RangeError('Question has already been submitted in this session');
       }
     }
+    let intent;
+    try {
+      intent = academy.prepareLearningProvenance({
+        recordRef: graded.recordRef, record: graded.record,
+        academyQuestionRef: ref, sessionId,
+      });
+      if (!intent.durable) return { gradingResult: graded.gradingResult,
+        recordRef: graded.recordRef, durable: false, derivedFresh: false,
+        errorCode: 'PREPARE_NOT_DURABLE' };
+    } catch (error) {
+      return { gradingResult: graded.gradingResult, recordRef: graded.recordRef,
+        durable: false, derivedFresh: false, errorCode: error.code ?? 'PREPARE_FAILED',
+        message: error.message };
+    }
     const existing = persisted(graded.recordRef);
     if (existing) {
       if (!same(existing, graded.record)) throw new RangeError('Conflicting canonical v3 attempt ID');
@@ -215,6 +229,7 @@ export function createAdaptiveLearningAdapter(storage, {
       sessionFresh: true };
   }
   function rebuild({ asOf, ...options } = {}) {
+    const recovery = academy.recoverPending({ asOf, ...options });
     const result = academy.rebuild({ asOf, ...options });
     for (const session of result.state.trainingSessions) {
       if ((result.state.provenanceLinks ?? []).some(p => p.sessionId === session.sessionId)) {
@@ -223,13 +238,15 @@ export function createAdaptiveLearningAdapter(storage, {
     }
     const { abilityProfile, reviewPlan } = result.state;
     return {
-      durable: result.durable, profile: toAbilityPublic(abilityProfile), reviewPlan,
+      durable: result.durable, pendingRecovery: recovery,
+      profile: toAbilityPublic(abilityProfile), reviewPlan,
       recommendation: getTodayRecommendation(abilityProfile, reviewPlan, asOf),
     };
   }
   return Object.freeze({
     contractVersion: V1.contractVersion,
     submitAnswer, rebuild, resolveReviewQuestion, reconcileSession,
+    recoverPending: academy.recoverPending,
     getSession: academy.getSession, saveSession: academy.saveSession,
     load: academy.load, loadStatus: academy.loadStatus,
     getProvenance: academy.getProvenance, readLegacy: academy.readLegacy,
