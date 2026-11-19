@@ -16,10 +16,16 @@ const clone = value => JSON.parse(JSON.stringify(value));
  * independently injected question validator, never a naked 'available' flag.
  */
 export function buildAnswerableCatalog({
-  records = [], questionCatalog = [], validateAcademyDecisionRecord,
+  records = [], questionCatalog = [], reservedQuestionRefs = [], validateAcademyDecisionRecord,
   validateAcademyQuestion,
 } = {}) {
   const normalized = normalizeRecordEntries(records, { validateAcademyDecisionRecord });
+  if (!Array.isArray(reservedQuestionRefs)) throw new TypeError('reservedQuestionRefs must be an array');
+  const reserved = new Set(reservedQuestionRefs.map(ref => {
+    requireObject(ref, 'reservedQuestionRef');
+    requireId(ref.questionId); requireId(ref.questionVersion);
+    return ref.questionId + '@' + ref.questionVersion;
+  }));
   const candidates = [];
   for (const entry of normalized) {
     if (entry.kind !== 'legacy-v3') continue;
@@ -76,13 +82,14 @@ export function buildAnswerableCatalog({
     }
     unique.set(key, meta);
   }
-  return [...unique.values()].sort((a, b) =>
-    a.questionId.localeCompare(b.questionId) || a.questionVersion.localeCompare(b.questionVersion));
+  return [...unique.values()].filter(q => !reserved.has(q.questionId + '@' + q.questionVersion))
+    .sort((a, b) => a.questionId.localeCompare(b.questionId) ||
+      a.questionVersion.localeCompare(b.questionVersion));
 }
 
 /** Select only verified, replayable source questions; no simulated Bot or placeholder scenario. */
 export function planDailyTraining({
-  profile, reviewPlan, records = [], questionCatalog = [],
+  profile, reviewPlan, records = [], questionCatalog = [], reservedQuestionRefs = [],
   validateAcademyDecisionRecord, validateAcademyQuestion,
   minutes = 30, seed, asOf, ruleRef,
 } = {}) {
@@ -93,7 +100,8 @@ export function planDailyTraining({
   requireId(String(seed ?? ''), 'seed');
   const generatedAsOf = requireUtc(asOf);
   const catalog = buildAnswerableCatalog({
-    records, questionCatalog, validateAcademyDecisionRecord, validateAcademyQuestion,
+    records, questionCatalog, reservedQuestionRefs, validateAcademyDecisionRecord,
+    validateAcademyQuestion,
   });
   if (ruleRef !== undefined) {
     requireObject(ruleRef, 'ruleRef');
