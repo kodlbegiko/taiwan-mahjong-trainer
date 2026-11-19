@@ -1,0 +1,107 @@
+name: V0.2 Independent UI Release Gates
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/v02-ui-release-gates.yml'
+      - 'tests/browser/**'
+      - 'tests/pwa/**'
+      - 'tests/integration/**'
+      - 'src/app.js'
+      - 'src/training/**'
+      - 'src/storage/**'
+      - 'public/**'
+      - 'sw.js'
+      - 'index.html'
+      - 'style.css'
+      - 'docs/quality/**'
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  node-release:
+    name: Node API / Golden / P0
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm run check
+      - run: echo "Verified exact source $(git rev-parse HEAD)"
+  chromium-release:
+    name: Chrome UI + real offline PWA
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Select exact UI source without changing production files
+        shell: bash
+        env:
+          PINNED_UI_SHA: 8d2360490a4d1aca979d6b3f2692a9d15462a4f1
+        run: |
+          set -euo pipefail
+          if [[ -f sw.js ]] && grep -q 'data-mode="multi_wait"' index.html; then
+            echo "UI_ROOT=$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
+            echo "GATE_SOURCE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+          else
+            git fetch --no-tags origin refs/pull/21/head
+            current=$(git rev-parse FETCH_HEAD)
+            if [[ "$current" != "$PINNED_UI_SHA" ]]; then
+              echo "::error::PR #21 head changed. Review the new source SHA and update pinned UI SHA before rerunning."
+              exit 1
+            fi
+            git worktree add --detach "$RUNNER_TEMP/tmt-ui-candidate" "$current"
+            mkdir -p "$RUNNER_TEMP/tmt-ui-candidate/tests/browser" "$RUNNER_TEMP/tmt-ui-candidate/tests/pwa" "$RUNNER_TEMP/tmt-ui-candidate/tests/integration"
+            cp tests/browser/_release_site.py tests/browser/release-gates.py "$RUNNER_TEMP/tmt-ui-candidate/tests/browser/"
+            cp tests/pwa/release-gates.py "$RUNNER_TEMP/tmt-ui-candidate/tests/pwa/"
+            cp tests/integration/release-storage.test.js "$RUNNER_TEMP/tmt-ui-candidate/tests/integration/"
+            echo "UI_ROOT=$RUNNER_TEMP/tmt-ui-candidate" >> "$GITHUB_ENV"
+            echo "GATE_SOURCE_SHA=$current" >> "$GITHUB_ENV"
+          fi
+          mkdir -p "$RUNNER_TEMP/ui-release-evidence"
+      - name: Validate candidate P0 on exact source SHA
+        run: cd "$UI_ROOT" && npm run check
+      - name: Install browser prerequisites
+        run: |
+          python -m pip install 'playwright==1.56.0'
+          google-chrome --version
+          sudo apt-get update -qq
+          sudo apt-get install -y fonts-noto-cjk
+      - name: Real browser canonical scoring and storage gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$UI_ROOT"
+          python tests/browser/release-gates.py --screenshots "$RUNNER_TEMP/ui-release-evidence" | tee "$RUNNER_TEMP/ui-release-evidence/browser-results.txt"
+      - name: Real offline / new tab / version update gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$UI_ROOT"
+          python tests/pwa/release-gates.py --screenshots "$RUNNER_TEMP/ui-release-evidence" | tee "$RUNNER_TEMP/ui-release-evidence/pwa-results.txt"
+      - name: Report exact SHA and browser environment
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/ui-release-evidence"
+          echo "workflow_run=$GITHUB_RUN_ID checkout_sha=$GITHUB_SHA" >> "$RUNNER_TEMP/ui-release-evidence/environment.txt"
+          echo "ui_source=$GATE_SOURCE_SHA" >> "$RUNNER_TEMP/ui-release-evidence/environment.txt"
+          node --version >> "$RUNNER_TEMP/ui-release-evidence/environment.txt"
+          python --version >> "$RUNNER_TEMP/ui-release-evidence/environment.txt"
+          google-chrome --version >> "$RUNNER_TEMP/ui-release-evidence/environment.txt"
+          uname -srmo >> "$RUNNER_TEMP/ui-release-evidence/environment.txt"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: independent-ui-release-evidence
+          path: ${{ runner.temp }}/ui-release-evidence
+          retention-days: 14
