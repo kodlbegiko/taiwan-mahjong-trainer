@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createGame, createPlayerView, listLegalActions, applyAction } from '../../src/rules/index.js';
 import { analyzePlayerView } from '../../src/strategy/index.js';
-import { createReplayService, createReplayArchive, validateReplayArchive, ReplayError } from '../../src/replay/index.js';
-import { checksum } from '../../src/replay/internal.js';
+import { createReplayService, ReplayError } from '../../src/replay/index.js';
+import { createReplayArchive, validateReplayArchive, checksum } from '../../src/replay/internal.js';
 import { prepareVerifiedAdaptiveEvidence } from '../../src/scenario/index.js';
 
 const game=(seed='replay-golden-2026',gameId='replay-golden') =>
