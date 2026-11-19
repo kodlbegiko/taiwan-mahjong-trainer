@@ -74,6 +74,10 @@ function physical(s) {
   if (!match || Number(match[1]) > 33 || s !== 't:' + Number(match[1]) + ':' + match[2]) throw new RangeError('無效 standard physical tileId：' + s);
   return Number(match[1]);
 }
+function flowerPhysical(s) {
+  if (typeof s !== 'string' || !/^f:[a-z][a-z0-9-]*:[0-9]+$/.test(s)) throw new RangeError('無效 flower physical tileId');
+  return s;
+}
 function identity(t, kind = 'standard') {
   object(t, 'TileIdentity', ['schemaVersion','contractVersion','id','kind','tileType','flowerCode','copyIndex'],
     ['schemaVersion','contractVersion','id','kind','copyIndex']);
@@ -129,7 +133,8 @@ function publicEvent(e, asOf) {
   object(e.payload, 'public payload', ['seat','tileId','tileIds','kind','claimEventId','concealedCount','reasonCode','sourceSeat'], []);
   if (e.payload.tileId !== undefined) {
     if (!['discard','claim','kong','flower'].includes(e.type)) throw new TypeError('摸牌等事件不得曝光 tileId');
-    physical(e.payload.tileId);
+    if (e.type === 'flower') flowerPhysical(e.payload.tileId);
+    else physical(e.payload.tileId);
   }
   if (e.payload.tileIds !== undefined) {
     if (!['claim','kong'].includes(e.type)) throw new TypeError('事件不得曝光隱藏 tileIds');
