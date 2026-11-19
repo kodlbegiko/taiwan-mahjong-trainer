@@ -110,3 +110,46 @@
 4. Phase 3 **PENDING**：建立獨立 Academy 固定 SHA 預覽並驗證離線，留下 iOS/Android **NOT_RUN**，更新此報告的實際 QA/Gate。
 
 **最終結論：Phase 0 契約完成，Master Academy 全功能整合尚未完成；不對 V0.2 正式發版授權。**
+
+
+---
+
+## 10. Phase 1 來源審查／Phase 2 初次隔離整合快照（2026-11-19 晚間；以此節覆蓋前述「來源尚無 PR」歷史狀態）
+
+> **此段是更新的稽核事實，不改寫前述 Phase 0 的歷史時間點。** 最新查詢時正式 `main=25870862b6499f7e699967aa76429ae5dcfc5db4`；所有五個來源 PR 已建立，均尚未合併。整合使用原 [Draft PR #33](https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/33)，**不可在未解除阻擋前升為 Ready 或合併 main**。
+
+| 模組／來源 PR | 當次 pinned HEAD | 來源 CI／驗收結論 |
+| --- | --- | --- |
+| Rules Engine [#34](https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/34) | `6463132f039c28400f1b8816e683a90ddd77bc03` | `PR_OPEN / BLOCKED`；[Verify #44505529705](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44505529705) SUCCESS，但兩項未解決 inline reviews：`JSON.stringify` 比對導致 JSON key order 不同即錯拒合法重播；花牌 profile 漏 `code` 因 RegExp coercion 可通過驗證。已在來源 PR 留下 blocking 審查，未納入整合 |
+| Strategy [#36](https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/36) | `fe09dfe137e154a549d03da61b310e6386c4d6a6` | `PR_OPEN (Draft) / CI_PASS / CROSS_MODULE_NOT_RUN`；[Verify #44507783666](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44507783666) SUCCESS，程式只讀安全 `PlayerView` 並重用 canonical `analyzeDiscards`，模擬兩巡明確為 uncalibrated estimate，放槍/台數 unknown；等待真正 Rules→Strategy runtime tests |
+| Learning Academy [#35](https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/35) | `deceed51c156284607367a2592dae32f9808e736` | `PR_OPEN / CI_PASS / STAGED_FOR_INTEGRATION`；[Verify #44506271214](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44506271214) SUCCESS，20 Lessons、100 題基於正式 v3 的可重播結構題；`VERIFIED_SCENARIO_SCORER_COUNT=0`，不得稱已可評情境題 |
+| Adaptive [#37](https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/37) | `aca0a5f1e369aaa1fa5d55d8fd7e9df7e9807a2a` | `PR_OPEN (Draft) / CI_PASS / STAGED_FOR_INTEGRATION`；最新 [Verify #44508648384](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44508648384) SUCCESS。提供 RecordRef 家族驗證、idempotent AbilityProfile、ReviewPlan、namespaced sidecar；需要 Learning SkillTag registry 的正式 adapter 與實際 UI 消費者 |
+| Academy UI [#38](https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/38) | `e42d8a1b8abead2654fbdc0591353b62d6d3c3f3` | `PR_OPEN (Draft) / CI_PASS / UI-01 BLOCKED`；[Verify #44507726809](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44507726809) 及 Chrome/PWA jobs SUCCESS，但 `src/academy-ui/public-facade.js` 明確只是**舊 v3 紀錄的唯讀 adapter**；目前只有模擬 scenario 牌面與舊三模式導流，未接 `src/academy/*`／`src/adaptive/*`，**沒有正式 12 步閉環**；SW 也尚未納入新模組的 JS/JSON 資源 |
+
+上述所有來源均收到整合者的 GitHub PR 討論審查：#34 需修 replay 與花牌；#36 需真正與 Rules 公開視角合測；#35 必須保留 scenario unscorable；#37 需正式 registry adapter／舊資料讀回；#38 必須回來源 PR 把真實 Learning/Adaptive API 接到玩家的全部學習流程。**不要在此整合 PR 偷改來源 AI 的責任模組**。
+
+### 10.1 本輪實際提交到 #33 的隔離候選
+
+- 正式 main 仍是 `25870862b6499f7e699967aa76429ae5dcfc5db4`，未變動。整合 Draft 在 `9b7e9bab2a2d321865f6bf5b4cc154c4dd78eec5` 組合了 **Learning #35 及 Adaptive #37 的 22 個新增來源檔案**，均使用與 GitHub PR HEAD 完全相同的 blob，無覆寫共用核心／任何 UI／`sw.js`。
+- 整合者新增 `src/integration/master-academy-facade.js`：明確批准的 `SkillTag` registry 和 legacy error mapping、`LessonPublic/QuestionPublic` 讀取、`submitAcademyAnswer` 正式 v3 grading、舊版 `archive:v3` 持久化核驗、`RecordRef{kind:"legacy-v3"}`、Adaptive sidecar、`AbilityProfilePublic/ReviewPlan` 和今日建議。**沒有 verified scenario scorer 時拒絕正式作答**；不宣稱 Rules、Strategy、UI 12 步已接線。
+- 新增必跑 `tests/integration/master-academy-learning-adaptive.test.js`：20 真 Lessons、100 題來源、公開題無 answerKey、正式 v3 作答→archive 讀回→AbilityProfile/ReviewPlan、重複 ID 擋下、歷史 v1/v3 bytes 保留、未驗證 scenario 不計分、損毀 sidecar fail closed、拒絕儲存時不能冒稱持久化。
+- [整合 Verify #44538204653](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44538204653)，HEAD `9b7e9bab2a2d321865f6bf5b4cc154c4dd78eec5`：**146 tests／145 pass／0 fail／0 TODO／1 opt-in skipped**。兩套必要 10k Oracle 與 Q-001/Q-002/I-003 仍 PASS；Learning/Adaptive 來源獨立測試及四項全新整合測試 PASS。
+- [整合 Independent UI/PWA #44538204663](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44538204663) 同 HEAD：Chrome UI/real offline PWA 及 Node API/P0 兩個 jobs 都 **SUCCESS**。**它只驗證既有 V0.2 UI 和 SW**，不能宣稱 Master Academy 新學院介面已離線／實機可用。
+- 此階段沒有新增任何由瀏覽器直接 import 的 Academy 模組：原 V0.2 `sw.js` 沒有因隔離的 Node integration test 擅自升版。將來 UI 真正引入新模組時必須在其來源 PR 中更新全部新 JS/JSON 快取並原子提升 `CACHE_VERSION`。
+- **PR #33 必須保留 Draft；既有 V0.2 Pages PR #26 SOURCE_SHA 不變，舊 V0.2 網址不是 Academy 預覽。**
+
+### 10.2 真正剩餘的品質 Gate
+
+| Gate | 狀態 | 原因 |
+| --- | --- | --- |
+| R-01 / R-02 | `BLOCKED` | #34 JSON key-order 重播與非法花牌 Profile 未修；Rules 不在隔離候選 |
+| S-01 | `CI_PASS_ONLY` | #36 來源測試通過，但真實 PlayerView 接合、策略防洩漏同 SHA 尚未完成 |
+| L-01 | `NODE_CROSS_PASS`（既有 v3 題型） | 100 題來源與公開題/評分檢查；情境題 verified scorer 仍為零 |
+| A-01 | `NODE_CROSS_PASS`（legacy-v3） | 真正 Learning→Adaptive 持久化／冪等／複習測試通過；academy-v1 情境證據因無 scorer 不可宣稱已正式使用 |
+| UI-01 | `BLOCKED` | #38 尚未導入 LessonPublic + Adaptive 公開 API，未有完整學習閉環 |
+| REG-01 | `PASS` | 整合 Draft 同 SHA Golden／雙 10k Oracle／三種既有模式 Node 回歸 |
+| REG-02 | `BASELINE_PASS` | 現有 34 SVG、Chromium desktop/mobile 模擬；不是五個新模組的 UI 驗收 |
+| PWA-01 / Academy 預發布 | `BLOCKED` | 尚無完整新 UI/快取、新 Academy 固定 SHA preview；不拿 V0.2 old Preview 冒充 |
+| 實體 iPhone/Android、VoiceOver/TalkBack | `NOT_RUN` | 使用者已決定暫緩；Issue #12 維持 Open |
+
+**Phase 2 進展：Learning + Adaptive 在隔離組合的 backend 單一 v3 學習流程已獲得可重播測試證據。Rules／Strategy／UI 仍未通過跨模組放行，五個來源 PR 均未合併 main；完整 12 步 Master Academy 尚未完成、正式 Release 不授權。**
