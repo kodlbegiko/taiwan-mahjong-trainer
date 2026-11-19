@@ -203,3 +203,23 @@ test('Public flower identities are separate from standard 0..33 and do not reduc
   illegal.publicEvents[0].type='draw';
   assert.throws(()=>validatePlayerView(illegal),/不得曝光/);
 });
+
+
+test('asOf may include a private event after the last public event, but no public event may exceed the public watermark',()=>{
+  const view=makePlayerView();
+  view.asOfEventSeq=5; // e.g. own private draw; round.lastPublicEventSeq remains 4
+  assert.equal(validatePlayerView(view),true);
+  const future=structuredClone(view);
+  future.publicEvents=[{
+    schemaVersion:1,contractVersion:future.contractVersion,
+    eventId:'public-event-5',gameId:future.gameId,seq:5,ruleRef:future.ruleRef,
+    type:'pass',visibility:'public',payload:{},
+  }];
+  assert.throws(()=>validatePlayerView(future),/event.seq/);
+});
+test('Claimed river de-duplication must correspond to a public meld; cannot hide a duplicated ID in two rivers',()=>{
+  const view=makePlayerView();
+  view.opponents[0].river=[{tileId:'t:29:0',seq:1,claimedByEventId:'claim-fake'}];
+  view.opponents[1].river=[{tileId:'t:29:0',seq:2}];
+  assert.throws(()=>validatePlayerView(view),/重複/);
+});
