@@ -28,12 +28,12 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     env:
-      SOURCE_SHA: 4be352ff202d509ab0f52e4fed0c0e504d900a11
+      SOURCE_SHA: 5e692fd9bce18ff6a947cd7f2045e8425b8fe63b
     steps:
       - name: Check out pinned V0.2 main source, not the preview branch
         uses: actions/checkout@v4
         with:
-          ref: 4be352ff202d509ab0f52e4fed0c0e504d900a11
+          ref: 5e692fd9bce18ff6a947cd7f2045e8425b8fe63b
 
       - name: Ensure source SHA matches the documented test candidate
         shell: bash
@@ -93,6 +93,8 @@ jobs:
             'public/icons/icon-192.png',
             'public/icons/icon-512.png',
             'src/app.js',
+            'src/tile-visuals.js',
+            ...Array.from({ length: 34 }, (_, i) => `public/tiles/${i}.svg`),
             'src/core/efficiency.js',
             'src/analysis/explain.js',
             'src/storage/local.js',
@@ -113,6 +115,16 @@ jobs:
             const type = response.headers.get('content-type') ?? '';
             if (path === 'sw.js') {
               assert.match(type, /javascript|ecmascript/, 'SW must have a JavaScript MIME type');
+              const text = new TextDecoder().decode(body);
+              assert.match(text, /tmt-v02-realistic-tiles-20261119-r1/, 'SW not updated to realistic tiles cache');
+              for (let i = 0; i < 34; i++) {
+                assert.ok(text.includes(`'./public/tiles/${i}.svg'`), 'SW missing offline tile ' + i);
+              }
+              assert.ok(text.includes("'./src/tile-visuals.js'"), 'SW missing renderer module');
+            }
+            if (path.startsWith('public/tiles/')) {
+              assert.match(type, /image\/svg\+xml|text\/xml/, 'SVG MIME mismatch: ' + path);
+              assert.match(new TextDecoder().decode(body), /<svg\b/, 'SVG file not rendered: ' + path);
             }
             if (path === '__acceptance.json') {
               const info = JSON.parse(new TextDecoder().decode(body));
@@ -130,3 +142,100 @@ jobs:
           console.log('PASS LIVE PREVIEW SHA', process.env.SOURCE_SHA);
           console.log('PAGES_URL', base.href);
           JS
+
+      - name: Real public HTTPS Chromium with all tile images and offline cold tab
+        env:
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install 'playwright==1.56.0'
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          from playwright.sync_api import sync_playwright
+          
+          base = os.environ['PAGE_URL'].rstrip('/') + '/'
+          shots = Path(os.environ['RUNNER_TEMP']) / 'tmt-live-preview'
+          shots.mkdir(parents=True, exist_ok=True)
+          
+          def verify_images(page, selector, number):
+              page.wait_for_function("""([sel, count]) => {
+                const imgs=[...document.querySelectorAll(sel)];
+                return imgs.length === count && imgs.every(i=>i.complete && i.naturalWidth>0 && i.naturalHeight>0);
+              }""", arg=[selector, number], timeout=45000)
+          
+          with sync_playwright() as p:
+              browser = p.chromium.launch(channel='chrome', headless=True, args=['--no-sandbox'])
+              context = browser.new_context(viewport={'width':390, 'height':900}, is_mobile=True, has_touch=True)
+              page = context.new_page()
+              faults = []
+              page.on('pageerror', lambda err: faults.append(str(err)))
+              page.goto(base, wait_until='domcontentloaded', timeout=60000)
+              verify_images(page, '#hand img.tile-face-image', 17)
+              assert page.locator('#hand button[data-tile]').count() == 17
+              assert page.evaluate('document.documentElement.scrollWidth <= innerWidth + 2')
+              page.screenshot(path=str(shots / 'live-390-question.png'), full_page=True)
+              first = page.locator('#hand button').first
+              first.focus()
+              first.press('ArrowRight')
+              assert page.evaluate('document.activeElement.dataset.index') == '1'
+              page.keyboard.press('End')
+              page.keyboard.press('Enter')
+              page.locator('#answer:visible').wait_for()
+              assert page.locator('#explanation-panel:visible').count() == 1
+              verify_images(page, '#hand img.tile-face-image', 17)
+              page.screenshot(path=str(shots / 'live-390-discard-answer.png'), full_page=True)
+              page.locator('[data-mode="tenpai"]').click()
+              verify_images(page, '#wait-options img.tile-face-image', 34)
+              page.locator('#wait-options button:not([disabled])').first.click()
+              page.locator('#submit-waits').click()
+              page.locator('#wait-answer:visible').wait_for()
+              page.locator('[data-mode="multi_wait"]').click()
+              verify_images(page, '#wait-options img.tile-face-image', 34)
+              page.locator('#wait-options button:not([disabled])').first.click()
+              page.locator('#submit-waits').click()
+              page.locator('#wait-answer:visible').wait_for()
+              saved = page.evaluate("""() => JSON.parse(localStorage.getItem('tw-mahjong-trainer:archive:v3'))""")
+              assert saved['schemaVersion'] == 3 and len(saved['records']) >= 3
+              assert set(r['taskType'] for r in saved['records']) == {'discard','tenpai','multi_wait'}
+              page.screenshot(path=str(shots / 'live-390-multi-wait.png'), full_page=True)
+              page.wait_for_function('Boolean(navigator.serviceWorker?.controller)', timeout=45000)
+              pre = page.evaluate("""async () => {
+                const names = (await caches.keys()).filter(x=>x.startsWith('tmt-shell-'));
+                if (names.length !== 1) return {names, missing:['cache-count']};
+                const cache=await caches.open(names[0]), missing=[];
+                for(let i=0;i<34;i++){
+                  if(!(await cache.match(new URL('./public/tiles/'+i+'.svg', location.href)))) missing.push(i);
+                }
+                if(!(await cache.match(new URL('./src/tile-visuals.js',location.href)))) missing.push('renderer');
+                return {names, missing};
+              }""")
+              assert len(pre['names']) == 1 and len(pre['missing']) == 0, pre
+              preserved = json.dumps([{'grade':'perfect','seconds':1.5,'difficulty':'beginner','date':'2026-11-01T00:00:00.000Z'}])
+              page.evaluate('(v) => localStorage.setItem("tw-mahjong-trainer:session:v1", v)', preserved)
+              context.set_offline(True)
+              cold = context.new_page()
+              cold.goto(base, wait_until='domcontentloaded', timeout=45000)
+              verify_images(cold, '#hand img.tile-face-image', 17)
+              cold.locator('[data-mode="tenpai"]').click()
+              verify_images(cold, '#wait-options img.tile-face-image', 34)
+              cold.locator('#wait-options button:not([disabled])').first.click()
+              cold.locator('#submit-waits').click()
+              cold.locator('#wait-answer:visible').wait_for()
+              cold.screenshot(path=str(shots / 'live-390-offline-34-tiles.png'), full_page=True)
+              assert cold.evaluate('localStorage.getItem("tw-mahjong-trainer:session:v1")') == preserved
+              offline_archive = cold.evaluate("""() => JSON.parse(localStorage.getItem('tw-mahjong-trainer:archive:v3'))""")
+              assert len(offline_archive['records']) >= 4 and offline_archive['schemaVersion'] == 3
+              assert not faults, faults
+              print('PASS live HTTPS: 17 discard / 34 tenpai / 34 multi_wait / grade / v3 persisted')
+              print('PASS live offline: SW control / atomic 34 SVG + renderer cache / new offline tab / answer / preserve v1+v3')
+              context.close()
+              browser.close()
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: v02-public-live-tiles-offline
+          path: ${{ runner.temp }}/tmt-live-preview
+          retention-days: 14
