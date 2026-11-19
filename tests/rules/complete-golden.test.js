@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   createGame,applyAction,listLegalActions,replayGame,createPlayerView,
-  validateGameState,createDeck,getRuleProfile,startNextRound,
+  validateGameState,createDeck,getRuleProfile,startNextRound,COMPLETE_ENGINE_VERSION,
 } from '../../src/rules/index.js';
 import {calculateShanten} from '../../src/core/efficiency.js';
 
@@ -42,6 +42,7 @@ function fixture(seats,liveFirst=[],tag='golden'){
   const s=createGame({gameId:'golden-'+tag,seed:'fixture-seed-'+tag,
     fixtureDeck:arrangedDeck(seats,liveFirst),dealerSeat:0,...REF});
   assert.equal(s.round.phase,'await_discard');
+  assert.equal(s.round.prevailingWind,'east');
   assert.equal(validateGameState(s),true);
   assert.deepEqual(replayGame(s),s);
   const view=createPlayerView(s,0);
@@ -79,6 +80,7 @@ test('R3-B positive Golden: dealer has a real canonical 5-meld+eye self-win, set
   const s=fixture({0:seventeen},[],'selfwin');
   const win=selected(s,0,'win',undefined,'SELF_DRAW_WIN');
   assert.equal(win.actorSeat,0);
+  assert.equal(win.legalityBasis.engineVersion,COMPLETE_ENGINE_VERSION);
   const result=step(s,0,win);
   assert.equal(result.round.phase,'settled');
   assert.equal(result.extensions.tw16.result.winnerSeat,0);
@@ -288,8 +290,9 @@ test('R3-B exhaustive draw Golden: reserve exactly 16 tail tiles, zero settlemen
   assert.equal(validateGameState(s),true);
   assert.deepEqual(replayGame(s),s);
   assert.ok(s.events.every((e,i)=>e.seq===i+1));
-  const following=startNextRound(s,{gameId:'next-draw-hand',seed:'next-draw-seed'});
+  const following=startNextRound(s,{gameId:'next-draw-hand',seed:'next-draw-seed',prevailingWind:'south'});
   assert.equal(following.round.dealerSeat,s.round.dealerSeat);
   assert.equal(following.round.handIndex,1);
+  assert.equal(following.round.prevailingWind,'south');
   assert.equal(validateGameState(following),true);
 });
