@@ -130,7 +130,7 @@ function publicEvent(e, asOf) {
   if (e.causedByActionId !== undefined) id(e.causedByActionId, 'causedByActionId');
   if (e.previousEventId !== undefined) id(e.previousEventId, 'previousEventId');
   // The adapter deliberately accepts only unambiguous public payload fields.
-  object(e.payload, 'public payload', ['seat','tileId','tileIds','kind','claimEventId','concealedCount','reasonCode','sourceSeat'], []);
+  object(e.payload, 'public payload', ['seat','tileId','tileIds','kind','claimEventId','concealedCount','reasonCode','sourceSeat','count','countsBySeat'], []);
   if (e.payload.tileId !== undefined) {
     if (!['discard','claim','kong','flower'].includes(e.type)) throw new TypeError('摸牌等事件不得曝光 tileId');
     if (e.type === 'flower') flowerPhysical(e.payload.tileId);
@@ -143,6 +143,16 @@ function publicEvent(e, asOf) {
   if (e.payload.seat !== undefined) integer(e.payload.seat, 'payload.seat', 0, 3);
   if (e.payload.sourceSeat !== undefined) integer(e.payload.sourceSeat, 'payload.sourceSeat', 0, 3);
   if (e.payload.concealedCount !== undefined) integer(e.payload.concealedCount, 'payload.concealedCount');
+  if (e.payload.count !== undefined) {
+    if (e.type !== 'draw') throw new TypeError('count 只可用於 redacted draw');
+    integer(e.payload.count, 'payload.count', 1, 1);
+  }
+  if (e.payload.countsBySeat !== undefined) {
+    if (e.type !== 'deal') throw new TypeError('countsBySeat 只可用於 redacted deal');
+    if (!Array.isArray(e.payload.countsBySeat) || e.payload.countsBySeat.length !== 4)
+      throw new TypeError('countsBySeat 應為四席公開數量');
+    e.payload.countsBySeat.forEach(n=>integer(n, 'countsBySeat'));
+  }
   for (const k of ['kind','claimEventId','reasonCode']) if (e.payload[k] !== undefined) id(e.payload[k], k);
 }
 function action(a, v) {
@@ -200,7 +210,7 @@ export function readPlayerView(input) {
   v.opponents.forEach(p=>member(p));
   const seats = new Set([v.self.seat,...v.opponents.map(p=>p.seat)]);
   if (seats.size !== 4) throw new RangeError('席位重複');
-  array(v.publicEvents, 'publicEvents').forEach(e => { publicEvent(e, v.round.lastPublicEventSeq); if (e.gameId !== v.gameId) throw new RangeError('event.gameId 不符'); sameRule(e.ruleRef, v.ruleRef); });
+  array(v.publicEvents, 'publicEvents').forEach(e => { publicEvent(e, v.asOfEventSeq); if (e.gameId !== v.gameId) throw new RangeError('event.gameId 不符'); sameRule(e.ruleRef, v.ruleRef); });
   array(v.legalActions, 'legalActions').forEach(a=>action(a, v));
   if (new Set(v.legalActions.map(a=>a.actionId)).size !== v.legalActions.length) throw new RangeError('actionId 重複');
   array(v.knownUnavailableTypes, 'knownUnavailableTypes').forEach(t=>integer(t, 'knownUnavailableType', 0, 33));
