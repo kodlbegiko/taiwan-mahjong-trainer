@@ -272,3 +272,47 @@ test('R3-C invalid actions and unsupported special claims fail closed',()=>{
   const post=move(game,game.round.currentSeat,act);
   assert.ok(listLegalActions(post,game.round.currentSeat).every(a=>a.kind!=='chi'));
 });
+
+
+test('R3-A positive flower Golden for nonzero dealer: dealer-first clockwise replacement and private tail-redaction',()=>{
+  let game;
+  for(let i=0;i<12;i++){
+    const candidate=createGame({gameId:'flower-dealer2',seed:'flower-dealer2-'+i,...REF,dealerSeat:2});
+    if(candidate.round.phase==='replacement'){game=candidate;break;}
+  }
+  assert.ok(game,'must locate a reproducible seeded deal with at least one flower');
+  const order=[2,3,0,1];
+  const first=order.find(seat=>game.players[seat].concealed.some(id=>id.startsWith('f:')));
+  assert.equal(game.round.currentSeat,first);
+  let count=0;
+  for(;game.round.phase==='replacement'&&count<50;count++){
+    const actor=game.round.currentSeat;
+    const flower=pick(game,actor,'replace_flower');
+    assert.ok(flower);
+    const before=game.wall.length;
+    game=move(game,actor,flower);
+    assert.equal(game.wall.length,before-1);
+  }
+  assert.ok(count>0);
+  assert.equal(game.round.currentSeat,2);
+  assert.equal(game.round.phase,'await_discard');
+  assert.ok(game.players.some(p=>p.flowers.length>0));
+  const outsider=createPlayerView(game,0);
+  assert.ok(outsider.publicEvents.some(e=>e.type==='flower'));
+  assert.ok(outsider.publicEvents.every(e=>!Object.hasOwn(e.payload,'replacementTileId')));
+  assert.ok(outsider.opponents.every(x=>!Object.hasOwn(x,'concealed')));
+  assert.equal(validateGameState(game),true);
+  assert.deepEqual(replayGame(game),game);
+});
+
+test('R3-C adversarial duplicate physical cards fail before an action can move them',()=>{
+  const game=ready('duplicate-inventory-fixture');
+  const forged=cloned(game);
+  forged.players[0].concealed[0]=forged.wall[0];
+  assert.throws(()=>validateGameState(forged,{replay:false}),/Physical tile duplication/);
+  const actor=forged.round.currentSeat;
+  const action=listLegalActions(game,actor).find(a=>a.kind==='discard');
+  assert.throws(()=>applyAction(forged,{
+    actorSeat:actor,actionId:action.actionId,expectedRevision:forged.revision,
+  }),/Physical tile duplication/);
+});
