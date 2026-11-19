@@ -13,3 +13,5 @@ export {
 } from './engine.js';
 
 export { scoreWinningHand, settleWin } from './scoring.js';
+
+export { COMPLETE_ENGINE_VERSION } from './complete-engine.js';
