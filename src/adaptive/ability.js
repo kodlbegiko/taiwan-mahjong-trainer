@@ -104,7 +104,7 @@ export function buildAbilityProfile({
       tagId: bucket.tagId, attempts: n, correct: bucket.correct,
       scoreSum: bucket.scoreSum, meanDurationMs: n ? bucket.totalDuration / n : null,
       evidenceRefs: uniqueRefs(bucket.evidenceRefs),
-      estimatedProficiency: n >= MIN_ESTIMATE_ATTEMPTS ? mean : null,
+      estimatedProficiency: n >= MIN_ESTIMATE_ATTEMPTS && bucket.questionIds.size >= 3 ? mean : null,
       uncertainty: { low: n ? Math.max(0, mean - margin) : 0, high: n ? Math.min(1, mean + margin) : 1 },
     };
   });
