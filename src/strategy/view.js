@@ -161,6 +161,7 @@ function action(a, v) {
   v1(a, 'LegalAction'); id(a.actionId, 'actionId');
   if (!types.has(a.kind) || a.actorSeat !== v.audienceSeat) throw new RangeError('非法 actor/action kind');
   integer(a.expectedRevision, 'expectedRevision');
+  if (a.expectedRevision !== v.asOfEventSeq) throw new RangeError('LegalAction expectedRevision 與 PlayerView.asOfEventSeq 不一致');
   sameRule(a.ruleRef, v.ruleRef);
   array(a.tileIds, 'action.tileIds').forEach(physical);
   if (a.claimEventId !== undefined) id(a.claimEventId, 'claimEventId');
