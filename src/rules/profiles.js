@@ -104,6 +104,32 @@ export function validateRuleProfile(p) {
       || !['undefined','configured'].includes(p.scoringPolicy.mode)
       || (p.scoringPolicy.mode === 'configured' && !string(p.scoringPolicy.configRef))) fail('scoringPolicy');
   if (p.extensions !== undefined && !isObj(p.extensions)) fail('extensions');
+  if (p.profileId === 'tw16-configurable-table') {
+    const x=p.extensions?.tw16;
+    if (p.ruleVersion !== 'experimental-full-v1' || p.status !== 'experimental'
+        || p.scope !== 'four-player' || !isObj(x)
+        || p.turnPolicy.claimPriority !== 'configured'
+        || p.turnPolicy.replacementDraw !== 'configured'
+        || p.winningPolicy.mode !== 'configured'
+        || p.winningPolicy.configRef !== 'tw16-win-five-melds-v1'
+        || p.scoringPolicy.mode !== 'configured'
+        || p.scoringPolicy.configRef !== 'tw16-minimal-tai-v1'
+        || x.housePolicyVersion !== 'tw16-table-experimental/1.0.0'
+        || x.startingPrevailingWind !== 'east'
+        || x.windAdvancePolicy !== 'explicit'
+        || !Array.isArray(x.claimOrder)
+        || x.claimOrder.join(',') !== 'win,kong,pong,chi'
+        || x.singleWinner !== true || x.chiFromPreviousSeatOnly !== true
+        || x.robAddedKong !== false || x.passWinLock !== 'until-own-discard'
+        || x.replacementFromTail !== true || x.dealerRetentionOnDraw !== true
+        || !Number.isInteger(x.reserveTail) || x.reserveTail < 0 || x.reserveTail > 32
+        || !Array.isArray(x.specialHands) || x.specialHands.length
+        || !isObj(x.scoring)
+        || Object.values(x.scoring).some(n=>typeof n!=='number'
+          || !Number.isFinite(n)||n<0)) fail('experimental table policy');
+    if (!p.tileSet.flowers.enabled || p.tileSet.flowers.codes.length!==8)
+      fail('experimental table flowers');
+  }
   // Verification in this engine is intentionally restricted to the independently
   // regression-tested concealed-hand structure, not local four-player house rules.
   if (p.status === 'verified' && (p.scope !== 'structural-16' || !p.sourceRefs.length
