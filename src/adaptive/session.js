@@ -48,7 +48,11 @@ export function buildAnswerableCatalog({
       try {
         replayExercise(item.questionSnapshot);
         if (item.questionId !== item.questionSnapshot.id ||
-          item.questionVersion !== LEGACY_QUESTION_VERSION) continue;
+          item.questionVersion !== LEGACY_QUESTION_VERSION ||
+          item.taskType !== item.questionSnapshot.taskType ||
+          item.seed !== item.questionSnapshot.seed ||
+          item.generatorVersion !== item.questionSnapshot.generatorVersion ||
+          item.ruleRef?.ruleVersion !== item.questionSnapshot.ruleVersion) continue;
       } catch { continue; }
     } else if (item.source === 'academy-v1') {
       const question = item.questionSnapshot;
@@ -58,6 +62,10 @@ export function buildAnswerableCatalog({
         question.questionId !== item.questionId ||
         question.questionVersion !== item.questionVersion ||
         !['discard', 'tenpai', 'multi_wait', 'scenario'].includes(question.taskType) ||
+        item.taskType !== question.taskType ||
+        item.seed !== question.generator?.seed ||
+        item.generatorVersion !== question.generator?.generatorVersion ||
+        canonicalJson(item.ruleRef) !== canonicalJson(question.ruleRef) ||
         question.answerKey?.correctnessBasis === 'unverified') continue;
     } else continue;
     if (!Number.isSafeInteger(item.estimatedMinutes) || item.estimatedMinutes < 1 || item.estimatedMinutes > 60) continue;
