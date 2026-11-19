@@ -5,8 +5,10 @@ import {
   requireTimezone, localDayKey, addLocalCalendarDays, stableId, uniqueRefs, recordKey,
 } from './core.js';
 import { makeRecordRef, normalizeRecordEntries } from './records.js';
+import { validateLearningProvenance } from './provenance.js';
 
-function questionRef(entry) {
+function questionRef(entry, link) {
+  if (link) return { ...link.academyQuestionRef };
   return entry.kind === 'legacy-v3'
     ? { questionId: entry.record.exerciseId, questionVersion: 'legacy-exercise-v3' }
     : { ...entry.record.questionRef };
@@ -40,7 +42,7 @@ function replayableLegacy(snapshot) {
  */
 export function buildReviewPlan({
   profile, records = [], asOf, timezone = DEFAULT_TIMEZONE, dailyLimit = 20,
-  questionCatalog = [], reservedQuestionRefs = [],
+  questionCatalog = [], reservedQuestionRefs = [], provenanceLinks = [], learning,
   validateAcademyDecisionRecord, validateAcademyQuestion,
 } = {}) {
   requireV1(profile, 'AbilityProfile');
@@ -65,18 +67,26 @@ export function buildReviewPlan({
   if (normalized.some(x => Date.parse(x.record.timestamp) > Date.parse(generatedAsOf))) {
     throw new RangeError('Future record cannot be used in an asOf review snapshot');
   }
+  if (!Array.isArray(provenanceLinks)) throw new TypeError('provenanceLinks must be an array');
+  const links = new Map();
+  for (const link of provenanceLinks) {
+    const key = recordKey(link.recordRef);
+    if (links.has(key)) throw new RangeError('Duplicate learning provenance RecordRef');
+    links.set(key, link);
+  }
   const groups = new Map();
   for (const entry of normalized) {
-    const qref = questionRef(entry);
+    const link = links.get(recordKey(makeRecordRef(entry.kind, entry.record))) ?? null;
+    const qref = questionRef(entry, link);
     const key = questionKey(qref);
-    if (!groups.has(key)) groups.set(key, { qref, entries: [], refs: [] });
+    if (!groups.has(key)) groups.set(key, { qref, entries: [], refs: [], link });
     const group = groups.get(key);
+    if (Boolean(group.link) !== Boolean(link) ||
+      group.link && link && group.link.underlyingExerciseId !== link.underlyingExerciseId)
+      throw new RangeError('Ambiguous question provenance grouping');
     group.entries.push(entry);
     group.refs.push(makeRecordRef(entry.kind, entry.record));
   }
-  const legacy = normalized.filter(x => x.kind === 'legacy-v3').map(x => x.record);
-  const queue = new Map(buildReviewQueue(legacy, { asOf: generatedAsOf, includeNotDue: true })
-    .map(x => [x.exerciseId, x]));
   const today = localDayKey(generatedAsOf, timezone);
   const items = [];
   for (const group of groups.values()) {
@@ -85,7 +95,8 @@ export function buildReviewPlan({
     const recent = attempts.at(-1);
     let state;
     if (first.kind === 'legacy-v3') {
-      const legacyState = queue.get(first.record.exerciseId);
+      const [legacyState] = buildReviewQueue(attempts.map(x => x.record),
+        { asOf: generatedAsOf, includeNotDue: true });
       state = { repetitions: legacyState.repetitions, lapses: legacyState.lapses,
         intervalDays: legacyState.intervalDays, lastScore: legacyState.lastScore };
     } else {
@@ -93,11 +104,23 @@ export function buildReviewPlan({
       for (const entry of attempts) state = stepScenario(state, entry);
     }
     const dueAt = addLocalCalendarDays(recent.record.timestamp, state.intervalDays, timezone);
-    const tags = categoryTags(profile, group.refs);
+    let sourceVerified = false;
+    if (group.link && learning) {
+      try {
+        for (const entry of attempts) validateLearningProvenance(
+          links.get(recordKey(makeRecordRef(entry.kind, entry.record))), entry.record, learning);
+        sourceVerified = true;
+      } catch { sourceVerified = false; }
+    }
+    const tags = group.link
+      ? (sourceVerified ? [...group.link.skillTagIds].sort() : [])
+      : categoryTags(profile, group.refs);
     const sourceRecordRefs = uniqueRefs(group.refs);
     const catalogEntry = catalog.get(questionKey(group.qref));
     // Legacy snapshots can replay without Academy's as-yet-unmerged question bank.
-    const available = !reserved.has(questionKey(group.qref)) && (first.kind === 'legacy-v3'
+    const available = !reserved.has(questionKey(group.qref)) && (group.link
+      ? sourceVerified && replayableLegacy(recent.record.exerciseSnapshot)
+      : first.kind === 'legacy-v3'
       ? replayableLegacy(recent.record.exerciseSnapshot) && catalogEntry?.available !== false
       : catalogEntry?.available === true && catalogEntry.taskType === 'scenario' &&
         catalogEntry.questionSnapshot?.status === 'validated' &&
@@ -116,6 +139,7 @@ export function buildReviewPlan({
     if (recent.record.score < 0.8) reasons.push('recent-mistake');
     if (state.repetitions >= 3) reasons.push('interval-extended');
     if (reserved.has(questionKey(group.qref))) reasons.push('unavailable:held-out');
+    else if (group.link && !available) reasons.push('unavailable:source-lookup');
     else if (!available) reasons.push(first.kind === 'legacy-v3' ?
       'unavailable:legacy-replay' : 'unavailable:question-catalog');
     const priority = (isDue ? 100 : 0) + Math.min(state.lapses, 10) * 20 +
