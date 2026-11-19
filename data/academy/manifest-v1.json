@@ -1,0 +1,1009 @@
+{
+  "schemaVersion": 1,
+  "contractVersion": "master-academy/1.0.0",
+  "version": "academy-structural-bank-v1",
+  "totalQuestions": 100,
+  "note": "Public seed metadata only. Structural verification uses legacy Exercise v3. This manifest is not a player ability certification or verified risk / settlement model.",
+  "questions": [
+    {
+      "questionId": "academy-q-001",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l1-01",
+      "level": 1,
+      "taskType": "discard",
+      "seed": "academy-v1-structural-0001",
+      "index": 0,
+      "legacyLevel": "beginner"
+    },
+    {
+      "questionId": "academy-q-002",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l1-01",
+      "level": 1,
+      "taskType": "tenpai",
+      "seed": "academy-v1-structural-0002",
+      "index": 1,
+      "legacyLevel": "beginner"
+    },
+    {
+      "questionId": "academy-q-003",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l1-01",
+      "level": 1,
+      "taskType": "multi_wait",
+      "seed": "academy-v1-structural-0003",
+      "index": 2,
+      "legacyLevel": "beginner"
+    },
+    {
+      "questionId": "academy-q-004",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l1-01",
+      "level": 1,
+      "taskType": "discard",
+      "seed": "academy-v1-structural-0004",
+      "index": 3,
+      "legacyLevel": "beginner"
+    },
+    {
+      "questionId": "academy-q-005",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l1-01",
+      "level": 1,
+      "taskType": "tenpai",
+      "seed": "academy-v1-structural-0005",
+      "index": 4,
+      "legacyLevel": "beginner"
+    },
+    {
+      "questionId": "academy-q-006",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l1-02",
+      "level": 1,
+      "taskType": "discard",
+      "seed": "academy-v1-structural-0006",
+      "index": 5,
+      "legacyLevel": "beginner"
+    },
+    {
+      "questionId": "academy-q-007",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l1-02",
+      "level": 1,
+      "taskType": "tenpai",
+      "seed": "academy-v1-structural-0007",
+      "index": 6,
+      "legacyLevel": "beginner"
+    },
+    {
+      "questionId": "academy-q-008",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l1-02",
+      "level": 1,
+      "taskType": "multi_wait",
+      "seed": "academy-v1-structural-0008",
+      "index": 7,
+      "legacyLevel": "beginner"
+    },
+    {
+      "questionId": "academy-q-009",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l1-02",
+      "level": 1,
+      "taskType": "discard",
+      "seed": "academy-v1-structural-0009",
+      "index": 8,
+      "legacyLevel": "beginner"
+    },
+    {
+      "questionId": "academy-q-010",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l1-02",
+      "level": 1,
+      "taskType": "tenpai",
+      "seed": "academy-v1-structural-0010",
+      "index": 9,
+      "legacyLevel": "beginner"
+    },
+    {
+      "questionId": "academy-q-011",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l1-03",
+      "level": 1,
+      "taskType": "discard",
+      "seed": "academy-v1-structural-0011",
+      "index": 10,
+      "legacyLevel": "beginner"
+    },
+    {
+      "questionId": "academy-q-012",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l1-03",
+      "level": 1,
+      "taskType": "tenpai",
+      "seed": "academy-v1-structural-0012",
+      "index": 11,
+      "legacyLevel": "beginner"
+    },
+    {
+      "questionId": "academy-q-013",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l1-03",
+      "level": 1,
+      "taskType": "multi_wait",
+      "seed": "academy-v1-structural-0013",
+      "index": 12,
+      "legacyLevel": "beginner"
+    },
+    {
+      "questionId": "academy-q-014",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l1-03",
+      "level": 1,
+      "taskType": "discard",
+      "seed": "academy-v1-structural-0014",
+      "index": 13,
+      "legacyLevel": "beginner"
+    },
+    {
+      "questionId": "academy-q-015",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l1-03",
+      "level": 1,
+      "taskType": "tenpai",
+      "seed": "academy-v1-structural-0015",
+      "index": 14,
+      "legacyLevel": "beginner"
+    },
+    {
+      "questionId": "academy-q-016",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l1-04",
+      "level": 1,
+      "taskType": "discard",
+      "seed": "academy-v1-structural-0016",
+      "index": 15,
+      "legacyLevel": "beginner"
+    },
+    {
+      "questionId": "academy-q-017",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l1-04",
+      "level": 1,
+      "taskType": "tenpai",
+      "seed": "academy-v1-structural-0017",
+      "index": 16,
+      "legacyLevel": "beginner"
+    },
+    {
+      "questionId": "academy-q-018",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l1-04",
+      "level": 1,
+      "taskType": "multi_wait",
+      "seed": "academy-v1-structural-0018",
+      "index": 17,
+      "legacyLevel": "beginner"
+    },
+    {
+      "questionId": "academy-q-019",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l1-04",
+      "level": 1,
+      "taskType": "discard",
+      "seed": "academy-v1-structural-0019",
+      "index": 18,
+      "legacyLevel": "beginner"
+    },
+    {
+      "questionId": "academy-q-020",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l1-04",
+      "level": 1,
+      "taskType": "tenpai",
+      "seed": "academy-v1-structural-0020",
+      "index": 19,
+      "legacyLevel": "beginner"
+    },
+    {
+      "questionId": "academy-q-021",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l2-01",
+      "level": 2,
+      "taskType": "discard",
+      "seed": "academy-v1-structural-0021",
+      "index": 20,
+      "legacyLevel": "intermediate"
+    },
+    {
+      "questionId": "academy-q-022",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l2-01",
+      "level": 2,
+      "taskType": "tenpai",
+      "seed": "academy-v1-structural-0022",
+      "index": 21,
+      "legacyLevel": "intermediate"
+    },
+    {
+      "questionId": "academy-q-023",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l2-01",
+      "level": 2,
+      "taskType": "multi_wait",
+      "seed": "academy-v1-structural-0023",
+      "index": 22,
+      "legacyLevel": "intermediate"
+    },
+    {
+      "questionId": "academy-q-024",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l2-01",
+      "level": 2,
+      "taskType": "discard",
+      "seed": "academy-v1-structural-0024",
+      "index": 23,
+      "legacyLevel": "intermediate"
+    },
+    {
+      "questionId": "academy-q-025",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l2-01",
+      "level": 2,
+      "taskType": "tenpai",
+      "seed": "academy-v1-structural-0025",
+      "index": 24,
+      "legacyLevel": "intermediate"
+    },
+    {
+      "questionId": "academy-q-026",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l2-02",
+      "level": 2,
+      "taskType": "discard",
+      "seed": "academy-v1-structural-0026",
+      "index": 25,
+      "legacyLevel": "intermediate"
+    },
+    {
+      "questionId": "academy-q-027",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l2-02",
+      "level": 2,
+      "taskType": "tenpai",
+      "seed": "academy-v1-structural-0027",
+      "index": 26,
+      "legacyLevel": "intermediate"
+    },
+    {
+      "questionId": "academy-q-028",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l2-02",
+      "level": 2,
+      "taskType": "multi_wait",
+      "seed": "academy-v1-structural-0028",
+      "index": 27,
+      "legacyLevel": "intermediate"
+    },
+    {
+      "questionId": "academy-q-029",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l2-02",
+      "level": 2,
+      "taskType": "discard",
+      "seed": "academy-v1-structural-0029",
+      "index": 28,
+      "legacyLevel": "intermediate"
+    },
+    {
+      "questionId": "academy-q-030",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l2-02",
+      "level": 2,
+      "taskType": "tenpai",
+      "seed": "academy-v1-structural-0030",
+      "index": 29,
+      "legacyLevel": "intermediate"
+    },
+    {
+      "questionId": "academy-q-031",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l2-03",
+      "level": 2,
+      "taskType": "discard",
+      "seed": "academy-v1-structural-0031",
+      "index": 30,
+      "legacyLevel": "intermediate"
+    },
+    {
+      "questionId": "academy-q-032",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l2-03",
+      "level": 2,
+      "taskType": "tenpai",
+      "seed": "academy-v1-structural-0032",
+      "index": 31,
+      "legacyLevel": "intermediate"
+    },
+    {
+      "questionId": "academy-q-033",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l2-03",
+      "level": 2,
+      "taskType": "multi_wait",
+      "seed": "academy-v1-structural-0033",
+      "index": 32,
+      "legacyLevel": "intermediate"
+    },
+    {
+      "questionId": "academy-q-034",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l2-03",
+      "level": 2,
+      "taskType": "discard",
+      "seed": "academy-v1-structural-0034",
+      "index": 33,
+      "legacyLevel": "intermediate"
+    },
+    {
+      "questionId": "academy-q-035",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l2-03",
+      "level": 2,
+      "taskType": "tenpai",
+      "seed": "academy-v1-structural-0035",
+      "index": 34,
+      "legacyLevel": "intermediate"
+    },
+    {
+      "questionId": "academy-q-036",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l2-04",
+      "level": 2,
+      "taskType": "discard",
+      "seed": "academy-v1-structural-0036",
+      "index": 35,
+      "legacyLevel": "intermediate"
+    },
+    {
+      "questionId": "academy-q-037",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l2-04",
+      "level": 2,
+      "taskType": "tenpai",
+      "seed": "academy-v1-structural-0037",
+      "index": 36,
+      "legacyLevel": "intermediate"
+    },
+    {
+      "questionId": "academy-q-038",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l2-04",
+      "level": 2,
+      "taskType": "multi_wait",
+      "seed": "academy-v1-structural-0038",
+      "index": 37,
+      "legacyLevel": "intermediate"
+    },
+    {
+      "questionId": "academy-q-039",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l2-04",
+      "level": 2,
+      "taskType": "discard",
+      "seed": "academy-v1-structural-0039",
+      "index": 38,
+      "legacyLevel": "intermediate"
+    },
+    {
+      "questionId": "academy-q-040",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l2-04",
+      "level": 2,
+      "taskType": "tenpai",
+      "seed": "academy-v1-structural-0040",
+      "index": 39,
+      "legacyLevel": "intermediate"
+    },
+    {
+      "questionId": "academy-q-041",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l3-01",
+      "level": 3,
+      "taskType": "discard",
+      "seed": "academy-v1-structural-0041",
+      "index": 40,
+      "legacyLevel": "advanced"
+    },
+    {
+      "questionId": "academy-q-042",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l3-01",
+      "level": 3,
+      "taskType": "tenpai",
+      "seed": "academy-v1-structural-0042",
+      "index": 41,
+      "legacyLevel": "advanced"
+    },
+    {
+      "questionId": "academy-q-043",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l3-01",
+      "level": 3,
+      "taskType": "multi_wait",
+      "seed": "academy-v1-structural-0043",
+      "index": 42,
+      "legacyLevel": "advanced"
+    },
+    {
+      "questionId": "academy-q-044",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l3-01",
+      "level": 3,
+      "taskType": "discard",
+      "seed": "academy-v1-structural-0044",
+      "index": 43,
+      "legacyLevel": "advanced"
+    },
+    {
+      "questionId": "academy-q-045",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l3-01",
+      "level": 3,
+      "taskType": "tenpai",
+      "seed": "academy-v1-structural-0045",
+      "index": 44,
+      "legacyLevel": "advanced"
+    },
+    {
+      "questionId": "academy-q-046",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l3-02",
+      "level": 3,
+      "taskType": "discard",
+      "seed": "academy-v1-structural-0046",
+      "index": 45,
+      "legacyLevel": "advanced"
+    },
+    {
+      "questionId": "academy-q-047",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l3-02",
+      "level": 3,
+      "taskType": "tenpai",
+      "seed": "academy-v1-structural-0047",
+      "index": 46,
+      "legacyLevel": "advanced"
+    },
+    {
+      "questionId": "academy-q-048",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l3-02",
+      "level": 3,
+      "taskType": "multi_wait",
+      "seed": "academy-v1-structural-0048",
+      "index": 47,
+      "legacyLevel": "advanced"
+    },
+    {
+      "questionId": "academy-q-049",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l3-02",
+      "level": 3,
+      "taskType": "discard",
+      "seed": "academy-v1-structural-0049",
+      "index": 48,
+      "legacyLevel": "advanced"
+    },
+    {
+      "questionId": "academy-q-050",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l3-02",
+      "level": 3,
+      "taskType": "tenpai",
+      "seed": "academy-v1-structural-0050",
+      "index": 49,
+      "legacyLevel": "advanced"
+    },
+    {
+      "questionId": "academy-q-051",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l3-03",
+      "level": 3,
+      "taskType": "discard",
+      "seed": "academy-v1-structural-0051",
+      "index": 50,
+      "legacyLevel": "advanced"
+    },
+    {
+      "questionId": "academy-q-052",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l3-03",
+      "level": 3,
+      "taskType": "tenpai",
+      "seed": "academy-v1-structural-0052",
+      "index": 51,
+      "legacyLevel": "advanced"
+    },
+    {
+      "questionId": "academy-q-053",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l3-03",
+      "level": 3,
+      "taskType": "multi_wait",
+      "seed": "academy-v1-structural-0053",
+      "index": 52,
+      "legacyLevel": "advanced"
+    },
+    {
+      "questionId": "academy-q-054",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l3-03",
+      "level": 3,
+      "taskType": "discard",
+      "seed": "academy-v1-structural-0054",
+      "index": 53,
+      "legacyLevel": "advanced"
+    },
+    {
+      "questionId": "academy-q-055",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l3-03",
+      "level": 3,
+      "taskType": "tenpai",
+      "seed": "academy-v1-structural-0055",
+      "index": 54,
+      "legacyLevel": "advanced"
+    },
+    {
+      "questionId": "academy-q-056",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l3-04",
+      "level": 3,
+      "taskType": "discard",
+      "seed": "academy-v1-structural-0056",
+      "index": 55,
+      "legacyLevel": "advanced"
+    },
+    {
+      "questionId": "academy-q-057",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l3-04",
+      "level": 3,
+      "taskType": "tenpai",
+      "seed": "academy-v1-structural-0057",
+      "index": 56,
+      "legacyLevel": "advanced"
+    },
+    {
+      "questionId": "academy-q-058",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l3-04",
+      "level": 3,
+      "taskType": "multi_wait",
+      "seed": "academy-v1-structural-0058",
+      "index": 57,
+      "legacyLevel": "advanced"
+    },
+    {
+      "questionId": "academy-q-059",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l3-04",
+      "level": 3,
+      "taskType": "discard",
+      "seed": "academy-v1-structural-0059",
+      "index": 58,
+      "legacyLevel": "advanced"
+    },
+    {
+      "questionId": "academy-q-060",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l3-04",
+      "level": 3,
+      "taskType": "tenpai",
+      "seed": "academy-v1-structural-0060",
+      "index": 59,
+      "legacyLevel": "advanced"
+    },
+    {
+      "questionId": "academy-q-061",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l4-01",
+      "level": 4,
+      "taskType": "discard",
+      "seed": "academy-v1-structural-0061",
+      "index": 60,
+      "legacyLevel": "advanced"
+    },
+    {
+      "questionId": "academy-q-062",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l4-01",
+      "level": 4,
+      "taskType": "tenpai",
+      "seed": "academy-v1-structural-0062",
+      "index": 61,
+      "legacyLevel": "advanced"
+    },
+    {
+      "questionId": "academy-q-063",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l4-01",
+      "level": 4,
+      "taskType": "multi_wait",
+      "seed": "academy-v1-structural-0063",
+      "index": 62,
+      "legacyLevel": "advanced"
+    },
+    {
+      "questionId": "academy-q-064",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l4-01",
+      "level": 4,
+      "taskType": "discard",
+      "seed": "academy-v1-structural-0064",
+      "index": 63,
+      "legacyLevel": "advanced"
+    },
+    {
+      "questionId": "academy-q-065",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l4-01",
+      "level": 4,
+      "taskType": "tenpai",
+      "seed": "academy-v1-structural-0065",
+      "index": 64,
+      "legacyLevel": "advanced"
+    },
+    {
+      "questionId": "academy-q-066",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l4-02",
+      "level": 4,
+      "taskType": "discard",
+      "seed": "academy-v1-structural-0066",
+      "index": 65,
+      "legacyLevel": "advanced"
+    },
+    {
+      "questionId": "academy-q-067",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l4-02",
+      "level": 4,
+      "taskType": "tenpai",
+      "seed": "academy-v1-structural-0067",
+      "index": 66,
+      "legacyLevel": "advanced"
+    },
+    {
+      "questionId": "academy-q-068",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l4-02",
+      "level": 4,
+      "taskType": "multi_wait",
+      "seed": "academy-v1-structural-0068",
+      "index": 67,
+      "legacyLevel": "advanced"
+    },
+    {
+      "questionId": "academy-q-069",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l4-02",
+      "level": 4,
+      "taskType": "discard",
+      "seed": "academy-v1-structural-0069",
+      "index": 68,
+      "legacyLevel": "advanced"
+    },
+    {
+      "questionId": "academy-q-070",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l4-02",
+      "level": 4,
+      "taskType": "tenpai",
+      "seed": "academy-v1-structural-0070",
+      "index": 69,
+      "legacyLevel": "advanced"
+    },
+    {
+      "questionId": "academy-q-071",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l4-03",
+      "level": 4,
+      "taskType": "discard",
+      "seed": "academy-v1-structural-0071",
+      "index": 70,
+      "legacyLevel": "advanced"
+    },
+    {
+      "questionId": "academy-q-072",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l4-03",
+      "level": 4,
+      "taskType": "tenpai",
+      "seed": "academy-v1-structural-0072",
+      "index": 71,
+      "legacyLevel": "advanced"
+    },
+    {
+      "questionId": "academy-q-073",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l4-03",
+      "level": 4,
+      "taskType": "multi_wait",
+      "seed": "academy-v1-structural-0073",
+      "index": 72,
+      "legacyLevel": "advanced"
+    },
+    {
+      "questionId": "academy-q-074",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l4-03",
+      "level": 4,
+      "taskType": "discard",
+      "seed": "academy-v1-structural-0074",
+      "index": 73,
+      "legacyLevel": "advanced"
+    },
+    {
+      "questionId": "academy-q-075",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l4-03",
+      "level": 4,
+      "taskType": "tenpai",
+      "seed": "academy-v1-structural-0075",
+      "index": 74,
+      "legacyLevel": "advanced"
+    },
+    {
+      "questionId": "academy-q-076",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l4-04",
+      "level": 4,
+      "taskType": "discard",
+      "seed": "academy-v1-structural-0076",
+      "index": 75,
+      "legacyLevel": "advanced"
+    },
+    {
+      "questionId": "academy-q-077",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l4-04",
+      "level": 4,
+      "taskType": "tenpai",
+      "seed": "academy-v1-structural-0077",
+      "index": 76,
+      "legacyLevel": "advanced"
+    },
+    {
+      "questionId": "academy-q-078",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l4-04",
+      "level": 4,
+      "taskType": "multi_wait",
+      "seed": "academy-v1-structural-0078",
+      "index": 77,
+      "legacyLevel": "advanced"
+    },
+    {
+      "questionId": "academy-q-079",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l4-04",
+      "level": 4,
+      "taskType": "discard",
+      "seed": "academy-v1-structural-0079",
+      "index": 78,
+      "legacyLevel": "advanced"
+    },
+    {
+      "questionId": "academy-q-080",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l4-04",
+      "level": 4,
+      "taskType": "tenpai",
+      "seed": "academy-v1-structural-0080",
+      "index": 79,
+      "legacyLevel": "advanced"
+    },
+    {
+      "questionId": "academy-q-081",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l5-01",
+      "level": 5,
+      "taskType": "discard",
+      "seed": "academy-v1-structural-0081",
+      "index": 80,
+      "legacyLevel": "advanced"
+    },
+    {
+      "questionId": "academy-q-082",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l5-01",
+      "level": 5,
+      "taskType": "tenpai",
+      "seed": "academy-v1-structural-0082",
+      "index": 81,
+      "legacyLevel": "advanced"
+    },
+    {
+      "questionId": "academy-q-083",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l5-01",
+      "level": 5,
+      "taskType": "multi_wait",
+      "seed": "academy-v1-structural-0083",
+      "index": 82,
+      "legacyLevel": "advanced"
+    },
+    {
+      "questionId": "academy-q-084",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l5-01",
+      "level": 5,
+      "taskType": "discard",
+      "seed": "academy-v1-structural-0084",
+      "index": 83,
+      "legacyLevel": "advanced"
+    },
+    {
+      "questionId": "academy-q-085",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l5-01",
+      "level": 5,
+      "taskType": "tenpai",
+      "seed": "academy-v1-structural-0085",
+      "index": 84,
+      "legacyLevel": "advanced"
+    },
+    {
+      "questionId": "academy-q-086",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l5-02",
+      "level": 5,
+      "taskType": "discard",
+      "seed": "academy-v1-structural-0086",
+      "index": 85,
+      "legacyLevel": "advanced"
+    },
+    {
+      "questionId": "academy-q-087",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l5-02",
+      "level": 5,
+      "taskType": "tenpai",
+      "seed": "academy-v1-structural-0087",
+      "index": 86,
+      "legacyLevel": "advanced"
+    },
+    {
+      "questionId": "academy-q-088",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l5-02",
+      "level": 5,
+      "taskType": "multi_wait",
+      "seed": "academy-v1-structural-0088",
+      "index": 87,
+      "legacyLevel": "advanced"
+    },
+    {
+      "questionId": "academy-q-089",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l5-02",
+      "level": 5,
+      "taskType": "discard",
+      "seed": "academy-v1-structural-0089",
+      "index": 88,
+      "legacyLevel": "advanced"
+    },
+    {
+      "questionId": "academy-q-090",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l5-02",
+      "level": 5,
+      "taskType": "tenpai",
+      "seed": "academy-v1-structural-0090",
+      "index": 89,
+      "legacyLevel": "advanced"
+    },
+    {
+      "questionId": "academy-q-091",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l5-03",
+      "level": 5,
+      "taskType": "discard",
+      "seed": "academy-v1-structural-0091",
+      "index": 90,
+      "legacyLevel": "advanced"
+    },
+    {
+      "questionId": "academy-q-092",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l5-03",
+      "level": 5,
+      "taskType": "tenpai",
+      "seed": "academy-v1-structural-0092",
+      "index": 91,
+      "legacyLevel": "advanced"
+    },
+    {
+      "questionId": "academy-q-093",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l5-03",
+      "level": 5,
+      "taskType": "multi_wait",
+      "seed": "academy-v1-structural-0093",
+      "index": 92,
+      "legacyLevel": "advanced"
+    },
+    {
+      "questionId": "academy-q-094",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l5-03",
+      "level": 5,
+      "taskType": "discard",
+      "seed": "academy-v1-structural-0094",
+      "index": 93,
+      "legacyLevel": "advanced"
+    },
+    {
+      "questionId": "academy-q-095",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l5-03",
+      "level": 5,
+      "taskType": "tenpai",
+      "seed": "academy-v1-structural-0095",
+      "index": 94,
+      "legacyLevel": "advanced"
+    },
+    {
+      "questionId": "academy-q-096",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l5-04",
+      "level": 5,
+      "taskType": "discard",
+      "seed": "academy-v1-structural-0096",
+      "index": 95,
+      "legacyLevel": "advanced"
+    },
+    {
+      "questionId": "academy-q-097",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l5-04",
+      "level": 5,
+      "taskType": "tenpai",
+      "seed": "academy-v1-structural-0097",
+      "index": 96,
+      "legacyLevel": "advanced"
+    },
+    {
+      "questionId": "academy-q-098",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l5-04",
+      "level": 5,
+      "taskType": "multi_wait",
+      "seed": "academy-v1-structural-0098",
+      "index": 97,
+      "legacyLevel": "advanced"
+    },
+    {
+      "questionId": "academy-q-099",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l5-04",
+      "level": 5,
+      "taskType": "discard",
+      "seed": "academy-v1-structural-0099",
+      "index": 98,
+      "legacyLevel": "advanced"
+    },
+    {
+      "questionId": "academy-q-100",
+      "questionVersion": "1.0.0",
+      "lessonId": "academy-l5-04",
+      "level": 5,
+      "taskType": "tenpai",
+      "seed": "academy-v1-structural-0100",
+      "index": 99,
+      "legacyLevel": "advanced"
+    }
+  ]
+}
