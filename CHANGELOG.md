@@ -40,3 +40,10 @@
 
 ### Third audit final decision / unfinished items
 - All feature PR #1/#5/#3/#4 have merged and source/main automated regression checks passed. Issues Q-001 #7, Q-002 #8 and I-003 #9 closed with evidence. However, the new advanced explanation / tenpai / multi-wait exercise UI, v3 DecisionRecord end-to-end UI persistence, physical-device validation and installable offline PWA are **NOT** shipped; main ruleset Issue #13 remains open. Do not mark V0.2 release as GO, do not bump package version or tag a release without explicit scope acceptance and testing.
+
+
+## Unreleased — Independent adversarial QA (2026-11-19)
+
+- PR #15 test-only merge `067c8bbcc5026e542ae5b6688a7aceb5dd33e5b7`: new mandatory 10k numerical Oracle, 60% uniform/20% constructed/20% adversarial four-quads, stronger Q-001/Q-002/I-003 hard gates and reproducible performance benchmarks; no production algorithm change. [main Verify #44444529115](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44444529115) 82 total /81 pass/0 fail/0 TODO/1 optional skip.
+- Draft staging #10 at `b62979a0cd2fec75451f37a4f5e594a0a7e820ea`: [Verify #44444678634](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44444678634) 88 total/87 pass/0 fail/0 TODO/1 optional skip (two independent mandatory 10k suites); [Chromium #44444678821](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44444678821) desktop/mobile emulation passed on exact same SHA.
+- V0.2 remains **NO-GO**, with incomplete advanced UI, v3 DecisionRecord UI, actual phone and offline PWA (Issue #12), and missing main branch ruleset (Issue #13). No release or version bump.
