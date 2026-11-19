@@ -36,10 +36,10 @@ export async function createFullRoundSession({storage} = {}) {
   let storageWarning = '', replayWarning = '', replayId = null;
   const replays = replayApi.createReplayService({storage});
 
-  function persist(next) {
+  function persist(next,{paused=controller?.isPaused()??false}={}) {
     if (blocked) throw new Error('舊紀錄損壞，禁止覆蓋');
     try {
-      storage.setItem(KEY, JSON.stringify({version:1, gameState:next}));
+      storage.setItem(KEY, JSON.stringify({version:1, gameState:next, botCheckpoint:{paused}}));
       storageWarning = '';
     } catch (e) {
       storageWarning = 'R3 對局儲存失敗，重新整理可能遺失進度：' + e.message;
@@ -82,12 +82,12 @@ export async function createFullRoundSession({storage} = {}) {
       replayWarning = '正式 Replay 儲存／驗證失敗：' + e.message;
     }
   }
-  function setupController() {
+  function setupController(checkpoint=null) {
     controller = botApi.createBotController({
       bots:[1,2,3].map(seat=>botApi.createBot({
         seat,difficulty:'Beginner',seed:'table-bot-seat-'+seat
       })),
-      humanSeat:HUMAN, maxRevision:100000,
+      humanSeat:HUMAN, maxRevision:100000,checkpoint,
       getActingSeat:()=>state.round.phase==='settled'
         ? state.round.currentSeat
         : state.round.phase==='claim_window'
@@ -108,7 +108,7 @@ export async function createFullRoundSession({storage} = {}) {
       ))) throw new Error('Invalid R3 checkpoint');
       rules.validateGameState(obj.gameState);
       state=obj.gameState;
-      setupController();
+      setupController(obj.botCheckpoint??null);
       if (state.round.phase==='settled') archive();
       return true;
     } catch (e) {
@@ -127,7 +127,7 @@ export async function createFullRoundSession({storage} = {}) {
     const next=rules.createGame({gameId:seed.replace(/[^A-Za-z0-9_-]/g,'-'),
       seed,profileId,ruleVersion,dealerSeat:HUMAN});
     rules.validateGameState(next);
-    persist(next);
+    persist(next,{paused:false});
     state=next;
     replayId=null;replayWarning='';
     setupController();
@@ -217,8 +217,8 @@ export async function createFullRoundSession({storage} = {}) {
   }
   return Object.freeze({
     start,restore,snapshot,submit,advanceBots,replay,
-    pause(){controller?.pause();return snapshot();},
-    resume(){controller?.resume();return snapshot();},
+    pause(){controller?.pause();if(state)persist(state);return snapshot();},
+    resume(){controller?.resume();if(state)persist(state);return snapshot();},
     availableProfiles(){return rules.listRuleProfiles().filter(isR3);}
   });
 }
