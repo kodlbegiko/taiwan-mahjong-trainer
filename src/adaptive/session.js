@@ -2,7 +2,7 @@ import { createSeededRandom } from '../training/random.js';
 import { replayExercise } from '../training/exercises.js';
 import {
   V1, SESSION_ALGORITHM_VERSION, requireV1, requireUtc, requireId,
-  requireObject, stableId, canonicalJson, localDayKey, uniqueRefs,
+  requireObject, stableId, canonicalJson, localDayKey, uniqueRefs, validateRegistry,
 } from './core.js';
 import { normalizeRecordEntries } from './records.js';
 
@@ -16,10 +16,11 @@ const clone = value => JSON.parse(JSON.stringify(value));
  * independently injected question validator, never a naked 'available' flag.
  */
 export function buildAnswerableCatalog({
-  records = [], questionCatalog = [], reservedQuestionRefs = [], validateAcademyDecisionRecord,
-  validateAcademyQuestion,
+  records = [], questionCatalog = [], reservedQuestionRefs = [], registry,
+  validateAcademyDecisionRecord, validateAcademyQuestion,
 } = {}) {
   const normalized = normalizeRecordEntries(records, { validateAcademyDecisionRecord });
+  const skills = registry ? validateRegistry(registry) : null;
   if (!Array.isArray(reservedQuestionRefs)) throw new TypeError('reservedQuestionRefs must be an array');
   const reserved = new Set(reservedQuestionRefs.map(ref => {
     requireObject(ref, 'reservedQuestionRef');
@@ -65,11 +66,18 @@ export function buildAnswerableCatalog({
   const unique = new Map();
   for (const candidate of candidates) {
     const key = candidate.questionId + '@' + candidate.questionVersion;
+    // Unseen variants inherit only validated AcademyQuestion tags or explicitly
+    // registry-mapped legacy task tags; never infer concepts from hand patterns.
+    const tagIds = candidate.source === 'academy-v1'
+      ? candidate.questionSnapshot.skillTagIds
+      : (registry?.legacyMappings?.taskTypes?.[candidate.taskType] ?? []);
+    if (!Array.isArray(tagIds) || tagIds.some(tag => typeof tag !== 'string' ||
+      (skills && !skills.has(tag)))) throw new RangeError('Unknown candidate SkillTag mapping');
     const meta = {
       questionId: candidate.questionId, questionVersion: candidate.questionVersion,
       taskType: candidate.taskType, ruleRef: candidate.ruleRef,
       seed: candidate.seed, generatorVersion: candidate.generatorVersion,
-      source: candidate.source, available: true,
+      source: candidate.source, skillTagIds: [...new Set(tagIds)].sort(), available: true,
       estimatedMinutes: candidate.estimatedMinutes,
     };
     requireId(meta.questionId); requireId(meta.questionVersion);
@@ -90,7 +98,7 @@ export function buildAnswerableCatalog({
 /** Select only verified, replayable source questions; no simulated Bot or placeholder scenario. */
 export function planDailyTraining({
   profile, reviewPlan, records = [], questionCatalog = [], reservedQuestionRefs = [],
-  validateAcademyDecisionRecord, validateAcademyQuestion,
+  registry, validateAcademyDecisionRecord, validateAcademyQuestion,
   minutes = 30, seed, asOf, ruleRef,
 } = {}) {
   requireV1(profile, 'AbilityProfile');
@@ -100,8 +108,8 @@ export function planDailyTraining({
   requireId(String(seed ?? ''), 'seed');
   const generatedAsOf = requireUtc(asOf);
   const catalog = buildAnswerableCatalog({
-    records, questionCatalog, reservedQuestionRefs, validateAcademyDecisionRecord,
-    validateAcademyQuestion,
+    records, questionCatalog, reservedQuestionRefs, registry,
+    validateAcademyDecisionRecord, validateAcademyQuestion,
   });
   if (ruleRef !== undefined) {
     requireObject(ruleRef, 'ruleRef');
@@ -137,8 +145,8 @@ export function planDailyTraining({
   const targets = {
     'weakness-review': Math.ceil(minutes * 0.3),
     'focused-practice': Math.ceil(minutes * 0.3),
-    'mixed-practice': Math.ceil(minutes * 0.25),
-    'mistake-recap': minutes,
+    'mixed-practice': Math.ceil(minutes * 0.2),
+    'mistake-recap': Math.ceil(minutes * 0.2),
   };
   const pick = (list, section, target) => {
     let spent = 0;
@@ -147,13 +155,20 @@ export function planDailyTraining({
       if (add(q, section)) spent += q.estimatedMinutes;
     }
   };
-  pick(due.filter(q => q.skillTagIds.some(tag => weakTags.includes(tag)))
-    .map(q => available.get(q.questionId + '@' + q.questionVersion)), SECTIONS[0], targets[SECTIONS[0]]);
-  pick(shuffled.filter(q => due.some(d => d.questionId === q.questionId && d.skillTagIds.some(t => weakTags.includes(t)))),
+  const mistakes = due.filter(q => q.reasonCodes.includes('recent-mistake') ||
+    q.reasonCodes.includes('repeated-error'))
+    .map(q => available.get(q.questionId + '@' + q.questionVersion));
+  const recapPool = mistakes.slice(0, Math.max(1, Math.ceil(minutes * 0.2 / 3)));
+  const recapIds = new Set(recapPool.map(q => q.questionId + '@' + q.questionVersion));
+  const candidates = shuffled.filter(q => !recapIds.has(q.questionId + '@' + q.questionVersion));
+  const weakDue = due.filter(q => q.skillTagIds.some(tag => weakTags.includes(tag)))
+    .map(q => available.get(q.questionId + '@' + q.questionVersion))
+    .filter(q => !recapIds.has(q.questionId + '@' + q.questionVersion));
+  pick(weakDue, SECTIONS[0], targets[SECTIONS[0]]);
+  pick(candidates.filter(q => q.skillTagIds.some(tag => weakTags.includes(tag))),
     SECTIONS[1], targets[SECTIONS[1]]);
-  pick(shuffled, SECTIONS[2], targets[SECTIONS[2]]);
-  pick(due.filter(q => q.reasonCodes.includes('recent-mistake') || q.reasonCodes.includes('repeated-error'))
-    .map(q => available.get(q.questionId + '@' + q.questionVersion)), SECTIONS[3], targets[SECTIONS[3]]);
+  pick(candidates, SECTIONS[2], targets[SECTIONS[2]]);
+  pick(recapPool, SECTIONS[3], targets[SECTIONS[3]]);
   // A short bank is an honest short session. No duplicate or fictitious exercises.
   pick(shuffled, SECTIONS[2], budget);
   const questionRefs = chosen.map(({ questionId, questionVersion }) => ({ questionId, questionVersion }));
