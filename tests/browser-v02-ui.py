@@ -149,10 +149,9 @@ def legacy_and_corruption(browser, base):
     context.close()
 
     context = browser.new_context()
-    context.add_init_script('''() => {
-       const old = Storage.prototype.setItem;
+    context.add_init_script('''(() => {
        Storage.prototype.setItem = function() { throw new DOMException('blocked', 'QuotaExceededError'); };
-    }''')
+    })()''')
     page = context.new_page()
     page.goto(base)
     page.locator('#hand button').first.click()
