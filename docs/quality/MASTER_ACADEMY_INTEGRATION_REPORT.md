@@ -71,7 +71,7 @@
 | `npm run check` / Verify | [main #44499594721](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44499594721)，`25870862b6499f7e699967aa76429ae5dcfc5db4` | **PASS：104 tests／103 pass／0 fail／0 TODO／1 選擇性 skipped** |
 | 必要 Golden 和雙 10,000 題獨立數值 Oracle | 同一 main Verify 日誌，包含 Q-001/Q-002/I-003、`required: 10,000`、`integration: 10,000` | **PASS；不可把 skipped stress 算已執行** |
 | 34 張 SVG／真 Chromium 尺寸／PWA | [main Tile QA #44499594706](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44499594706)，同 SHA | **PASS** |
-| 獨立 UI/PWA | [main Independent #44499594563](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44499594563) | 建立基線時**仍在執行**；正式結論以當次最後 GitHub 狀態為準 |
+| 獨立 UI/PWA | [main Independent #44499594563](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44499594563)，同 SHA | **PASS**：Node API/Golden/P0 和真 Chrome UI+離線 PWA jobs 均 SUCCESS，1440px/390px、離線新分頁、作答、持久化、SW 更新 |
 | Rules/Strategy/Learning/Adaptive/Academy UI 專屬新測試 | 尚無來源 code | **NOT_RUN**，不能引用舊三模式 CI 冒充 |
 | Academy cross-module browser/offline | 未整合新功能，亦無新版 Academy URL | **NOT_RUN** |
 | iPhone Safari／Android Chrome 實機、VoiceOver／TalkBack | [Issue #12](https://github.com/kodlbegiko/taiwan-mahjong-trainer/issues/12) | **NOT_RUN（使用者同意本階段延後）** |
