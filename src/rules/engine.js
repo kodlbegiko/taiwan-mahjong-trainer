@@ -82,9 +82,9 @@ function actionFor(state, seat, kind, tileIds = []) {
 export function createGame({
   gameId = 'game-1', seed, profileId = 'tw16-four-player-sandbox',
   ruleVersion = 'experimental-move-v1', dealerSeat = 0, fixtureDeck = null,
-  handIndex = 0, previousRoundRef = null,
+  handIndex = 0, previousRoundRef = null, prevailingWind = null,
 } = {}) {
-  if(isCompleteRef({profileId})) return completeCreateGame({gameId,seed,profileId,ruleVersion,dealerSeat,fixtureDeck,handIndex,previousRoundRef});
+  if(isCompleteRef({profileId})) return completeCreateGame({gameId,seed,profileId,ruleVersion,dealerSeat,fixtureDeck,handIndex,previousRoundRef,prevailingWind});
   if (typeof gameId !== 'string' || !/^[A-Za-z0-9_-]+$/.test(gameId)) throw new TypeError('Invalid gameId');
   assertSeat(dealerSeat);
   const profile = getRuleProfile(profileId, ruleVersion);
