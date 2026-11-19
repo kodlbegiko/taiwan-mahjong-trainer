@@ -1,6 +1,6 @@
 # Adaptive Training V1 — API、信任邊界與整合說明
 
-契約：`docs/contracts/MASTER_ACADEMY_V1.md` / `master-academy/1.0.0`。實作僅在 `src/adaptive/**`。此模組**不是** UI/PWA；整合者負責在 `sw.js` 加入新的 import 與離線快取、在 UI 綁定介面與重跑真實裝置測試。
+契約：`docs/contracts/MASTER_ACADEMY_V1.md` / `master-academy/1.0.0`。**正式課程來源持久化修復與 AI6 Adapter** 請先閱讀 [`PROVENANCE_RECOVERY_V1.md`](./PROVENANCE_RECOVERY_V1.md)（含已驗證的 `academy-q-*` ↔ `ex3-*` 對應、預備交易紀錄及重啟回復）。實作僅在 `src/adaptive/**`。此模組**不是** UI/PWA；整合者負責在 `sw.js` 加入新的 import 與離線快取、在 UI 綁定介面與重跑真實裝置測試。
 
 ## 分家族的正式資料路徑
 
@@ -9,6 +9,14 @@
 - `SkillTag` 由 Learning Academy 所有。`registry.skills` 嚴守 V1 定義；舊三種題型沒有原生 `skillTagIds`，只有 Learning Academy/整合者**明確確認**並注入 `registry.legacyMappings = {taskTypes:{...},errorTypes:{...}}` 時才可映射。同一 record/tag 只計一次；無映射代表「未知」，不是零能力。
 - `assessmentRefs` 是另行保留的未見題集合引用，非「這次練習的分數很高」即算測驗。Profile 的 `extensions['adaptive.evidence'].skillBreakdown` 分開記錄練習/測驗嘗試與不同題數，另以 `unseenAssessmentAttempts`、`contaminatedAssessmentAttempts` 標示是否已做過相同題目；重做測驗題也不是首次未見證據。未有真人校準時 `calibrationStatus='uncalibrated'`。少於 5 次有效嘗試或少於 3 道不同題目時 `estimatedProficiency=null`；樣本足夠時只回傳未校準平均分數及保守誤差區間，不得解讀成真正實力百分比、達到大師級或具統計因果意義的進步。
 - v1 Aggregate `legacySessions` 僅計 `legacyImported` 與 `legacyAggregateCount`，不創造任一 recordRef / errorType / tag。
+
+## Academy provenance 跨模組更新
+
+- Legacy v3 作答仍以原本 `archive:v3` 保存，決不擴張 `DecisionRecord`；每筆由 AI3 題庫實際評分的結果可另存 `provenanceLinks[]`（`academy-provenance/1.0.0`）。
+- Sidecar 關聯包含 `RecordRef`、原始 `exerciseId`、`AcademyQuestionRef`、`LessonRef`、`SkillTagIds`、`ruleRef`、`generatorVersion`、`seed/index`、`scoringVersion` 及安全的 `QuestionPublic` 快照；必須通過真實 AI3 `toPublicQuestion/getLessonPublic` 和原版題目重播。禁止靠 `ex3-*` 推測課程。
+- `createAdaptiveLearningAdapter(storage,{learning,registry,...})` 是 AI6 主要入口；注入 AI3 的 `submitAcademyAnswer/toPublicQuestion/getLessonPublic`，使用 `submitAnswer/rebuild/resolveReviewQuestion/getSession/reconcileSession`。
+- 為保證 localStorage 兩個 key 之間的崩潰恢復，先寫入**不參與計分**的 `pendingProvenance[]` 預備意圖，原始 v3 record 持久化且讀回後，才正式提交 `provenanceLinks[]`、能力、複習、Session。重啟 `rebuild({asOf})` 先安全回收準備狀態；未持久化的 raw record 不會計分。
+- 找不到原版 AI3 question 或 lesson 時，ReviewPlan 保留 `academy-q-* @ version`，但標示 `unavailable:source-lookup`，不退化為假課程或新題。原生歷史 legacy exercise 無經證實的 Academy 對應時仍可複習 `ex3-*`，但 `lesson:null`。
 
 ## 公開 API
 
@@ -25,6 +33,7 @@
 | `buildAnswerableCatalog({records,questionCatalog,reservedQuestionRefs,registry,validateAcademyQuestion,...})` | legacy 可回放快照；Academy 須獨立驗證 question | 實際可作答且鎖定來源/種子的題目清單 |
 | `planDailyTraining({profile,reviewPlan,records,questionCatalog,reservedQuestionRefs,registry,minutes,seed,asOf,ruleRef,...})` | minutes=10/20/30/60，預設 30 | `{session:TrainingSession V1,sections,availableQuestionCount}` |
 | `transitionTrainingSession(session,status,{at,recordRefs,reason})` | 僅 planned→active→completed/aborted | 驗證合法轉移後的新 Session |
+| `createAdaptiveLearningAdapter(storage,{learning,registry,profileId,timezone,...})` | 注入 Learning 公開正式來源、評分、讀回及崩潰恢復 | `submitAnswer/rebuild/resolveReviewQuestion/reconcileSession/getSession` 等供 AI6 使用的 API |
 | `createAcademyStore(storage,{registry,validateAcademyDecisionRecord,validateAcademyQuestion,profileId,timezone,migrations})` | 例如 localStorage | `load/loadStatus/persistScoredRecord/rebuild/saveSession/importJSON/exportJSON/readLegacy` |
 
 ## 整合範例
