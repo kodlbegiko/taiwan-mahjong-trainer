@@ -9,7 +9,7 @@ export {
 } from './profiles.js';
 export {
   createGame, listLegalActions, applyAction, replayGame,
-  validateGameState, createPlayerView, projectPlayerView,
+  validateGameState, createPlayerView, projectPlayerView, startNextRound,
 } from './engine.js';
 
 export { scoreWinningHand, settleWin } from './scoring.js';
