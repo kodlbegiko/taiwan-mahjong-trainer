@@ -51,10 +51,11 @@ function activate(page,{focus=true}={}) {
 function draw() {
   if(!root)return;
   if(activePage==='daily') {
-    root.innerHTML=daily?daily.render():
+    root.innerHTML=(daily?daily.render():
       '<header class="table-heading"><h1 id="table-heading" tabindex="-1">今日訓練</h1></header>'+
       '<section class="table-empty"><p>正式 Daily Controller 尚未就緒。'+
-      safe(lastError)+'</p><button type="button" data-daily-retry>重試連線</button></section>';
+      safe(lastError)+'</p><button type="button" data-daily-retry>重試連線</button></section>')+
+      (daily&&lastError?'<p class="table-warning" role="alert">'+safe(lastError)+'</p>':'');
     return;
   }
   if(activePage==='replay'){
@@ -176,7 +177,20 @@ async function dailyAction(kind) {
 }
 function onClick(event) {
   const button=event.target.closest('button');
-  if(!button||busy)return;
+  if(!button)return;
+  if(button.hasAttribute('data-pause-bots')){
+    session?.pause?.();botStatus='對局已暫停';draw();return;
+  }
+  if(button.hasAttribute('data-resume-bots')){
+    session?.resume?.();botStatus='';
+    if(!busy){
+      busy=true;void driveBots().catch(e=>lastError=e.message).finally(()=>{
+        busy=false;botStatus='';draw();
+      });
+    }else draw();
+    return;
+  }
+  if(busy)return;
   if(button.hasAttribute('data-return-academy'))return activate('academy');
   if(button.hasAttribute('data-return-table'))return activate('play');
   if(button.hasAttribute('data-start-new'))return void startNew();
