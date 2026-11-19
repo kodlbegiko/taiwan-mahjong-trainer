@@ -103,3 +103,20 @@ body[data-academy-page=training] #main > .roadmap{display:none}
 @media(prefers-reduced-motion:reduce){
  .academy-nav,.academy-page{scroll-behavior:auto}
 }
+
+/* iOS PWA standalone / notch / Dynamic Island / home indicator safe areas.
+   Apply padding to the shared outer shell, never to tile geometry itself. */
+.layout{
+  padding-left:max(28px,env(safe-area-inset-left,0px));
+  padding-right:max(28px,env(safe-area-inset-right,0px));
+  padding-bottom:max(12px,env(safe-area-inset-bottom,0px));
+}
+@media(max-width:640px){
+  .layout{
+    padding-left:max(14px,env(safe-area-inset-left,0px));
+    padding-right:max(14px,env(safe-area-inset-right,0px));
+  }
+}
+@media(prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto!important}
+}
