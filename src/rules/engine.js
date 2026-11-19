@@ -80,9 +80,9 @@ function actionFor(state, seat, kind, tileIds = []) {
 /** This function is deterministic; it never calls Math.random or Date.now. */
 export function createGame({
   gameId = 'game-1', seed, profileId = 'tw16-four-player-sandbox',
-  ruleVersion = 'experimental-move-v1', dealerSeat = 0,
+  ruleVersion = 'experimental-move-v1', dealerSeat = 0, fixtureDeck = null,
 } = {}) {
-  if(isCompleteRef({profileId})) return completeCreateGame({gameId,seed,profileId,ruleVersion,dealerSeat});
+  if(isCompleteRef({profileId})) return completeCreateGame({gameId,seed,profileId,ruleVersion,dealerSeat,fixtureDeck});
   if (typeof gameId !== 'string' || !/^[A-Za-z0-9_-]+$/.test(gameId)) throw new TypeError('Invalid gameId');
   assertSeat(dealerSeat);
   const profile = getRuleProfile(profileId, ruleVersion);
