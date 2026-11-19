@@ -9,7 +9,7 @@
 
 ## 圖像來源與授權
 
-筒子、竹索、鳥紋及白板圖形為本專案新繪的 SVG 幾何圖案，未裁切、追描或複製照片素材。萬字牌與風牌／三元牌中的中文書法輪廓擷取自 **Noto Serif CJK TC Bold**，字體 © 2010–2012 Google Corporation，依 **SIL Open Font License 1.1** 授權。上游字體與授權文件：https://github.com/notofonts/noto-cjk ，https://openfontlicense.org/ 。專案內 `docs/tile-glyph-outlines.json` 保存來源輪廓資訊，以便稽核。牌面輪廓經雙區塊排版重新組合；不包含任何外部字型檔案，並保留來源及授權聲明。MIT 專案的原有 LICENSE 不變；上述來源字形遵守自身 OFL 授權。
+筒子、竹索、鳥紋及白板圖形為本專案新繪的 SVG 幾何圖案，未裁切、追描或複製照片素材。萬字牌與風牌／三元牌中的中文書法輪廓擷取自 **Noto Serif CJK TC Bold**，字體 © 2010–2012 Google Corporation，依 **SIL Open Font License 1.1** 授權。上游字體與授權文件：https://github.com/notofonts/noto-cjk ，https://openfontlicense.org/ 。本儲存庫另保存上游 OFL 1.1 授權全文於 [`docs/licenses/NotoSerifCJK-OFL-1.1.txt`](./licenses/NotoSerifCJK-OFL-1.1.txt)。專案內 `docs/tile-glyph-outlines.json` 保存來源輪廓資訊，以便稽核。牌面輪廓經雙區塊排版重新組合；不包含任何外部字型檔案，並保留來源及授權聲明。MIT 專案的原有 LICENSE 不變；上述來源字形遵守自身 OFL 授權。
 
 ## 整合及限制
 
