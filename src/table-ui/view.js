@@ -128,7 +128,7 @@ export function TableView(snapshot, { selection = null, busy = false, error = ''
     '<div class="table-felt" aria-label="牌桌中央狀態"><strong>' +
     (currentlyHuman ? '輪到你' : botConnected ? '等待正式 Bot' : '等待 Bot API') +
     '</strong><span>' + escapeHtml(lastEvent(view.publicEvents)) +
-    '</span><small>公開資訊のみ · 不顯示其他玩家暗牌</small></div>' +
+    '</span><small>僅顯示公開資訊 · 不顯示其他玩家暗牌</small></div>' +
     OpponentSeat(opponents.get(1), view.round.currentSeat, view.round.dealerSeat) +
     '</div>' +
     PlayerHand(view.self, actions, selection) +
