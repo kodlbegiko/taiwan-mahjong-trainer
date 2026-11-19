@@ -1,7 +1,7 @@
-import { advanceReview, buildReviewQueue } from '../training/progress.js';
+import { buildReviewQueue } from '../training/progress.js';
 import { replayExercise } from '../training/exercises.js';
 import {
-  V1, DEFAULT_TIMEZONE, REVIEW_ALGORITHM_VERSION, requireUtc, requireId, requireV1,
+  V1, DEFAULT_TIMEZONE, REVIEW_ALGORITHM_VERSION, requireUtc, requireId, requireV1, canonicalJson,
   requireTimezone, localDayKey, addLocalCalendarDays, stableId, uniqueRefs, recordKey,
 } from './core.js';
 import { makeRecordRef, normalizeRecordEntries } from './records.js';
@@ -40,7 +40,7 @@ function replayableLegacy(snapshot) {
  */
 export function buildReviewPlan({
   profile, records = [], asOf, timezone = DEFAULT_TIMEZONE, dailyLimit = 20,
-  questionCatalog = [], validateAcademyDecisionRecord,
+  questionCatalog = [], validateAcademyDecisionRecord, validateAcademyQuestion,
 } = {}) {
   requireV1(profile, 'AbilityProfile');
   requireId(profile.profileId, 'profileId');
@@ -56,6 +56,9 @@ export function buildReviewPlan({
     catalog.set(key, question);
   }
   const normalized = normalizeRecordEntries(records, { validateAcademyDecisionRecord });
+  if (normalized.some(x => Date.parse(x.record.timestamp) > Date.parse(generatedAsOf))) {
+    throw new RangeError('Future record cannot be used in an asOf review snapshot');
+  }
   const groups = new Map();
   for (const entry of normalized) {
     const qref = questionRef(entry);
@@ -90,7 +93,13 @@ export function buildReviewPlan({
     // Legacy snapshots can replay without Academy's as-yet-unmerged question bank.
     const available = first.kind === 'legacy-v3'
       ? replayableLegacy(recent.record.exerciseSnapshot) && catalogEntry?.available !== false
-      : catalogEntry?.available === true && catalogEntry.taskType === 'scenario';
+      : catalogEntry?.available === true && catalogEntry.taskType === 'scenario' &&
+        catalogEntry.questionSnapshot?.status === 'validated' &&
+        catalogEntry.questionSnapshot.questionId === group.qref.questionId &&
+        catalogEntry.questionSnapshot.questionVersion === group.qref.questionVersion &&
+        catalogEntry.questionSnapshot.answerKey?.correctnessBasis !== 'unverified' &&
+        typeof validateAcademyQuestion === 'function' &&
+        validateAcademyQuestion(catalogEntry.questionSnapshot) === true;
     const isDue = localDayKey(dueAt, timezone) <= today;
     const reasons = [];
     if (isDue) reasons.push('due');
@@ -109,7 +118,7 @@ export function buildReviewPlan({
     a.questionId.localeCompare(b.questionId) || a.questionVersion.localeCompare(b.questionVersion));
   return {
     ...V1, planId: stableId('review', profile.profileId, generatedAsOf, timezone,
-      normalized.map(x => recordKey(makeRecordRef(x.kind, x.record))).join(',')),
+      normalized.map(x => canonicalJson(x.record)).join(',')),
     profileId: profile.profileId, generatedAsOf, algorithmVersion: REVIEW_ALGORITHM_VERSION,
     items, settings: { dailyLimit, timezone }, method: 'sm2-inspired',
     calibrationStatus: profile.calibrationStatus,
