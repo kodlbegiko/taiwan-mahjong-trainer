@@ -244,7 +244,8 @@ test('unverified scenario catalog flags are insufficient; only verified scenario
     source: 'academy-v1', available: true, estimatedMinutes: 3,
     questionSnapshot: { schemaVersion: 1, contractVersion: 'master-academy/1.0.0',
       questionId: 'scenario-a', questionVersion: 'v1', status: 'validated',
-      taskType: 'scenario', answerKey: { correctnessBasis: 'exact' } },
+      taskType: 'scenario', skillTagIds: ['waits.enumeration'],
+      answerKey: { correctnessBasis: 'exact' } },
   };
   const unknown = buildReviewPlan({ profile, records: input, asOf,
     validateAcademyDecisionRecord: validator, questionCatalog: [candidate] });
