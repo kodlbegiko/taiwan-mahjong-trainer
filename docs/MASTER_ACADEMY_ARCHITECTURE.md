@@ -18,7 +18,8 @@ Existing src/tiles.js, src/shanten.js, src/practice.js, src/training/*, src/stor
      (only PlayerView)                (Lesson/Question/answerKey vault)
                   └───────────┬───────────────┘
                               ▼
-                canonical grading and v3 DecisionRecord
+                canonical grading → Record dispatcher
+             (existing DecisionRecord v3 OR AcademyDecisionRecord V1)
                               │
                               ▼
                     Adaptive Training
@@ -50,7 +51,7 @@ Existing src/tiles.js, src/shanten.js, src/practice.js, src/training/*, src/stor
 
 1. Rules Engine 的 `GameState` 由完整局面事件 log 還原；公開頁面只能取得 `PlayerView`，並且 `PlayerView` 對所有對手暗牌/wall 做白名單投影。回放中的 post-game full-information 另走**明示授權及新 schema**，不沿用 as-of PlayerView。
 2. Learning 題目 `answerKey` 與完整 grading fixture 留在受保護服務／local-domain 封存層；UI 接到 `QuestionPublic`，只在作答後顯示 `GradingResult`。本地 PWA 中所有 JS/JSON 都能被使用者檢視，**若答案內嵌在前端下載檔，無法宣稱真正防作弊或保密**。本版可做到正常 UI 預答題不洩漏，但強防作弊需服務端授權。
-3. 已驗證 `DecisionRecord v3` 保留原始成績 snapshot；自適應 `AbilityProfile`／`ReviewPlan` 屬可重算的**衍生 sidecar**，採先驗證/寫原紀錄、再更新 sidecar 並容許重建。不得覆寫 `tw-mahjong-trainer:session:v1` 或 `archive:v3`。
+3. 已驗證 `DecisionRecord v3` 的 `discard/tenpai/multi_wait` 評分與快照照舊；`scenario` **不是 v3 taskType**，必須使用**新版本** `AcademyDecisionRecord` 與獨立驗證器／sidecar，未有可信情境 scorer 時不可產生正式成績。跨模組僅以 `{kind:"legacy-v3"|"academy-v1",id}` 的 `RecordRef` 引用。自適應 `AbilityProfile`／`ReviewPlan` 屬可重算的**衍生 sidecar**，依各家族 validator 先驗證並持久化紀錄，再做冪等 reducer；不能為情境題修改 v3 `Exercise` 允許題型，不得覆寫 `tw-mahjong-trainer:session:v1` 或 `archive:v3`。
 4. 排程依傳入 `asOf` 和 IANA 時區重現；舊例 `advanceReview` 僅 SM-2-inspired。策略放槍率/台數未驗證時不顯示數字或冒稱「正確答案」。
 5. 獨立 QA 必須測非法負面例：隱藏牌曝光、重複 physical ID、未知 RuleProfile、無法重播題目、重複 DecisionRecord、過期 expectedRevision、PWA 快取半更新、quota-denied 舊資料保全。
 
