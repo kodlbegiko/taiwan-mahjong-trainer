@@ -5,6 +5,15 @@ import { structuralCandidates } from './structure.js';
 import { simulateTwoDraws, SIMULATOR_VERSION, stableHash } from './simulate.js';
 
 export const STRATEGY_ENGINE_VERSION = 'advanced-strategy/1.0.0';
+/** Stable identity for semantically equivalent public JSON, independent of object key order. */
+function canonicalJSON(value) {
+  if (Array.isArray(value)) return '['+value.map(canonicalJSON).join(',')+']';
+  if (value && typeof value === 'object') {
+    return '{'+Object.keys(value).sort().map(key=>JSON.stringify(key)+':'+canonicalJSON(value[key])).join(',')+'}';
+  }
+  return JSON.stringify(value);
+}
+
 const claimKinds = new Set(['chi','pong','kong']);
 const metric = (name,value,unit,epistemic,method,ruleRef,extra={}) => ({
   name,value,unit,epistemic,method,ruleRef:{...ruleRef},...extra,
@@ -26,7 +35,7 @@ function context(parsed, opts) {
   const {view} = parsed;
   const viewRef={gameId:view.gameId,viewId:view.viewId,asOfEventSeq:view.asOfEventSeq,audienceSeat:view.audienceSeat};
   const allIds=view.legalActions.map(a=>a.actionId);
-  const identifier=stableHash(JSON.stringify(view)+JSON.stringify(opts)+STRATEGY_ENGINE_VERSION);
+  const identifier=stableHash(canonicalJSON(view)+canonicalJSON(opts)+STRATEGY_ENGINE_VERSION);
   const base={
     schemaVersion:1,contractVersion:CONTRACT_VERSION,
     analysisId:'strategy:'+view.gameId+':'+view.viewId+':'+identifier,
