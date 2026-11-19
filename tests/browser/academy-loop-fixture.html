@@ -1,0 +1,9 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Academy Fixture-only Chromium Harness</title><link rel="stylesheet" href="../../style.css"><link rel="stylesheet" href="../../src/academy-ui/academy.css"></head>
+<body><main class="layout">
+<header class="academy-page-head"><h1>Fixture-only Browser Harness</h1><p>不是正式 Master Academy API／CI，僅用來測試可操作學習 UI。</p></header>
+<nav aria-label="測試導覽"><button id="go-today">今日訓練</button><button id="go-lessons">正式課程介面</button><button id="go-growth">成長介面</button><button id="toggle-quota">模擬儲存失敗</button></nav>
+<p id="fixture-status" role="status" hidden></p><p id="fixture-page" aria-live="polite"></p>
+<section id="academy-root" class="academy-page"></section>
+</main><script type="module" src="./academy-loop-fixture.js"></script></body></html>

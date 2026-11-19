@@ -73,7 +73,7 @@ def three_modes(browser, base, width, shots):
     p = ctx.new_page()
     faults = []
     p.on('pageerror', lambda e: faults.append(str(e)))
-    p.goto(base, wait_until='domcontentloaded')
+    p.goto(base + '?academy=training', wait_until='domcontentloaded')
     loaded_images(p, '#hand img.tile-face-image', 17)
     check(p.locator('#hand button[data-tile]').count() == 17, 'missing discard buttons')
     no_overflow_and_tappable(p, width, '#hand button')
@@ -162,7 +162,7 @@ def offline_and_upgrade(browser, base, site, shots):
     ctx = browser.new_context(viewport={'width': 390, 'height': 850},
                               is_mobile=True, has_touch=True)
     p = ctx.new_page()
-    p.goto(base)
+    p.goto(base + '?academy=training')
     p.locator('#hand button').first.wait_for()
     p.wait_for_function('Boolean(navigator.serviceWorker?.controller)', timeout=30000)
     p.reload()
@@ -193,7 +193,7 @@ def offline_and_upgrade(browser, base, site, shots):
 
     ctx.set_offline(True)
     cold = ctx.new_page()
-    cold.goto(base, wait_until='domcontentloaded')
+    cold.goto(base + '?academy=training', wait_until='domcontentloaded')
     loaded_images(cold, '#hand img.tile-face-image', 17)
     cold.locator('[data-mode="tenpai"]').click()
     loaded_images(cold, '#hand img.tile-face-image', 16)
