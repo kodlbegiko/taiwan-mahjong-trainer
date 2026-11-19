@@ -86,7 +86,7 @@ def complete_real_lesson_question(page,root,label):
     check(now['resolved']['lesson']['lessonId']=='academy-l1-01','replay failed to return the original lesson')
     check(now['resolved']['question']['questionId']=='academy-q-001','review returned a different question')
     check(len(now['links'])==1,'reload lost provenance')
-    check(len(now['profile']['sourceRecordRefs'])==1,'ability evidence is not unique')
+    check(len({r['kind']+':'+r['id'] for skill in now['profile']['skills'] for r in skill['evidenceRefs']})==1,'public ability evidence is not unique')
     check(page.evaluate("""() => localStorage.getItem('tw-mahjong-trainer:archive:v3')""")==result['v3raw'],
           'rebuild rewrote the original v3 bytes')
     check(page.evaluate("""() => localStorage.getItem('tw-mahjong-trainer:session:v1')""")==result['v1'],
