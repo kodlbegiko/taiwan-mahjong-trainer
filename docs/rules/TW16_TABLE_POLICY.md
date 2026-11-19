@@ -22,8 +22,8 @@ These references differ on added-kong robbery, open-kong seating, flower-only wi
 | Deal | 16 to each player, 17 to dealer; fixed seed with Fisher–Yates; sequential seed-deal order | Experimental dealing procedure |
 | Flower | Flowers are identified outside 0..33, exposed and replaced from tail in fixed seat order | Experimental |
 | Claim | 3-seat response window: win > open kong > pong > chi, nearest seat as tie-break | Experimental |
-| Chi | Only first next seat may take a valid same-suit sequence | Experimental |
-| Pong | Two owned matching tiles plus public discarded matching tile | Experimental |
+| Chi | Only first next seat may take a valid same-suit sequence; claimed tile type cannot be immediately discarded | Experimental |
+| Pong | Two owned matching tiles plus public discarded matching tile; first discard required before any self kong | Experimental |
 | Exposed kong | Three owned matching tiles plus a publicly discarded matching tile | Experimental |
 | Concealed kong | Four owned matching tiles; this experimental profile publicly reveals all four identities | Experimental, visibility differs from some table practices |
 | Added kong | Exposed triplet + one owned matching tile; **rob-added-kong disabled** | Experimental |
@@ -32,7 +32,7 @@ These references differ on added-kong robbery, open-kong seating, flower-only wi
 | Pass win | If eligible to win on a discard but electing any other action, block wins until the actor's own next discard | Experimental; variants differ |
 | Exhaustive draw | When the live wall reaches 16 reserved tiles and all responses pass, declare no-winner settlement | Experimental |
 | Winner count | One winner; nearest seat takes precedence for simultaneous discard wins | Experimental |
-| Next round | **Not implemented as a continuous multi-round session ledger** | Unavailable |
+| Next round | `startNextRound(previous,{gameId,seed})` initializes a separately replayable next hand, links previous game/revision and rotates or retains dealer | Experimental; **not** one continuous multi-round ledger |
 | Special hands | Flower-only wins, seven-pair variants, and other non-five-meld hands **not implemented** | Unavailable |
 
 \`RuleProfile.status='experimental'\` and the pinned \`extensions.tw16.housePolicyVersion\` are authoritative. The implementation refuses other profile IDs and incompatible rule versions. The original \`tw16-structural-verified\` remains strictly structural and does not gain a four-player verification label.
@@ -93,3 +93,23 @@ Current *abstract* payment formula per payer: \`100 + (winningTai + dealerIntera
 - **R3-C (bounded)**: old sandbox Golden tests retained, deterministic action-group replay, opponent concealed/wall physical swap (public view unchanged), bad action/forged hand/replay mutation rejection, canonical 10k independent Oracles unchanged.
 
 \`npm run check\` must run at the exact PR head. CI passing this experimental table policy does not certify the complete R-01 gate or authorize its integration into a published academy player match without human table policy review.
+
+
+## Golden fixtures, private security and next-hand boundary
+
+\`tests/rules/complete-golden.test.js\` constructs a **valid physical 144-tile permutation** with explicit hands and wall ordering, but only in the experimental engine fixture API. The actual full permutation is recorded inside the **system-private** \`deal.payload.fixtureDeck\` and passed into deterministic replay as part of the saved event ledger. Public \`deal\` projection includes **only four starting hand counts**, never that permutation. Production games that omit \`fixtureDeck\` use the version-pinned shuffled Seed as usual. A fixture permutation is not cryptographically signed; if a malicious actor rewrites the private ledger **and** the full state consistently, the local offline replay validator is not an authenticated anti-cheat service.
+
+These forced legal real-engine scenarios include:
+
+- Dealer 5-meld/eye self-win with a complete zero-sum settlement and a new replayable dealer-retained hand.
+- Discard-win (ron) with only the discarder paying; simultaneous win outranks a competing pong.
+- Eligible win deliberately passed, then a different self-drawn matching tile cannot bypass the pass-win lock.
+- Pong outranks next-seat chi regardless of declaration order.
+- Concealed kong from four owned matching physical copies and a tail replacement draw.
+- Exposed pong followed by the mandatory discard and next rotation, then an added kong using the last owned matching copy.
+- Multi-action \`win + settle\` and \`pass + resolved claim\` are replayed as **one submitted LegalAction** producing a deterministic group of TurnEvents.
+- Exhaustive live wall draw with exactly 16 tiles retained and zero-score settlement.
+
+Every rule is limited to the explicitly versioned experimental table, not a blanket certification of other Taiwan house rules. RuleProfile changes that introduce unsupported configurations, including multiwinner and rob-kong, must fail closed until separate action/settlement logic and Golden cases are implemented.
+
+The \`startNextRound\` API accepts only a previously **settled** hand, a **distinct gameId** and a **new explicit seed**. It increments \`round.handIndex\`, retains the dealer on self-win or drawn hand according to the pinned table policy, and otherwise rotates dealer. The new \`deal\` event persistently records \`previousRoundRef={gameId,roundId,revision}\`; each hand is independently replayable. A cryptographically authenticated cross-round match ledger, dealer streak tai, and annual/match score accumulation are outside this implementation.
