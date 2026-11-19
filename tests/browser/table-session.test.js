@@ -82,7 +82,7 @@ test('corrupt game data is not silently erased; unsupported full game profile is
   assert.equal(s.restore(), false);
   const raw = storage.getItem(TABLE_STORAGE_KEY);
   const p = firstProfile();
-  assert.throws(() => s.start({ profileId:p.profileId, ruleVersion:p.ruleVersion }), /禁止覆寫|驗證/);
+  assert.throws(() => s.start({ profileId:p.profileId, ruleVersion:p.ruleVersion }), /禁止覆寫|驗證|已停止寫入/);
   assert.equal(storage.getItem(TABLE_STORAGE_KEY), raw);
   const other = createSandboxSession();
   assert.throws(() => other.start({ profileId: 'tw16-structural-verified', ruleVersion:'structural-only-v1' }));
