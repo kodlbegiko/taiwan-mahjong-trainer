@@ -1,7 +1,7 @@
 /* Offline-first, atomic shell for GitHub Pages root or /repo/ deployments.
  * IMPORTANT: change CACHE_VERSION whenever any precached file changes.
  * The install event only succeeds if the entire listed release is cached. */
-const CACHE_VERSION = 'tmt-v02-realistic-tiles-master-academy-phase3-integrated-experimental-20261120-r2';
+const CACHE_VERSION = 'tmt-v02-realistic-tiles-master-academy-phase3-integrated-daily-20261120-r3';
 const SHELL_CACHE = `tmt-shell-${CACHE_VERSION}`;
 const BASE = new URL('./', self.location.href);
 const SHELL = [
@@ -71,7 +71,7 @@ const SHELL = [
   './src/adaptive/session.js',
   './src/adaptive/storage.js',
   './src/adaptive/validate.js',
-  './src/adaptive/learning-adapter.js',
+  './src/adaptive/learning-adapter.js', './src/adaptive/daily-training.js',
   './src/adaptive/provenance.js',
   './src/rules/index.js',
   './src/rules/tile-constants.js',
