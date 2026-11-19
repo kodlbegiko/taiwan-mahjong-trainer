@@ -82,6 +82,8 @@ function endInitialFlowers(state){
   if(pending!==undefined){state.round.currentSeat=pending;state.round.phase='replacement';return;}
   ext(state).initialFlowers=false;
   state.round.currentSeat=state.round.dealerSeat;state.round.phase='await_discard';
+  ext(state).lastDraw={seat:state.round.dealerSeat,
+    tileId:state.players[state.round.dealerSeat].concealed.at(-1),source:'deal'};
 }
 function endSupplement(state,seat,drawnId){
   ext(state).pendingReplacement=false;
@@ -181,7 +183,7 @@ export function completeListLegalActions(state,seat){
   const actions=player.concealed.filter(id=>!isFlower(id)&&
     (locked?.seat!==seat||typeOf(id)!==locked.forbiddenDiscardType)).map(id=>
     action(state,seat,'discard',[id],'OWN_DISCARD'));
-  if(winning(player)&&!ext(state).passLocks[seat]){
+  if(winning(player)&&!ext(state).passLocks[seat]&&ext(state).lastDraw?.seat===seat){
     actions.push(action(state,seat,'win',[],'SELF_DRAW_WIN'));
   }
   if(state.wall.length&&ext(state).afterClaim?.seat!==seat){
