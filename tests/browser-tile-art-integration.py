@@ -97,7 +97,7 @@ def three_modes(browser, base, width, shots):
     p.keyboard.press('Enter')
     p.locator('#answer:visible').wait_for(timeout=25000)
     loaded_images(p, '#hand img.tile-face-image', 17)
-    check(p.locator('#hand button.picked').count() == 1, 'picked tile lost')
+    check(p.locator('#hand .tile.picked').count() == 1, 'picked tile lost')
     check(p.locator('#explanation-panel:visible').count() == 1, 'explanation missing')
     p.screenshot(path=str(shots / f'{width}-discard-result.png'), full_page=True)
 

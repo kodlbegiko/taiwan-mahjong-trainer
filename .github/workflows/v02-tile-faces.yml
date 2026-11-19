@@ -39,6 +39,7 @@ jobs:
           # required to validate the 34 faces and real Chrome touch/layout.
       - name: Real Chromium layouts, all SVGs, modes, offline/update and preservation
         run: |
+          set -euo pipefail
           mkdir -p "$RUNNER_TEMP/tmt-tile-art"
           python tests/browser-tile-art-integration.py --screenshots "$RUNNER_TEMP/tmt-tile-art" | tee "$RUNNER_TEMP/tmt-tile-art/test-results.txt"
           echo "checked_out_sha=$GITHUB_SHA" >> "$RUNNER_TEMP/tmt-tile-art/environment.txt"
