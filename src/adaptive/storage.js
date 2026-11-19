@@ -9,7 +9,8 @@ import { validateScoredRecord, makeRecordRef, normalizeRecordEntries } from './r
 import { buildAbilityProfile } from './ability.js';
 import { buildReviewPlan } from './review.js';
 import { validateAbilityProfile, validateReviewPlan, validateTrainingSession } from './validate.js';
-import { createLearningProvenance, validateProvenanceLinks, validateLearningProvenance } from './provenance.js';
+import { createLearningProvenance, validateProvenanceLinks, validateLearningProvenance,
+  validateProvenanceShape } from './provenance.js';
 
 export const ACADEMY_STORAGE_KEY = 'tw-mahjong-master-academy:state:v1';
 export const ACADEMY_STATE_FORMAT = 'taiwan-mahjong-master-academy-sidecar';
@@ -27,7 +28,7 @@ export class AcademyStorageError extends Error {
 export function emptyAcademyState() {
   return {
     ...V1, format: ACADEMY_STATE_FORMAT, revision: 0,
-    academyRecords: [], academyQuestions: [], provenanceLinks: [], abilityProfile: null, reviewPlan: null, trainingSessions: [],
+    academyRecords: [], academyQuestions: [], provenanceLinks: [], pendingProvenance: [], abilityProfile: null, reviewPlan: null, trainingSessions: [],
   };
 }
 export function validateAcademyState(state, { validateAcademyDecisionRecord } = {}) {
@@ -42,6 +43,16 @@ export function validateAcademyState(state, { validateAcademyDecisionRecord } = 
   }
   if (state.provenanceLinks !== undefined && (!Array.isArray(state.provenanceLinks) ||
     state.provenanceLinks.length > MAX_RECORDS)) throw new RangeError('Invalid provenance collection');
+  if (state.pendingProvenance !== undefined && (!Array.isArray(state.pendingProvenance) ||
+    state.pendingProvenance.length > MAX_RECORDS)) throw new RangeError('Invalid pending provenance collection');
+  const pendingIds = new Set();
+  for (const pending of state.pendingProvenance ?? []) {
+    requireObject(pending, 'pendingProvenance');
+    validateProvenanceShape(pending.link, pending.record);
+    const key = pending.link.recordRef.kind + ':' + pending.link.recordRef.id;
+    if (pendingIds.has(key)) throw new RangeError('Duplicate pending provenance');
+    pendingIds.add(key);
+  }
   const questions = new Map();
   for (const question of state.academyQuestions) {
     requireV1(question, 'AcademyQuestion snapshot');
@@ -272,6 +283,66 @@ export function createAcademyStore(storage, {
     }
   }
   /**
+   * Durable write-ahead INTENT (not scored evidence), needed because browser
+   * localStorage cannot atomically commit the old v3 archive and new sidecar.
+   * On crash after v3 append but before final provenance, recoverPending()
+   * can link the official question without guessing from its geometry.
+   */
+  function prepareLearningProvenance({ recordRef, record, academyQuestionRef, sessionId }) {
+    const link = createLearningProvenance({ record, recordRef, academyQuestionRef, learning, sessionId });
+    const state = load();
+    const pending = state.pendingProvenance ?? [];
+    const old = pending.find(p => p.link.recordRef.id === recordRef.id &&
+      p.link.recordRef.kind === recordRef.kind);
+    if (old && (canonicalJson(old.record) !== canonicalJson(record) ||
+      canonicalJson(old.link) !== canonicalJson(link))) {
+      throw new RangeError('Conflicting prepared provenance intent');
+    }
+    const finalized = (state.provenanceLinks ?? []).find(p =>
+      p.recordRef.id === recordRef.id && p.recordRef.kind === recordRef.kind);
+    if (finalized) {
+      if (canonicalJson(finalized) !== canonicalJson(link))
+        throw new RangeError('Conflicting finalized provenance');
+      return { durable: true, prepared: false, alreadyFinalized: true };
+    }
+    if (old) return { durable: true, prepared: true, alreadyFinalized: false };
+    const saved = save({ ...state, revision: state.revision + 1,
+      pendingProvenance: [...pending, { link, record }]
+        .sort((a,b)=>a.link.recordRef.id.localeCompare(b.link.recordRef.id)) });
+    return { durable: saved.durable, prepared: saved.durable, alreadyFinalized: false };
+  }
+  function recoverPending({ asOf, assessmentRefs = [], questionCatalog = [],
+    reservedQuestionRefs = [] } = {}) {
+    requireUtc(asOf);
+    const initial = load();
+    const results = [];
+    for (const pending of initial.pendingProvenance ?? []) {
+      const legacy = readLegacy();
+      const stored = legacy.hasCanonicalV3 &&
+        legacy.archive.records.find(r => r.schemaVersion === 3 &&
+          r.id === pending.link.recordRef.id);
+      if (!stored) {
+        results.push({ recordRef: pending.link.recordRef,
+          recovered: false, errorCode: 'AWAIT_CANONICAL' });
+        continue;
+      }
+      if (canonicalJson(stored) !== canonicalJson(pending.record)) {
+        throw new AcademyStorageError('PENDING_RECORD_CONFLICT',
+          'Prepared source differs from official durable v3 record');
+      }
+      validateLearningProvenance(pending.link, stored, learning);
+      const outcome = persistLearningProvenance({
+        recordRef: pending.link.recordRef, record: stored,
+        academyQuestionRef: pending.link.academyQuestionRef,
+        ...(pending.link.sessionId ? { sessionId: pending.link.sessionId } : {}),
+      }, { asOf, assessmentRefs, questionCatalog, reservedQuestionRefs });
+      results.push({ recordRef: pending.link.recordRef,
+        recovered: outcome.provenanceDurable === true,
+        ...(outcome.errorCode ? { errorCode: outcome.errorCode } : {}) });
+    }
+    return { results, remaining: load().pendingProvenance?.length ?? 0 };
+  }
+  /**
    * Canonical v3 bytes must already be durable. Commit validated provenance to
    * the independent sidecar BEFORE rebuilding any derived abilities/review.
    * The raw record always survives a sidecar quota exception or crash.
@@ -304,9 +375,19 @@ export function createAcademyStore(storage, {
     if (previous && canonicalJson(previous) !== canonicalJson(link)) {
       throw new RangeError('Conflicting immutable provenance RecordRef');
     }
-    if (!previous) {
+    const pending = (state.pendingProvenance ?? []).find(p =>
+      p.link.recordRef.kind === recordRef.kind && p.link.recordRef.id === recordRef.id);
+    if (pending && (canonicalJson(pending.link) !== canonicalJson(link) ||
+      canonicalJson(pending.record) !== canonicalJson(stored))) {
+      throw new RangeError('Canonical record/provenance conflicts with prepared intent');
+    }
+    if (!previous || pending) {
       const first = save({ ...state, revision: state.revision + 1,
-        provenanceLinks: [...links, link].sort((a,b)=>a.recordRef.id.localeCompare(b.recordRef.id)) });
+        provenanceLinks: previous ? links :
+          [...links, link].sort((a,b)=>a.recordRef.id.localeCompare(b.recordRef.id)),
+        pendingProvenance: (state.pendingProvenance ?? []).filter(p =>
+          p.link.recordRef.kind !== recordRef.kind || p.link.recordRef.id !== recordRef.id),
+      });
       if (!first.durable) return { recordRef, durable: false, provenanceDurable: false,
         derivedFresh: false, errorCode: 'STORAGE_UNAVAILABLE' };
       state = first.state;
@@ -381,7 +462,8 @@ export function createAcademyStore(storage, {
       trainingSessions: [...sessions, cloneJson(session)].sort((a,b) => a.sessionId.localeCompare(b.sessionId)) });
   }
   return { load, loadStatus, saveSession, getSession, getProvenance,
-    persistScoredRecord, persistLearningProvenance, rebuild,
+    persistScoredRecord, prepareLearningProvenance, persistLearningProvenance,
+    recoverPending, rebuild,
     readLegacy, exportJSON: () => JSON.stringify(load()),
     importJSON: json => save(migrateAcademyState(JSON.parse(json), { migrations, validateAcademyDecisionRecord })),
   };
