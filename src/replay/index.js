@@ -59,7 +59,14 @@ function frameFrom(archive,seq) {
   const m=archive.manifest;
   const state=replayStateAt(archive,seq);
   const view=createPlayerView(state,m.ownerSeat);
-  readPlayerView(view); // recursively checks the PlayerView allowlist and known-tile consistency
+  // Rules R3 can expose an own concealed flower while awaiting replacement;
+  // Strategy V1's standard-only view parser does not model that legal phase.
+  // In that case the authoritative Rules projection above is used as-is,
+  // with no Strategy access until flowers are resolved.
+  const pendingR3Flower=view.ruleRef.profileId==='tw16-configurable-table' &&
+    (view.self.concealed.some(x=>x.kind==='flower') ||
+      view.legalActions.some(a=>a.kind==='replace_flower'));
+  if(!pendingR3Flower)readPlayerView(view);
   return {...V1,frameVersion:FRAME_VERSION,replayId:m.replayId,
     perspective:'player-at-time',asOfEventSeq:seq,
     playerView:clone(view),publicEvent:clone(view.publicEvents.at(-1)),
@@ -182,7 +189,17 @@ export function createReplayService({storage=null}={}) {
     if(!legal || legal.kind!==decision.kind) throw new ReplayError('INVALID_ACTION_ID','Recorded action is not legal at the original decision point');
     if(actionId!==undefined && actionId!==decision.actionId)
       throw new ReplayError('INVALID_ACTION_ID','Requested action is not the recorded decision');
-    const strategy=analyzePlayerView(view,{seed:'replay-coach-v1',samples:0,maxSimulatedRoutes:0});
+    const pendingR3Flower=view.ruleRef.profileId==='tw16-configurable-table' &&
+      (view.self.concealed.some(x=>x.kind==='flower') ||
+        view.legalActions.some(a=>a.kind==='replace_flower'));
+    const strategy=pendingR3Flower?{
+      engineVersion:STRATEGY_ENGINE_VERSION,
+      viewRef:{gameId:view.gameId,viewId:view.viewId,asOfEventSeq:view.asOfEventSeq,
+        audienceSeat:view.audienceSeat},
+      legalActionIds:view.legalActions.map(a=>a.actionId),
+      recommendations:[],
+      limitations:['Unreplaced flowers are valid R3 Rules state but outside Strategy V1 standard-tile parser; no official scorer.'],
+    }:analyzePlayerView(view,{seed:'replay-coach-v1',samples:0,maxSimulatedRoutes:0});
     if(strategy.engineVersion!==STRATEGY_ENGINE_VERSION ||
        strategy.viewRef.viewId!==view.viewId ||
        strategy.legalActionIds.length!==view.legalActions.length ||
