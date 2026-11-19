@@ -189,3 +189,67 @@ export function explainStrategy(analysis, playerView) {
     };
   });
 }
+
+
+/**
+ * Compare TWO Rules Engine public PlayerView projections for a claim event.
+ * This is structural evidence conditional on an externally verified transition,
+ * never an independent confirmation of claim legality or full-game optimality.
+ */
+export function compareClaimProjections(beforeView, afterView, actionId) {
+  const before=readPlayerView(beforeView), after=readPlayerView(afterView);
+  const a=before.view.legalActions.find(x=>x.actionId===actionId && claimKinds.has(x.kind));
+  if (!a) throw new RangeError('副露動作不在 before PlayerView 合法清單');
+  if (before.view.gameId!==after.view.gameId ||
+      before.view.ruleRef.profileId!==after.view.ruleRef.profileId ||
+      before.view.ruleRef.ruleVersion!==after.view.ruleRef.ruleVersion ||
+      before.view.audienceSeat!==after.view.audienceSeat ||
+      before.view.round.roundId!==after.view.round.roundId ||
+      after.view.asOfEventSeq<=before.view.asOfEventSeq) {
+    throw new RangeError('副露前後視角或事件時間不一致');
+  }
+  const evidence=after.view.publicEvents.find(e=>e.causedByActionId===actionId && ['claim','kong'].includes(e.type));
+  if (!evidence) return {
+    actionId,kind:a.kind,status:'unavailable',
+    limitations:['缺少公開 claim/kong 事件關聯；不能相信任意傳入的後續手牌就是此動作結果。'],
+  };
+  const added=after.view.self.melds.filter(m=>m.tileIds.every(id=>a.tileIds.includes(id)) && m.tileIds.length===a.tileIds.length);
+  if (after.fixedMelds!==before.fixedMelds+1 || added.length!==1) return {
+    actionId,kind:a.kind,status:'unavailable',
+    limitations:['副露後的公開面子無法與指定 legalAction physical IDs 核對。'],
+  };
+  if (!before.view.capabilities.structuralScore || !after.view.capabilities.structuralScore ||
+      before.hand.length!==16-3*before.fixedMelds ||
+      after.hand.length!==17-3*after.fixedMelds) return {
+    actionId,kind:a.kind,status:'unavailable',
+    limitations:['副露前後有效暗牌張數或 canonical structuralScore 能力不符合本介面。'],
+  };
+  const postLegal=new Set(after.view.legalActions.filter(x=>x.kind==='discard')
+    .map(x=>Number(x.tileIds[0].split(':')[1])));
+  const postRanks=analyzeDiscards(after.hand,{visible:after.visible,fixedMelds:after.fixedMelds})
+    .filter(x=>postLegal.has(x.tile));
+  if (!postRanks.length) return {
+    actionId,kind:a.kind,status:'unavailable',
+    limitations:['副露後沒有可確認的合法捨牌；不會建議未宣告 legalAction 的出牌。'],
+  };
+  const initial=analyzeDraws(before.hand,{visible:before.visible,fixedMelds:before.fixedMelds});
+  const post=postRanks[0];
+  const wasClosed=before.view.self.melds.every(m=>!m.open);
+  const remainsClosed=after.view.self.melds.every(m=>!m.open);
+  return {
+    actionId,kind:a.kind,status:'exact-structural',
+    evidenceEventId:evidence.eventId,
+    before:{shanten:initial.shanten,effectiveCopies:initial.copies,effectiveKinds:initial.kinds,
+      shapeCandidates:structuralCandidates(before.hand,before.counts)},
+    afterBestLegalDiscard:{tile:post.tile,shanten:post.shanten,effectiveCopies:post.copies,
+      effectiveKinds:post.kinds,shapeCandidates:structuralCandidates(after.hand,after.counts)},
+    structuralClosureLost:wasClosed && !remainsClosed,
+    epistemic:{shanten:'exact',effectiveCopies:'exact',closure:'exact',shapeCandidates:'heuristic',
+      scoringOpportunityCost:'unknown',fullGameOptimality:'unknown'},
+    limitations:[
+      'before 為副露前等待階段，after 為副露後合法捨牌的最優結構路線，階段不同，不能把差值直接當勝率或策略價值。',
+      '公開 event 證明關聯，但跨局規則與事件有效性仍由 Rules Engine 驗證；本函式不重播 GameState。',
+      '失去門清僅是公開結構狀態；台數、過水、吃碰槓優先權與風險仍未知。',
+    ],
+  };
+}
