@@ -124,3 +124,32 @@ body[data-table-view="replay"] .roadmap { display: none !important; }
 @media(prefers-reduced-motion: reduce) {
   .table-hand button.table-tile, .table-hand button.table-tile.is-selected { transition:none; }
 }
+
+/* Daily route is owned by Table UI; legacy Academy remains intact. */
+body[data-table-view="daily"] #academy-navigation,
+body[data-table-view="daily"] .mode-nav,
+body[data-table-view="daily"] #academy-root,
+body[data-table-view="daily"] .intro,
+body[data-table-view="daily"] .columns,
+body[data-table-view="daily"] .roadmap { display:none !important; }
+#full-table-root { overflow-x:clip; padding-bottom:max(96px, env(safe-area-inset-bottom)); }
+.table-daily-hand { display:flex; flex-wrap:wrap; gap:3px; margin:12px 0; }
+.table-daily-hand .table-tile { width:35px; min-width:35px; min-height:48px; }
+.table-daily-option { display:inline-flex; align-items:center; gap:8px;
+  border:1px solid #79978b; background:#245248; color:#f3eee1; border-radius:9px;
+  padding:8px; min-height:48px; cursor:pointer; }
+.table-daily-option input { width:22px; height:22px; accent-color:#e6c477; }
+.table-daily-option .table-tile { width:32px; min-height:46px; }
+.table-daily-grade { max-height:240px; overflow:auto; white-space:pre-wrap;
+  overflow-wrap:anywhere; font-size:11px; }
+.table-hand-flower { display:flex; align-items:center; justify-content:center; min-height:52px; }
+.table-replay-controls select { max-width:100%; }
+.table-replay .table-hand { grid-template-columns:repeat(auto-fit,minmax(32px,1fr)); }
+.table-actions [data-continue-bots], .table-daily-question [data-daily-submit] {
+  min-height:44px;
+}
+@media(max-width:560px) {
+  .table-actions { position:relative; padding-bottom:calc(10px + env(safe-area-inset-bottom)); }
+  .table-daily-hand .table-tile { width:30px; min-width:30px; min-height:44px; }
+  .table-daily-option { min-height:48px; }
+}
