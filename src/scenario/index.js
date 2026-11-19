@@ -51,7 +51,7 @@ export function prepareVerifiedAdaptiveEvidence({record,question,finding}) {
     throw new ReplayError('ADAPTIVE_PROVENANCE_MISMATCH','Record, finding and original view do not match');
   }
   return {...V1,evidenceVersion:ADAPTIVE_EVIDENCE_VERSION,
-    evidenceId:'replay-evidence:'+record.recordKind+':'+record.id+':'+finding.findingId,
+    evidenceId:'replay-evidence:'+record.recordKind+':'+record.id,
     recordRef:{kind:'academy-v1',id:record.id},replayId:finding.replayId,
     eventSeq:finding.eventSeq,chosenActionId:record.chosenActionId,
     scoringEvidence:clone(record.scoringEvidence),skillTagIds:[...record.skillTagIds],
