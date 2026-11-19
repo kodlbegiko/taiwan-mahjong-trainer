@@ -1,0 +1,129 @@
+name: V0.2 Device Acceptance Pages Preview (NOT RELEASE)
+
+on:
+  push:
+    branches: [test/v0.2-device-acceptance]
+    paths:
+      - '.github/workflows/v02-device-pages-preview.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: v02-device-pages-preview
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy exact verified main snapshot (pre-release)
+    if: github.ref == 'refs/heads/test/v0.2-device-acceptance'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment:
+      name: github-pages
+      url: \${{ steps.deployment.outputs.page_url }}
+    env:
+      SOURCE_SHA: 4be352ff202d509ab0f52e4fed0c0e504d900a11
+    steps:
+      - name: Check out pinned V0.2 main source, not the preview branch
+        uses: actions/checkout@v4
+        with:
+          ref: 4be352ff202d509ab0f52e4fed0c0e504d900a11
+
+      - name: Ensure source SHA matches the documented test candidate
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          echo "PRE-RELEASE DEVICE ACCEPTANCE SOURCE_SHA=$SOURCE_SHA"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Reject source snapshot if required Node gates fail
+        run: npm run check
+
+      - name: Package only runtime assets and exact source identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/tmt-device-pages"
+          cp index.html style.css sw.js "$RUNNER_TEMP/tmt-device-pages/"
+          cp -R public src "$RUNNER_TEMP/tmt-device-pages/"
+          printf '{"sourceCommit":"%s","purpose":"V0.2-device-acceptance-preview","release":false}\n' "$SOURCE_SHA" > "$RUNNER_TEMP/tmt-device-pages/__acceptance.json"
+          test -f "$RUNNER_TEMP/tmt-device-pages/public/manifest.webmanifest"
+          test -f "$RUNNER_TEMP/tmt-device-pages/src/app.js"
+          test -f "$RUNNER_TEMP/tmt-device-pages/sw.js"
+
+      - name: Configure Pages (requires Pages admin enablement for first deployment)
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Upload immutable pre-release source snapshot
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: \${{ runner.temp }}/tmt-device-pages
+
+      - id: deployment
+        name: Deploy GitHub Pages
+        uses: actions/deploy-pages@v4
+
+      - name: Check public HTTPS, manifest, SW and exact deployment SHA
+        env:
+          PAGE_URL: \${{ steps.deployment.outputs.page_url }}
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          const pageUrl = process.env.PAGE_URL;
+          assert.ok(pageUrl?.startsWith('https://'), 'Pages must use HTTPS');
+          const base = new URL(pageUrl.endsWith('/') ? pageUrl : pageUrl + '/');
+          const resources = [
+            '__acceptance.json',
+            'index.html',
+            'style.css',
+            'sw.js',
+            'public/manifest.webmanifest',
+            'public/icons/icon-192.png',
+            'public/icons/icon-512.png',
+            'src/app.js',
+            'src/core/efficiency.js',
+            'src/analysis/explain.js',
+            'src/storage/local.js',
+          ];
+          for (const path of resources) {
+            let body, response;
+            for (let attempt = 0; attempt < 8; attempt++) {
+              try {
+                response = await fetch(new URL(path, base), { cache: 'no-store' });
+                if (response.ok) {
+                  body = await response.arrayBuffer();
+                  break;
+                }
+              } catch {}
+              await new Promise(resolve => setTimeout(resolve, 5000));
+            }
+            assert.ok(response?.ok && body, 'Pages public fetch failed: ' + path);
+            const type = response.headers.get('content-type') ?? '';
+            if (path === 'sw.js') {
+              assert.match(type, /javascript|ecmascript/, 'SW must have a JavaScript MIME type');
+            }
+            if (path === '__acceptance.json') {
+              const info = JSON.parse(new TextDecoder().decode(body));
+              assert.equal(info.sourceCommit, process.env.SOURCE_SHA);
+              assert.equal(info.release, false);
+            }
+            if (path === 'public/manifest.webmanifest') {
+              const manifest = JSON.parse(new TextDecoder().decode(body));
+              assert.equal(manifest.display, 'standalone');
+              assert.equal(new URL(manifest.scope, new URL(path, base)).pathname, base.pathname);
+              assert.equal(new URL(manifest.start_url, new URL(path, base)).pathname, base.pathname);
+            }
+            console.log('PASS HTTPS resource', path, body.byteLength, 'bytes');
+          }
+          console.log('PASS LIVE PREVIEW SHA', process.env.SOURCE_SHA);
+          console.log('PAGES_URL', base.href);
+          JS
