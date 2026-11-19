@@ -403,7 +403,7 @@ export function completeValidateGameState(state,{replay=true}={}){
   if(state.rng.algorithmVersion!==RNG_ALGORITHM_VERSION||
     state.rng.counter!==createDeck(profile).length-1||typeof state.rng.seed!=='string')
     throw new RangeError('RNG metadata mismatch');
-  const fullDeck=new Set(createDeck(profile)),seen=new Set(),claimed=new Map();
+  const fullDeck=new Set(createDeck(profile)),seen=new Set(),claimed=new Map(),claimedRivers=[];
   const put=id=>{parsePhysicalTileId(id);if(!fullDeck.has(id)||seen.has(id))
     throw new RangeError('Physical tile duplication, unknown id or loss: '+id);seen.add(id);};
   state.wall.forEach(put);
@@ -445,13 +445,15 @@ export function completeValidateGameState(state,{replay=true}={}){
         if(!claimant||!['claim','kong'].includes(claimant.type)||
           claimant.visibility!=='public'||!claimant.payload.tileIds?.includes(d.tileId))
           throw new RangeError('Forged claimed river link');
-        if(claimed.get(d.tileId)!==1)throw new RangeError('Claim has no unique public meld owner');
+        claimedRivers.push(d.tileId);
       }else put(d.tileId);
     }
     const effective=p.concealed.length+3*p.melds.length;
     if(effective<15||effective>17)
       throw new RangeError('Invalid player effective tile count');
   }
+  for(const id of claimedRivers)if(claimed.get(id)!==1)
+    throw new RangeError('Claim has no unique public meld owner');
   if(seen.size!==fullDeck.size)throw new RangeError('Physical tile conservation failed');
   let publicSeq=0;
   for(let i=0;i<state.events.length;i++){
