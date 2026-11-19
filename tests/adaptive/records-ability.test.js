@@ -142,3 +142,17 @@ test('registry validates cycles, type mismatches and repeated SkillTag', () => {
   const b = { ...registry.skills[1], prerequisiteTagIds: ['waits.enumeration'] };
   assert.throws(() => profile([], { registry: { skills: [a, b] } }));
 });
+
+test('five repeated answers to one question still cannot establish ability', () => {
+  const attempts = Array.from({ length: 5 }, (_, i) => ({
+    kind: 'legacy-v3',
+    record: { ...good, id: 'repeat-' + i,
+      timestamp: '2026-11-18T01:0' + i + ':00Z' },
+  }));
+  const result = profile(attempts);
+  const score = result.skills.find(x => x.tagId === 'waits.enumeration');
+  assert.equal(score.attempts, 5);
+  assert.equal(score.estimatedProficiency, null);
+  assert.equal(result.extensions['adaptive.evidence'].skillBreakdown
+    .find(x => x.tagId === 'waits.enumeration').uniqueQuestionCount, 1);
+});
