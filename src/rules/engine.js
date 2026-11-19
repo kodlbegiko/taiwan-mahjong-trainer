@@ -6,6 +6,13 @@
 import { SCHEMA_VERSION, CONTRACT_VERSION, ENGINE_VERSION } from './tile-constants.js';
 import { createDeck, shuffleDeck, parsePhysicalTileId, makeTileIdentity, typeOf, RNG_ALGORITHM_VERSION } from './tile-identity.js';
 import { getRuleProfile } from './profiles.js';
+import {
+  completeCreateGame, completeListLegalActions, completeApplyAction,
+  completeReplayGame, completeValidateGameState, completeCreatePlayerView,
+  completeStartNextRound,
+} from './complete-engine.js';
+const isCompleteRef=ref=>ref?.profileId==='tw16-configurable-table';
+
 
 const V1 = { schemaVersion: SCHEMA_VERSION, contractVersion: CONTRACT_VERSION };
 const clone = x => JSON.parse(JSON.stringify(x));
@@ -74,8 +81,10 @@ function actionFor(state, seat, kind, tileIds = []) {
 /** This function is deterministic; it never calls Math.random or Date.now. */
 export function createGame({
   gameId = 'game-1', seed, profileId = 'tw16-four-player-sandbox',
-  ruleVersion = 'experimental-move-v1', dealerSeat = 0,
+  ruleVersion = 'experimental-move-v1', dealerSeat = 0, fixtureDeck = null,
+  handIndex = 0, previousRoundRef = null, prevailingWind = null,
 } = {}) {
+  if(isCompleteRef({profileId})) return completeCreateGame({gameId,seed,profileId,ruleVersion,dealerSeat,fixtureDeck,handIndex,previousRoundRef,prevailingWind});
   if (typeof gameId !== 'string' || !/^[A-Za-z0-9_-]+$/.test(gameId)) throw new TypeError('Invalid gameId');
   assertSeat(dealerSeat);
   const profile = getRuleProfile(profileId, ruleVersion);
@@ -113,6 +122,7 @@ export function createGame({
  * replace_flower candidates are ever emitted.
  */
 export function listLegalActions(state, seat) {
+  if(isCompleteRef(state?.ruleRef))return completeListLegalActions(state,seat);
   assertSeat(seat);
   profileFor(state);
   if (state.round.currentSeat !== seat) return [];
@@ -127,6 +137,7 @@ export function listLegalActions(state, seat) {
 }
 
 export function applyAction(state, submission) {
+  if(isCompleteRef(state?.ruleRef))return completeApplyAction(state,submission);
   validateGameState(state, { replay: false });
   if (!submission || typeof submission !== 'object') throw new TypeError('Action submission required');
   const { actorSeat, actionId, expectedRevision } = submission;
@@ -184,6 +195,7 @@ function publicEvent(event) {
 }
 
 export function createPlayerView(state, seat, eventSeq = state.revision) {
+  if(isCompleteRef(state?.ruleRef))return completeCreatePlayerView(state,seat,eventSeq);
   assertSeat(seat);
   if (!Number.isInteger(eventSeq) || eventSeq < 1 || eventSeq > state.revision) {
     throw new RangeError('Invalid asOfEventSeq');
@@ -230,6 +242,7 @@ export const projectPlayerView = createPlayerView;
  * Events are never applied as trusted state mutations.
  */
 export function replayGame(config) {
+  if(isCompleteRef(config?.ruleRef))return completeReplayGame(config);
   if (!config || !Array.isArray(config.events)) throw new TypeError('Replay events required');
   const seed = config.seed ?? config.rng?.seed;
   const ruleRef = config.ruleRef ?? {};
@@ -260,6 +273,7 @@ export function replayGame(config) {
 
 /** Strict inventory, phase, causality, seat-count and optional replay checks. */
 export function validateGameState(state, { replay = true } = {}) {
+  if(isCompleteRef(state?.ruleRef))return completeValidateGameState(state,{replay});
   if (!state || state.schemaVersion !== 1 || state.contractVersion !== CONTRACT_VERSION
       || !Array.isArray(state.players) || state.players.length !== 4
       || !Array.isArray(state.wall) || !Array.isArray(state.events)
@@ -330,4 +344,10 @@ export function validateGameState(state, { replay = true } = {}) {
     throw new RangeError('State does not match deterministic replay');
   }
   return true;
+}
+
+/** Only the experimental complete profile supports linked next-hand initialization. */
+export function startNextRound(previous,options){
+  if(!isCompleteRef(previous?.ruleRef))throw new RangeError('Next-hand API requires explicit experimental complete profile');
+  return completeStartNextRound(previous,options);
 }
