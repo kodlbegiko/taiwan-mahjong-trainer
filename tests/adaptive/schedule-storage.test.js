@@ -209,6 +209,10 @@ test('session can be saved only with already persisted record references', () =>
   assert.equal(store.saveSession(session).durable, true);
   assert.equal(store.load().trainingSessions.length, 1);
   assert.throws(() => store.saveSession({ ...session,
-    recordRefs: [{ kind: 'legacy-v3', id: good.id }] }), /non-persisted/);
+    recordRefs: [{ kind: 'legacy-v3', id: good.id }] }), /Planned session cannot claim attempts/);
+  const attempted = transitionTrainingSession(session, 'active', {
+    at: clock, recordRefs: [{ kind: 'legacy-v3', id: good.id }],
+  });
+  assert.throws(() => store.saveSession(attempted), /non-persisted/);
   assert.deepEqual(store.load().trainingSessions[0].questionRefs, session.questionRefs);
 });
