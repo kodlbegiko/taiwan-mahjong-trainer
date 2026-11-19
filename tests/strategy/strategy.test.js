@@ -6,7 +6,7 @@ import { analyzeTaatsuCandidates } from '../../src/strategy/structure.js';
 import { simulateTwoDraws } from '../../src/strategy/simulate.js';
 import {
   analyzePlayerView, analyzeEfficiencyRoutes, inspectClaimOptions,
-  analyzeAttackDefense, explainStrategy,
+  analyzeAttackDefense, explainStrategy, compareClaimProjections,
 } from '../../src/strategy/index.js';
 import { makePlayerView, handTypes } from './fixtures.js';
 
@@ -145,4 +145,39 @@ test('Fail closed if structural capability is unavailable and do not invent win/
   const analysis=analyzePlayerView(view);
   assert.equal(analysis.status,'unavailable');
   assert.equal(analysis.recommendations.length,0);
+});
+
+
+test('Claim interface compares only causally linked before/after public projections and never invents tai',()=>{
+  const before=makePlayerView({public28:true,legalClaims:true});
+  before.self.concealed=before.self.concealed.filter(t=>t.id!=='t:0:0');
+  before.legalActions=before.legalActions.filter(a=>a.kind==='pong');
+  before.round.phase='claim_window';before.capabilities.roundActions=true;
+  const after=structuredClone(before);
+  after.self.concealed=after.self.concealed.filter(t=>t.tileType!==28);
+  after.self.melds=[{kind:'triplet',open:true,tileIds:['t:28:0','t:28:1','t:28:2']}];
+  after.opponents[0].river[0].claimedByEventId='e-claim';
+  after.asOfEventSeq=5;after.round.lastPublicEventSeq=5;after.round.phase='await_discard';
+  after.publicEvents=[{
+    schemaVersion:1,contractVersion:after.contractVersion,eventId:'e-claim',gameId:after.gameId,
+    seq:5,ruleRef:after.ruleRef,type:'claim',visibility:'public',
+    causedByActionId:'pong:fixture',payload:{tileId:'t:28:2'},
+  }];
+  after.legalActions=[...new Set(after.self.concealed.map(x=>x.tileType))].map(tile=>{
+    const id=after.self.concealed.find(x=>x.tileType===tile).id;
+    return {
+      schemaVersion:1,contractVersion:after.contractVersion,actionId:'after-discard:'+id,
+      kind:'discard',actorSeat:0,expectedRevision:5,tileIds:[id],ruleRef:after.ruleRef,
+      legalityBasis:{engineVersion:'fixture-legal/1',reasonCodes:['FIXTURE_AFTER_CLAIM']},
+    };
+  });
+  const outcome=compareClaimProjections(before,after,'pong:fixture');
+  assert.equal(outcome.status,'exact-structural');
+  assert.equal(outcome.evidenceEventId,'e-claim');
+  assert.equal(outcome.structuralClosureLost,true);
+  assert.equal(outcome.epistemic.scoringOpportunityCost,'unknown');
+  assert.ok(after.legalActions.some(a=>Number(a.tileIds[0].split(':')[1])===outcome.afterBestLegalDiscard.tile));
+  const noEvent=structuredClone(after);noEvent.publicEvents=[];
+  assert.equal(compareClaimProjections(before,noEvent,'pong:fixture').status,'unavailable');
+  assert.throws(()=>compareClaimProjections(before,after,'made-up-claim'),/不在 before/);
 });
