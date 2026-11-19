@@ -102,8 +102,8 @@ function findingsFor(analysis) {
  */
 export function createReplayService({storage=null}={}) {
   const store=createStorage(storage);
-  function saveReplay(gameState,{ownerSeat=0}={}) {
-    const archive=createReplayArchive(gameState,{ownerSeat});
+  function saveReplay(gameState,{ownerSeat=0,disclosurePolicy='none'}={}) {
+    const archive=createReplayArchive(gameState,{ownerSeat,disclosurePolicy});
     const id=archive.manifest.replayId;
     if(store.read(DATA_PREFIX+id)!==null && store.read(DATA_PREFIX+id)!==undefined) {
       const previous=readArchive(store,id);
@@ -122,20 +122,58 @@ export function createReplayService({storage=null}={}) {
   function loadReplay(replayId) { return publicManifest(readArchive(store,replayId)); }
   function getReplayFrame(replayId,eventSeq,{viewerSeat,perspective='player-at-time'}={}) {
     const archive=readArchive(store,replayId);
-    const seat=viewerSeat??archive.manifest.ownerSeat;
-    ownerOnly(archive.manifest,seat);
-    if(perspective==='postgame') {
-      throw new ReplayError('POSTGAME_UNAVAILABLE',
-        'Full postgame disclosure requires a settled verified RuleProfile and an explicit disclosure policy; unavailable in current sandbox');
-    }
-    if(perspective!=='player-at-time') throw new ReplayError('INVALID_PERSPECTIVE','Unknown replay perspective');
-    return frameFrom(archive,eventSeq);
+    const m=archive.manifest;
+    ownerOnly(m,viewerSeat??m.ownerSeat);
+    if(perspective!=='player-at-time'&&perspective!=='postgame')
+      throw new ReplayError('INVALID_PERSPECTIVE','Unknown replay perspective');
+    const frame=frameFrom(archive,eventSeq);
+    if(perspective==='player-at-time')return frame;
+    if(m.completionStatus!=='settled-experimental'&&m.completionStatus!=='settled-verified')
+      throw new ReplayError('POSTGAME_UNAVAILABLE','Unsettled games have no postgame disclosure');
+    if(m.disclosurePolicy!=='settled-public-only')
+      throw new ReplayError('POSTGAME_UNAVAILABLE','Postgame disclosure was not explicitly authorized');
+    // Final-state result is the Rules-authoritative settlement. Only an auditable
+    // allowlist of public outcome fields is copied; never an opponent hand or wall.
+    const final=replayStateAt(archive,archive.events.length);
+    const result=final.extensions?.tw16?.result;
+    if(!result||final.round.phase!=='settled')
+      throw new ReplayError('POSTGAME_UNAVAILABLE','Missing settled Rules result');
+    const outcome={reason:result.reason,
+      winnerSeat:result.winnerSeat??null,
+      delta:clone(result.delta),
+      ...(Number.isInteger(result.tai)?{experimentalTai:result.tai}:{})};
+    return {...frame,perspective:'postgame-public',
+      informationBoundary:'historic PlayerView unchanged; end-of-game public result is separate',
+      postgameDisclosure:{
+        policy:'settled-public-only',status:'experimental-not-certified',
+        asOfEventSeq:final.revision,outcome,
+        originallyUnavailable:'Final settlement was not known at the historical decision time',
+        withheld:['opponent concealed tiles','live wall','tail wall','fixture deck','private claims','seed'],
+        allowedForDecisionScoring:false}};
+  }
+  function getPlayerDecision(replayId,eventSeq,{viewerSeat}={}) {
+    const archive=readArchive(store,replayId),m=archive.manifest;
+    ownerOnly(m,viewerSeat??m.ownerSeat);
+    const d=archive.decisions.find(x=>x.eventSeq===eventSeq||x.endEventSeq===eventSeq);
+    if(!d)throw new ReplayError('DECISION_NOT_FOUND','No complete LegalAction decision at event sequence');
+    if(d.actorSeat!==m.ownerSeat)
+      throw new ReplayError('VIEW_FORBIDDEN','Other players private decisions are not disclosed');
+    const frame=frameFrom(archive,d.beforeEventSeq);
+    const chosen=frame.playerView.legalActions.find(a=>a.actionId===d.actionId);
+    if(!chosen||chosen.kind!==d.kind)
+      throw new ReplayError('INVALID_ACTION_ID','Recorded LegalAction fails historical Rules validation');
+    return {...V1,decisionVersion:DECISION_VERSION,replayId,
+      eventSeq:d.eventSeq,endEventSeq:d.endEventSeq??d.eventSeq,
+      beforeEventSeq:d.beforeEventSeq,actorSeat:d.actorSeat,kind:d.kind,
+      actionId:d.actionId,sourceViewRef:{
+        viewId:frame.playerView.viewId,asOfEventSeq:d.beforeEventSeq,
+        audienceSeat:m.ownerSeat},legalActionIds:frame.playerView.legalActions.map(a=>a.actionId)};
   }
   function getDecisionAnalysis(replayId,eventSeq,{viewerSeat,actionId}={}) {
     const archive=readArchive(store,replayId);
     const m=archive.manifest;
     ownerOnly(m,viewerSeat??m.ownerSeat);
-    const decision=archive.decisions.find(d=>d.eventSeq===eventSeq);
+    const decision=archive.decisions.find(d=>d.eventSeq===eventSeq||d.endEventSeq===eventSeq);
     if(!decision) throw new ReplayError('DECISION_NOT_FOUND','No decision at event sequence');
     if(decision.actorSeat!==m.ownerSeat) throw new ReplayError('VIEW_FORBIDDEN','Other players decisions have no authorized own-hand view');
     const frame=frameFrom(archive,decision.beforeEventSeq);
@@ -152,13 +190,34 @@ export function createReplayService({storage=null}={}) {
        strategy.recommendations.some(rec=>!view.legalActions.some(a=>a.actionId===rec.actionId))) {
       throw new ReplayError('STRATEGY_VIEW_MISMATCH','Strategy evidence does not match legal PlayerView');
     }
+    // StrategyAnalysis has a verified structural ranker for discards only.
+    // Claims, passes, kongs, draws and wins get legal alternatives and public
+    // factors, NEVER a fabricated recommendation or probability.
     const candidates=clone(strategy.recommendations);
+    const openMelds=view.opponents.reduce((sum,p)=>
+      sum+p.melds.filter(x=>x.open).length,0);
+    for(const action of view.legalActions){
+      if(candidates.some(c=>c.actionId===action.actionId))continue;
+      candidates.push({actionId:action.actionId,kind:action.kind,rank:null,
+        reasonCodes:['RULES_LEGAL_ONLY','NO_VERIFIED_ALTERNATIVE_SCORER'],
+        metrics:[
+          {name:'opponentOpenMeldCount',value:openMelds,unit:'melds',
+            epistemic:'exact',method:'historical public melds',ruleRef:clone(m.ruleRef)},
+          {name:'postClaimShanten',value:null,unit:'shanten',
+            epistemic:'unknown',method:'no verified post-claim projection',ruleRef:clone(m.ruleRef)},
+          {name:'scoringOpportunityCost',value:null,unit:'tai',
+            epistemic:'unknown',method:'uncertified full-table scoring',ruleRef:clone(m.ruleRef)},
+          {name:'dealInRisk',value:null,unit:'probability',
+            epistemic:'unknown',method:'no calibrated danger model',ruleRef:clone(m.ruleRef)}
+        ]});
+    }
     const chosen=candidates.find(r=>r.actionId===decision.actionId);
-    const best=candidates[0];
+    const best=decision.kind==='discard'?strategy.recommendations[0]:null;
     const s=exactValue(chosen,'postDiscardShanten'),b=exactValue(best,'postDiscardShanten');
     const u=exactValue(chosen,'oneTurnEffectiveCopies'),v=exactValue(best,'oneTurnEffectiveCopies');
     const basic={...V1,analysisVersion:ANALYSIS_VERSION,replayId,eventSeq,
       decisionVersion:DECISION_VERSION,chosenActionId:decision.actionId,
+      endEventSeq:decision.endEventSeq??decision.eventSeq,
       decisionKind:decision.kind,ruleRef:clone(m.ruleRef),engineVersion:m.engineVersion,
       strategyVersion:STRATEGY_ENGINE_VERSION,scoringVersion:'unavailable',
       sourceViewRef:{gameId:view.gameId,viewId:view.viewId,
@@ -169,10 +228,11 @@ export function createReplayService({storage=null}={}) {
         shantenDifference:s===null||b===null?null:s-b,
         chosenEffectiveCopies:u,bestEffectiveCopies:v,
         effectiveCopyDifference:u===null||v===null?null:v-u,
-        epistemic:'exact',scope:'structural-only'},
-      epistemic:{structural:'exact',shape:'heuristic',twoTurn:'unknown',
+        epistemic:decision.kind==='discard'?'exact':'unknown',scope:'structural-only'},
+      epistemic:{structural:decision.kind==='discard'?'exact':'unknown',shape:'heuristic',twoTurn:'unknown',
         dealInRisk:'unknown',winRate:'unknown',expectedTai:'unknown'},
-      analysisStatus:chosen?'advisory-structural':'unavailable',
+      analysisStatus:chosen?(decision.kind==='discard'?'advisory-structural':'advisory-legal-only'):'unavailable',
+      recommendationAuthority:'advisory',officialScorerVerified:false,
       limitations:clone(strategy.limitations)};
     const analysis={...basic,analysisId:'decision-analysis:'+checksum(basic)};
     return {...analysis,findings:findingsFor(analysis)};
@@ -193,6 +253,6 @@ export function createReplayService({storage=null}={}) {
       source:{replayId,eventSeq}});
   }
   return Object.freeze({apiVersion:REPLAY_API_VERSION,saveReplay,
-    listReplays,loadReplay,getReplayFrame,getDecisionAnalysis,
+    listReplays,loadReplay,getReplayFrame,getPlayerDecision,getDecisionAnalysis,
     listCoachingFindings,createReviewQuestion});
 }
