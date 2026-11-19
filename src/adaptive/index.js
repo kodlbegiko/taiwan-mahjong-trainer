@@ -22,3 +22,5 @@ export { validateAbilityProfile, validateReviewPlan, validateTrainingSession } f
 export { PROVENANCE_VERSION, createLearningProvenance, validateProvenanceShape,
   validateLearningProvenance, validateProvenanceLinks } from './provenance.js';
 export { createAdaptiveLearningAdapter } from './learning-adapter.js';
+
+export { DAILY_TRAINING_VERSION, createDailyTrainingController } from './daily-training.js';
