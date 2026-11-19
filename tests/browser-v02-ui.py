@@ -192,8 +192,10 @@ def offline_and_update(browser, base, app_dir):
     sw.write_text(old.replace('tmt-v02-training-ui-20261119-r1', 'tmt-v02-training-ui-20261119-r2'))
     page.evaluate('''async () => { const r = await navigator.serviceWorker.ready; await r.update(); }''')
     page.locator('#update-app:visible').wait_for(timeout=20000)
-    page.locator('#update-app').click()
-    page.wait_for_load_state('domcontentloaded')
+    # The application intentionally reloads on a worker version switch.
+    # Wait for that navigation rather than evaluating during its teardown.
+    with page.expect_navigation(wait_until='domcontentloaded', timeout=20000):
+        page.locator('#update-app').click()
     page.wait_for_function('''async () => (await caches.keys()).filter(k => k.startsWith('tmt-shell-')).length === 1''', timeout=20000)
     keys = page.evaluate('''async () => await caches.keys()''')
     check(any('r2' in key for key in keys), f'old worker cache not replaced: {keys}')
