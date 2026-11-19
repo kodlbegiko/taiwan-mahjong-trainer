@@ -7,3 +7,10 @@ export { listQuestionRefs,toPublicQuestion,listPublicQuestions,gradeAcademyQuest
   submitAcademyAnswer } from './questions.js';
 export { createAcademyDecisionRecord,validateAcademyDecisionRecord,toRecordRef } from './records.js';
 export { VERIFIED_SCENARIO_SCORER_COUNT } from './scenario-scorers.js';
+export {
+  ACADEMY_PROVENANCE_VERSION, getAcademyExerciseMapping,
+  findAcademyQuestionByExerciseId, createAcademyProvenance,
+  validateAcademyProvenance, validateAcademyProvenanceBatch,
+  resolveAcademyProvenance,
+} from './provenance.js';
+
