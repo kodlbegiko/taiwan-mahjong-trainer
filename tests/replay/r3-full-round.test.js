@@ -114,6 +114,17 @@ test('R3 contested chi/pong claim and pass group: no hidden intent or future mel
   s=act(s,3,'pass');
   assert.equal(s.round.phase,'await_discard');
   assert.equal(s.players[2].melds.at(-1).kind,'triplet');
+  const responder=service(s,3);
+  code(()=>responder.api.getReplayFrame(responder.manifest.replayId,s.revision-1),
+    'NON_ATOMIC_EVENT_SEQ');
+  const lastAction=responder.api.getPlayerDecision(responder.manifest.replayId,s.revision);
+  assert.equal(lastAction.kind,'pass');
+  assert.equal(lastAction.endEventSeq,s.revision);
+  assert.equal(lastAction.eventSeq,s.revision-1);
+  const defender=service(s,2);
+  assert.notDeepEqual(defender.api.getReplayFrame(defender.manifest.replayId,before).playerView.self.concealed,
+    service(s,1).api.getReplayFrame('replay:'+s.gameId,before).playerView.self.concealed,
+    'each replay owner receives a distinct seat-scoped historical concealed hand');
   const {api,manifest}=service(s,1);
   const initial=api.getReplayFrame(manifest.replayId,before);
   const declared=api.getReplayFrame(manifest.replayId,chiSeq);
