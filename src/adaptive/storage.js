@@ -26,7 +26,7 @@ export class AcademyStorageError extends Error {
 export function emptyAcademyState() {
   return {
     ...V1, format: ACADEMY_STATE_FORMAT, revision: 0,
-    academyRecords: [], abilityProfile: null, reviewPlan: null, trainingSessions: [],
+    academyRecords: [], academyQuestions: [], abilityProfile: null, reviewPlan: null, trainingSessions: [],
   };
 }
 export function validateAcademyState(state, { validateAcademyDecisionRecord } = {}) {
@@ -34,14 +34,28 @@ export function validateAcademyState(state, { validateAcademyDecisionRecord } = 
   if (state.format !== ACADEMY_STATE_FORMAT || !Number.isSafeInteger(state.revision) || state.revision < 0) {
     throw new RangeError('Unknown Academy state format');
   }
-  if (![state.academyRecords, state.trainingSessions].every(Array.isArray) ||
-    state.academyRecords.length > MAX_RECORDS || state.trainingSessions.length > MAX_SESSIONS) {
+  if (![state.academyRecords, state.academyQuestions, state.trainingSessions].every(Array.isArray) ||
+    state.academyRecords.length > MAX_RECORDS || state.academyQuestions.length > MAX_RECORDS ||
+    state.trainingSessions.length > MAX_SESSIONS) {
     throw new RangeError('Invalid Academy collection sizes');
+  }
+  const questions = new Map();
+  for (const question of state.academyQuestions) {
+    requireV1(question, 'AcademyQuestion snapshot');
+    requireId(question.questionId, 'questionId');
+    requireId(question.questionVersion, 'questionVersion');
+    if (question.status !== 'validated' || question.taskType !== 'scenario' ||
+      !Array.isArray(question.skillTagIds)) throw new RangeError('Unscorable question snapshot');
+    const key = question.questionId + '@' + question.questionVersion;
+    if (questions.has(key)) throw new RangeError('Duplicate Academy question snapshot');
+    questions.set(key, question);
   }
   const recordIds = new Set();
   for (const record of state.academyRecords) {
     const ref = makeRecordRef('academy-v1', record);
-    validateScoredRecord(ref, record, { validateAcademyDecisionRecord });
+    const question = questions.get(record.questionRef?.questionId + '@' + record.questionRef?.questionVersion);
+    if (!question) throw new RangeError('Academy record has no immutable question snapshot');
+    validateScoredRecord(ref, record, { validateAcademyDecisionRecord, question });
     if (recordIds.has(record.id)) throw new RangeError('Duplicate Academy record ID');
     recordIds.add(record.id);
   }
@@ -143,7 +157,12 @@ export function createAcademyStore(storage, {
     return [
       ...legacy.archive.records.filter(record => record.schemaVersion === 3)
         .map(record => ({ kind: 'legacy-v3', record })),
-      ...academyState.academyRecords.map(record => ({ kind: 'academy-v1', record })),
+      ...academyState.academyRecords.map(record => ({
+        kind: 'academy-v1', record,
+        question: academyState.academyQuestions.find(q =>
+          q.questionId === record.questionRef.questionId &&
+          q.questionVersion === record.questionRef.questionVersion),
+      })),
     ];
   }
   function derive(state, asOf, assessmentRefs = [], questionCatalog = []) {
@@ -180,14 +199,22 @@ export function createAcademyStore(storage, {
         throw new AcademyStorageError('LEGACY_NOT_DURABLE', 'Persist legacy record through original v3 archive first');
       }
     } else {
+      if (!validated.question) throw new RangeError('Academy question snapshot is required for durable replay');
+      const question = validated.question;
+      const storedQuestion = state.academyQuestions.find(q =>
+        q.questionId === question.questionId && q.questionVersion === question.questionVersion);
+      if (storedQuestion && canonicalJson(storedQuestion) !== canonicalJson(question)) {
+        throw new RangeError('Conflicting immutable Academy question snapshot');
+      }
       const stored = state.academyRecords.find(r => r.id === ref.id);
       if (stored && canonicalJson(stored) !== canonicalJson(validated.record)) {
         throw new RangeError('Conflicting Academy record ID');
       }
-      if (!stored) {
+      if (!stored || !storedQuestion) {
         const result = save({
           ...state, revision: state.revision + 1,
-          academyRecords: [...state.academyRecords, validated.record],
+          academyRecords: stored ? state.academyRecords : [...state.academyRecords, validated.record],
+          academyQuestions: storedQuestion ? state.academyQuestions : [...state.academyQuestions, question],
         });
         if (!result.durable) {
           return { recordRef: ref, durable: false, derivedFresh: false, errorCode: 'STORAGE_UNAVAILABLE' };
