@@ -24,7 +24,7 @@ jobs:
     timeout-minutes: 20
     environment:
       name: github-pages
-      url: \${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deployment.outputs.page_url }}
     env:
       SOURCE_SHA: 4be352ff202d509ab0f52e4fed0c0e504d900a11
     steps:
@@ -52,6 +52,9 @@ jobs:
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/tmt-device-pages"
           cp index.html style.css sw.js "$RUNNER_TEMP/tmt-device-pages/"
+          # Only the deployed preview HTML is branded; original pinned source is unchanged.
+          sed -i 's/OPEN SOURCE · V0.2 訓練測試版/V0.2 預發布測試站 · NOT RELEASE/' "$RUNNER_TEMP/tmt-device-pages/index.html"
+          grep -q 'V0.2 預發布測試站 · NOT RELEASE' "$RUNNER_TEMP/tmt-device-pages/index.html"
           cp -R public src "$RUNNER_TEMP/tmt-device-pages/"
           printf '{"sourceCommit":"%s","purpose":"V0.2-device-acceptance-preview","release":false}\n' "$SOURCE_SHA" > "$RUNNER_TEMP/tmt-device-pages/__acceptance.json"
           test -f "$RUNNER_TEMP/tmt-device-pages/public/manifest.webmanifest"
@@ -60,13 +63,11 @@ jobs:
 
       - name: Configure Pages (requires Pages admin enablement for first deployment)
         uses: actions/configure-pages@v5
-        with:
-          enablement: true
 
       - name: Upload immutable pre-release source snapshot
         uses: actions/upload-pages-artifact@v3
         with:
-          path: \${{ runner.temp }}/tmt-device-pages
+          path: ${{ runner.temp }}/tmt-device-pages
 
       - id: deployment
         name: Deploy GitHub Pages
@@ -74,7 +75,7 @@ jobs:
 
       - name: Check public HTTPS, manifest, SW and exact deployment SHA
         env:
-          PAGE_URL: \${{ steps.deployment.outputs.page_url }}
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
         run: |
           node --input-type=module <<'JS'
           import assert from 'node:assert/strict';
