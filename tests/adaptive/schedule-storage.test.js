@@ -328,3 +328,26 @@ test('assessment provenance distinguishes first unseen test from practiced/repea
   assert.equal(evidence.unseenAssessmentAttempts, 0);
   assert.equal(evidence.contaminatedAssessmentAttempts, 1);
 });
+
+test('focused practice uses verified unseen same-skill variations, recap keeps its slot', () => {
+  const variant = createExercise({ seed: 'adaptive-variation-2', taskType: 'multi_wait' });
+  const catalogEntry = {
+    questionId: variant.id, questionVersion: 'legacy-exercise-v3',
+    taskType: variant.taskType, ruleRef, seed: variant.seed,
+    generatorVersion: variant.generatorVersion,
+    source: 'legacy-exercise-v3', available: true, estimatedMinutes: 3,
+    questionSnapshot: variant,
+  };
+  const profile = makeProfile();
+  const reviewPlan = makePlan();
+  const scheduled = planDailyTraining({
+    profile, reviewPlan, records: entries, questionCatalog: [catalogEntry], registry,
+    minutes: 10, seed: 'variation', asOf: clock, ruleRef,
+  });
+  assert.equal(scheduled.availableQuestionCount, 2);
+  assert(scheduled.sections.find(x => x.name === 'focused-practice')
+    .questions.some(q => q.questionId === variant.id));
+  assert(scheduled.sections.find(x => x.name === 'mistake-recap')
+    .questions.some(q => q.questionId === exercise.id));
+  assert(scheduled.session.questionRefs.every(q => q.questionVersion === 'legacy-exercise-v3'));
+});
