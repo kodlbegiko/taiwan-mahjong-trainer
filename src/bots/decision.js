@@ -2,11 +2,11 @@
  * Bot decision boundary. Only a strict, detached PlayerView is accepted.
  * Rules Engine owns legality, phase changes, wall, scoring and adjudication.
  */
-import { readPlayerView } from '../strategy/view.js';
+import { readBotView } from './view.js';
 import { analyzePlayerView } from '../strategy/index.js';
-import { analyzeDiscards } from '../core/efficiency.js';
+import { analyzeDiscards, analyzeDraws } from '../core/efficiency.js';
 
-export const BOT_ENGINE_VERSION = 'tw16-bots/0.1.0';
+export const BOT_ENGINE_VERSION = 'tw16-bots/0.2.0-r3-experimental';
 const LEVELS = new Set(['Beginner', 'Intermediate', 'Advanced']);
 const ACTION_KINDS = new Set(['draw','discard','chi','pong','kong','win','pass','replace_flower']);
 
@@ -55,7 +55,7 @@ function metric(rec, key) { return rec.metrics.find(m => m.name === key)?.value 
  */
 export function chooseBotAction(bot, playerView) {
   assertBot(bot);
-  const { view, hand, visible, fixedMelds } = readPlayerView(playerView);
+  const { view, hand, visible, fixedMelds } = readBotView(playerView);
   if (view.audienceSeat !== bot.seat) throw new RangeError('Bot seat / PlayerView mismatch');
   const seed = [bot.seed, view.gameId, view.asOfEventSeq, bot.seat, bot.difficulty].join('|');
   const legal = view.legalActions;
@@ -68,6 +68,14 @@ export function chooseBotAction(bot, playerView) {
   if (win) return make(win, 'ready', ['ENGINE_LEGAL_WIN']);
   const draw = legal.find(a => a.kind === 'draw');
   if (draw) return make(draw, 'ready', ['ENGINE_LEGAL_DRAW']);
+  // R3 initial flowers require a real tail-replacement action before any
+  // structural analysis. The narrow redacted-view adapter handles this phase.
+  const replace = legal.find(a => a.kind === 'replace_flower');
+  if (replace) return make(replace, 'ready', ['ENGINE_LEGAL_REPLACE_FLOWER']);
+  const ownKongs = legal.filter(a => a.kind === 'kong' &&
+    ['CONCEALED_KONG','ADDED_KONG'].includes(a.legalityBasis.reasonCodes[0]));
+  if (ownKongs.length && roll(seed+'|self-kong') < 0.4)
+    return make(ownKongs[0], 'ready', ['ENGINE_LEGAL_SELF_KONG','UNCALIBRATED_KONG_VALUE']);
   const discards = legal.filter(a => a.kind === 'discard');
 
   if (discards.length) {
@@ -111,20 +119,53 @@ export function chooseBotAction(bot, playerView) {
       analysis.engineVersion + (advanced ? '+bounded-two-draw-v1' : '+baseline-v1'));
   }
 
-  // Without a verified post-claim projection, do not invent chi/pong/kong value.
+  // A claim is actionable only when the R3 authority offers it; estimate
+  // structural shanten *after* a legal meld without simulating a private wall.
+  // This is a bounded heuristic, NOT post-claim Rule authorization or odds.
   const pass = legal.find(a => a.kind === 'pass');
-  if (pass) return make(pass, 'ready', ['ENGINE_LEGAL_PASS','CLAIM_EVALUATION_UNVERIFIED']);
-  const replace = legal.find(a => a.kind === 'replace_flower');
-  if (replace) return make(replace, 'ready', ['ENGINE_LEGAL_REPLACE_FLOWER']);
-  const claim = legal.find(a => ['chi','pong','kong'].includes(a.kind));
-  if (claim) return make(claim, 'ready', ['ENGINE_LEGAL_CLAIM','CLAIM_VALUE_UNVERIFIED']);
+  const claims = legal.filter(a => ['chi','pong','kong'].includes(a.kind));
+  if (pass && claims.length && view.ruleRef.profileId === 'tw16-configurable-table' &&
+      view.round.phase === 'claim_window' && view.capabilities.structuralScore) {
+    const owned = new Set(view.self.concealed.map(t => t.id));
+    const baseline = analyzeDraws(hand, {visible,fixedMelds}).shanten;
+    const candidates = [];
+    for (const a of claims) {
+      const used = a.tileIds.filter(id => owned.has(id));
+      if (used.length !== (a.kind === 'kong' ? 3 : 2)) continue;
+      const handAfter = [...hand];
+      for (const id of used) {
+        const tile = Number(id.split(':')[1]), pos = handAfter.indexOf(tile);
+        if (pos < 0) throw new RangeError('Claim does not match public own hand');
+        handAfter.splice(pos,1);
+      }
+      const nextFixed = fixedMelds+1;
+      if (nextFixed > 5) continue;
+      const projected = a.kind === 'kong'
+        ? analyzeDraws(handAfter,{visible,fixedMelds:nextFixed}).shanten
+        : Math.min(...analyzeDiscards(handAfter,{visible,fixedMelds:nextFixed})
+          .map(rank => rank.shanten));
+      if (!Number.isFinite(projected)) continue;
+      candidates.push({a, benefit:baseline-projected});
+    }
+    candidates.sort((a,b)=>b.benefit-a.benefit ||
+      a.a.actionId.localeCompare(b.a.actionId));
+    const best=candidates[0];
+    const threshold=bot.difficulty==='Beginner' ? 1 : 0;
+    if (best && best.benefit>=threshold &&
+        (bot.difficulty!=='Beginner' || roll(seed+'|open-claim')<0.45))
+      return make(best.a,'ready',['R3_LEGAL_CLAIM','PUBLIC_POST_MELD_SHANTEN_HEURISTIC',
+        'UNCALIBRATED_CLAIM_VALUE'],'canonical-efficiency/claim-heuristic');
+  }
+  if (pass) return make(pass, 'ready', ['ENGINE_LEGAL_PASS','CLAIM_VALUE_UNVERIFIED']);
+  const claim = claims[0];
+  if (claim) return make(claim, 'ready', ['ENGINE_LEGAL_CLAIM','NO_PASS_OFFERED']);
   return make(null, 'unsupported-action-set', ['NO_SUPPORTED_POLICY']);
 }
 
 /** Compare against a fresh Rules-projected legal set, never a bot-generated action. */
 export function validateBotDecision(bot, playerView, proposed) {
   assertBot(bot);
-  const { view } = readPlayerView(playerView);
+  const { view } = readBotView(playerView);
   if (bot.seat !== view.audienceSeat || !proposed ||
       proposed.botVersion !== BOT_ENGINE_VERSION ||
       proposed.actorSeat !== bot.seat || proposed.gameId !== view.gameId ||
