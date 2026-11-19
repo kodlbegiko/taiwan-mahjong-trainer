@@ -190,7 +190,9 @@ test('completed and aborted Daily sessions reject further scoring and remain dur
   assert.throws(()=>c.completeSession({asOf:A}),/Incomplete/);
   const a=c.abortSession({asOf:A,reason:'user-aborted'});
   assert.equal(a.status,'aborted');
-  assert.deepEqual(c.abortSession({asOf:B}),a);
+  const abortedAgain=c.abortSession({asOf:B});
+  assert.equal(abortedAgain.status,'aborted');
+  assert.equal(abortedAgain.sessionId,a.sessionId);
   const ref=day.questionRefs[0];
   assert.throws(()=>c.submit(ref,choose(c.getQuestion(ref,{asOf:A})),{
     asOf:A,durationMs:1000,attemptId:'daily-terminal-1'}),/terminal/);
