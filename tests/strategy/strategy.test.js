@@ -208,6 +208,7 @@ test('Public flower identities are separate from standard 0..33 and do not reduc
 test('Rules Engine projected private draw and deal summaries are accepted, while secret tiles stay forbidden',()=>{
   const view=makePlayerView();
   view.asOfEventSeq=5; // redacted private draw since last public discard seq=4
+  view.legalActions.forEach(a=>{a.expectedRevision=5;});
   view.publicEvents=[{
     schemaVersion:1,contractVersion:view.contractVersion,
     eventId:'draw-redacted-5',gameId:view.gameId,seq:5,ruleRef:view.ruleRef,
@@ -221,7 +222,7 @@ test('Rules Engine projected private draw and deal summaries are accepted, while
   privateDraw.publicEvents[0].payload={tileId:'t:8:2'};
   assert.throws(()=>validatePlayerView(privateDraw),/不得曝光/);
   const deal=makePlayerView();
-  deal.asOfEventSeq=1;deal.round.lastPublicEventSeq=0;
+  deal.asOfEventSeq=1;deal.round.lastPublicEventSeq=0;deal.legalActions=[];
   deal.publicEvents=[{
     schemaVersion:1,contractVersion:deal.contractVersion,
     eventId:'deal-1',gameId:deal.gameId,seq:1,ruleRef:deal.ruleRef,
@@ -237,4 +238,13 @@ test('Claimed river de-duplication must correspond to a public meld; cannot hide
   view.opponents[0].river=[{tileId:'t:29:0',seq:1,claimedByEventId:'claim-fake'}];
   view.opponents[1].river=[{tileId:'t:29:0',seq:2}];
   assert.throws(()=>validatePlayerView(view),/重複/);
+});
+
+
+test('Rejects a stale expectedRevision even if the actionId and owned tile are otherwise valid',()=>{
+  const view=makePlayerView();
+  const stale=structuredClone(view);
+  stale.legalActions[0].expectedRevision=3;
+  assert.throws(()=>validatePlayerView(stale),/expectedRevision/);
+  assert.throws(()=>analyzePlayerView(stale,{samples:0}),/expectedRevision/);
 });
