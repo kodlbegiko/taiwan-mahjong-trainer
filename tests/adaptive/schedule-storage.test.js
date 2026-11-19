@@ -216,3 +216,55 @@ test('session can be saved only with already persisted record references', () =>
   assert.throws(() => store.saveSession(attempted), /non-persisted/);
   assert.deepEqual(store.load().trainingSessions[0].questionRefs, session.questionRefs);
 });
+
+test('unverified scenario catalog flags are insufficient; only verified scenario questions become replayable', () => {
+  const record = scenario();
+  const input = [{ kind: 'academy-v1', record }];
+  const profile = buildAbilityProfile({ records: input, registry, asOf: clock,
+    validateAcademyDecisionRecord: validator });
+  const asOf = '2026-11-21T03:00:00Z';
+  const candidate = {
+    questionId: 'scenario-a', questionVersion: 'v1', taskType: 'scenario',
+    ruleRef: record.ruleRef, seed: 'verified-seed', generatorVersion: 'fixture-v1',
+    source: 'academy-v1', available: true, estimatedMinutes: 3,
+    questionSnapshot: { schemaVersion: 1, contractVersion: 'master-academy/1.0.0',
+      questionId: 'scenario-a', questionVersion: 'v1', status: 'validated',
+      taskType: 'scenario', answerKey: { correctnessBasis: 'exact' } },
+  };
+  const unknown = buildReviewPlan({ profile, records: input, asOf,
+    validateAcademyDecisionRecord: validator, questionCatalog: [candidate] });
+  assert(unknown.items[0].reasonCodes.includes('unavailable:question-catalog'));
+  const plan = buildReviewPlan({ profile, records: input, asOf,
+    validateAcademyDecisionRecord: validator, questionCatalog: [candidate],
+    validateAcademyQuestion: () => true });
+  assert.equal(plan.items[0].reasonCodes.includes('unavailable:question-catalog'), false);
+  const task = planDailyTraining({ profile, reviewPlan: plan, records: input,
+    questionCatalog: [candidate], validateAcademyDecisionRecord: validator,
+    validateAcademyQuestion: () => true, minutes: 10, seed: 's', asOf, ruleRef: record.ruleRef });
+  assert.equal(task.session.questionRefs[0].questionId, 'scenario-a');
+  assert.equal(task.session.extensions['adaptive.plan'].orderedSources[0].seed, 'verified-seed');
+});
+test('future evidence is rejected rather than entering past ability or review snapshots', () => {
+  assert.throws(() => buildAbilityProfile({
+    records: [{ kind: 'legacy-v3', record: bad }], registry,
+    asOf: '2026-11-17T00:00:00Z',
+  }), /Future record/);
+  assert.throws(() => buildReviewPlan({
+    profile: makeProfile(), records: entries,
+    asOf: '2026-11-17T00:00:00Z',
+  }), /Future record/);
+});
+test('persisted v1 validators reject incomplete profile, review and session state', async () => {
+  const { validateAbilityProfile, validateReviewPlan, validateTrainingSession } =
+    await import('../../src/adaptive/index.js');
+  assert.equal(validateAbilityProfile(makeProfile()), true);
+  assert.equal(validateReviewPlan(makePlan()), true);
+  assert.throws(() => validateAbilityProfile({ ...makeProfile(), skills: [{tagId: 'unknown'}] }));
+  assert.throws(() => validateReviewPlan({ ...makePlan(), settings: { dailyLimit: -1, timezone: 'Asia/Taipei' } }));
+  const { session } = planDailyTraining({
+    profile: makeProfile(), reviewPlan: makePlan(), records: entries,
+    minutes: 10, seed: 'schema', asOf: clock, ruleRef,
+  });
+  assert.equal(validateTrainingSession(session), true);
+  assert.throws(() => validateTrainingSession({ ...session, questionRefs: [{ questionId: '' }] }));
+});
