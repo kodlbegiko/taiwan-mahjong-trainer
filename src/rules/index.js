@@ -11,3 +11,5 @@ export {
   createGame, listLegalActions, applyAction, replayGame,
   validateGameState, createPlayerView, projectPlayerView,
 } from './engine.js';
+
+export { scoreWinningHand, settleWin } from './scoring.js';
