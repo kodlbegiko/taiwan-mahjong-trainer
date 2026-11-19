@@ -164,3 +164,11 @@
 - [ ] 實體手機、完整離線可安裝 PWA 與 main 分支保護；若要從 V0.2 排除，需先明確正式變更驗收範圍，不可無聲改寫里程碑。
 
 **工程分支合併不等於里程碑發布：目前 V0.2 NO-GO。**
+
+
+## 13. 第五輪獨立回歸強化（2026-11-19）
+
+- [x] 安全重整原修復前 Draft PR #15，排除過期 `golden-scoring` 與舊報告，只保留六個 tests/benchmark 路徑，無 `src/` 修改與 force push。
+- [x] 新必跑 10,000 題獨立 Oracle（6,000 uniform、2,000 constructed、2,000 adversarial quads），PR #15 HEAD `32bd48b14844458d53f7523e0fee2d5c87130215` Verify #44444307232 通過、main merge `067c8bbcc5026e542ae5b6688a7aceb5dd33e5b7`、main [Verify #44444529115](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44444529115) 82 total /81 pass/0 fail/0 TODO/1 skipped。
+- [x] Draft #10 精確 staging SHA `b62979a0cd2fec75451f37a4f5e594a0a7e820ea` [Verify #44444678634](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44444678634) 88/87 pass/0 fail/0 TODO/1 skipped，含兩套獨立 10k Oracle；[Chromium #44444678821](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44444678821) desktop 1440 / mobile emulator 390 PASS。
+- [ ] Issue #12 進階教學／新題型／v3 紀錄 UI／手機實機／離線 PWA，Issue #13 main branch ruleset，均未完成。未符合全部發布門檻前維持 **NO-GO**。
