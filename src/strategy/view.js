@@ -162,7 +162,7 @@ function action(a, v) {
 function countVisible(v) {
   const hand = v.self.concealed.map(t => t.tileType);
   const seen = new Set(v.self.concealed.map(t => t.id));
-  const claimedIds = new Set([...v.self.river,...v.opponents.flatMap(p=>p.river)].filter(d => d.claimedByEventId).map(d => d.tileId));
+  const meldIds = new Set([...v.self,...v.opponents].flatMap(p=>p.melds.flatMap(m=>m.tileIds)));
   const visible = [];
   const add = tileId => {
     if (seen.has(tileId)) throw new RangeError('相同 physical tileId 在多個實體區域重複出現');
@@ -170,7 +170,7 @@ function countVisible(v) {
   };
   for (const p of [v.self,...v.opponents]) for (const m of p.melds) for (const tileId of m.tileIds) add(tileId);
   for (const p of [v.self,...v.opponents]) for (const d of p.river) {
-    if (claimedIds.has(d.tileId) && seen.has(d.tileId)) continue; // 河牌被領走，明牌仍只扣一次
+    if (d.claimedByEventId && meldIds.has(d.tileId) && seen.has(d.tileId)) continue; // 已領取之河牌仍只扣一次
     add(d.tileId);
   }
   const counts = knownTileCounts(hand, visible);
@@ -190,7 +190,7 @@ export function readPlayerView(input) {
   v1(v.round, 'RoundState'); id(v.round.roundId, 'roundId'); integer(v.round.handIndex, 'handIndex');
   integer(v.round.dealerSeat, 'dealerSeat', 0, 3); integer(v.round.currentSeat, 'currentSeat', 0, 3);
   integer(v.round.lastPublicEventSeq, 'lastPublicEventSeq');
-  if (v.round.lastPublicEventSeq !== v.asOfEventSeq || !phases.has(v.round.phase)) throw new RangeError('公開事件序號或階段不符');
+  if (v.round.lastPublicEventSeq > v.asOfEventSeq || !phases.has(v.round.phase)) throw new RangeError('公開事件序號或階段不符');
   for (const k of ['prevailingWind','roundWind']) if (v.round[k] !== undefined && !['east','south','west','north'].includes(v.round[k])) throw new RangeError(k+' 不合法');
   if (v.round.scores !== undefined) {
     if (!Array.isArray(v.round.scores) || v.round.scores.length !== 4 || v.round.scores.some(x=>typeof x !== 'number' || !Number.isFinite(x))) throw new RangeError('scores 必須為四個有限數字');
@@ -200,7 +200,7 @@ export function readPlayerView(input) {
   v.opponents.forEach(p=>member(p));
   const seats = new Set([v.self.seat,...v.opponents.map(p=>p.seat)]);
   if (seats.size !== 4) throw new RangeError('席位重複');
-  array(v.publicEvents, 'publicEvents').forEach(e => { publicEvent(e, v.asOfEventSeq); if (e.gameId !== v.gameId) throw new RangeError('event.gameId 不符'); sameRule(e.ruleRef, v.ruleRef); });
+  array(v.publicEvents, 'publicEvents').forEach(e => { publicEvent(e, v.round.lastPublicEventSeq); if (e.gameId !== v.gameId) throw new RangeError('event.gameId 不符'); sameRule(e.ruleRef, v.ruleRef); });
   array(v.legalActions, 'legalActions').forEach(a=>action(a, v));
   if (new Set(v.legalActions.map(a=>a.actionId)).size !== v.legalActions.length) throw new RangeError('actionId 重複');
   array(v.knownUnavailableTypes, 'knownUnavailableTypes').forEach(t=>integer(t, 'knownUnavailableType', 0, 33));
