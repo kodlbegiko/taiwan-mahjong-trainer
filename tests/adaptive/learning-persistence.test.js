@@ -101,7 +101,7 @@ test('REAL STORAGE restart: Academy question → v3 record → provenance → le
   const archiveBefore = JSON.parse(storage.getItem(ARCHIVE_STORAGE_KEY));
   const first = setup(storage);
   first.saveSession(session());
-  const result = submit(first);
+  const result = submit(first, { sessionId: 'academy-session-fixture' });
   assert.equal(result.durable, true);
   assert.equal(result.provenanceDurable, true);
   assert.equal(result.derivedFresh, true);
@@ -145,9 +145,9 @@ test('same durable attempt submitted repeatedly is idempotent and session is sti
   const storage = backing();
   const a = setup(storage);
   a.saveSession(session());
-  submit(a);
+  submit(a, { sessionId: 'academy-session-fixture' });
   const baseline = a.rebuild({ asOf: at });
-  const again = submit(setup(storage));
+  const again = submit(setup(storage), { sessionId: 'academy-session-fixture' });
   assert.equal(again.durable, true);
   const b = setup(storage);
   const rerun = b.rebuild({ asOf: at });
@@ -235,7 +235,7 @@ test('interrupted Session write after canonical/provenance/derived is reconciled
   const first = setup(storage);
   first.saveSession(session());
   storage.onAcademyWrite(3);
-  const answer = submit(first);
+  const answer = submit(first, { sessionId: 'academy-session-fixture' });
   assert.equal(answer.provenanceDurable, true);
   assert.equal(answer.derivedFresh, true);
   assert.equal(answer.sessionFresh, false);
