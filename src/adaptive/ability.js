@@ -51,6 +51,9 @@ export function buildAbilityProfile({
       !Number.isFinite(Date.parse(session.date))) throw new RangeError('Invalid historical v1 aggregate');
   }
   const normalized = normalizeRecordEntries(records, { validateAcademyDecisionRecord });
+  if (normalized.some(x => Date.parse(x.record.timestamp) > Date.parse(updatedAt))) {
+    throw new RangeError('Future record cannot be used in an asOf ability snapshot');
+  }
   const assessment = new Set();
   for (const ref of assessmentRefs) {
     if (!ref || !['legacy-v3', 'academy-v1'].includes(ref.kind)) throw new RangeError('Invalid assessment RecordRef');
