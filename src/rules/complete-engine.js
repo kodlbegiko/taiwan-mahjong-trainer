@@ -123,7 +123,7 @@ export function completeCreateGame({
       currentSeat:dealerSeat,phase:'await_discard',lastPublicEventSeq:0},
     players,wall:tiles.slice(index),events:[],rng,revision:0,
     extensions:{tw16:{initialFlowers:true,pendingReplacement:false,
-      window:null,passLocks:[false,false,false,false],
+      window:null,afterClaim:null,passLocks:[false,false,false,false],
       lastDraw:null,result:null}}},
     counts=players.map(p=>p.concealed.length);
   event(state,'deal','system-private',undefined,{dealerSeat,countsBySeat:counts,
@@ -177,12 +177,14 @@ export function completeListLegalActions(state,seat){
       ?[action(state,seat,'draw',[],'LIVE_WALL_DRAW')]:[];
   }
   if(phase!=='await_discard')return [];
-  const actions=player.concealed.filter(id=>!isFlower(id)).map(id=>
+  const locked=ext(state).afterClaim;
+  const actions=player.concealed.filter(id=>!isFlower(id)&&
+    (locked?.seat!==seat||typeOf(id)!==locked.forbiddenDiscardType)).map(id=>
     action(state,seat,'discard',[id],'OWN_DISCARD'));
   if(winning(player)&&!ext(state).passLocks[seat]){
     actions.push(action(state,seat,'win',[],'SELF_DRAW_WIN'));
   }
-  if(state.wall.length){
+  if(state.wall.length&&ext(state).afterClaim?.seat!==seat){
     for(let t=0;t<34;t++){
       for(const handIds of combos(byType(player.concealed,t),4)){
         actions.push(action(state,seat,'kong',handIds,'CONCEALED_KONG'));
@@ -245,6 +247,8 @@ function resolveClaim(state,triggerActionId){
   state.round.phase=winner.kind==='kong'?'replacement':'await_discard';
   ext(state).pendingReplacement=winner.kind==='kong';
   ext(state).lastDraw=null;
+  ext(state).afterClaim=winner.kind==='kong'?null:{seat:winner.seat,kind:winner.kind,
+    forbiddenDiscardType:typeOf(w.tileId)};
 }
 export function completeApplyAction(state,submission){
   completeValidateGameState(state,{replay:false});
@@ -272,7 +276,7 @@ export function completeApplyAction(state,submission){
     resolveClaim(next,actionId);
   }else if(kind==='discard'){
     const id=action.tileIds[0];remove(p.concealed,id);
-    e.passLocks[actorSeat]=false;e.lastDraw=null;
+    e.passLocks[actorSeat]=false;e.lastDraw=null;e.afterClaim=null;
     const evt=event(next,'discard','public',actorSeat,{tileId:id},actionId);
     p.river.push({tileId:id,seq:evt.seq});
     e.window={discardEventId:evt.eventId,discardSeq:evt.seq,tileId:id,
