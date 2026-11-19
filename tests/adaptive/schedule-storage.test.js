@@ -92,6 +92,9 @@ test('calendar days honor IANA zones and DST, rather than fixed UTC milliseconds
   assert.equal(dueNY, '2026-03-08T16:00:00.000Z');
   assert.equal(dueTW, '2026-03-08T17:00:00.000Z');
   assert.notEqual(dueNY, dueTW);
+  // March 8, 2026 02:30 does not exist in New York: shift to 03:30 EDT.
+  assert.equal(addLocalCalendarDays('2026-03-07T07:30:00Z', 1, 'America/New_York'),
+    '2026-03-08T07:30:00.000Z');
   assert.throws(() => makePlan(entries, 'Not/A_Timezone'));
 });
 test('daily 10/20/30/60 plans only schedule real replayable questions and preserve seed', () => {
