@@ -22,8 +22,8 @@
 | `toAbilityPublic(profile)` | AbilityProfile | 僅個人化能力摘要與證據引用 |
 | `buildReviewPlan({profile,records,asOf,timezone,dailyLimit,questionCatalog,reservedQuestionRefs,validateAcademyDecisionRecord,validateAcademyQuestion})` | 原始記錄與可用題庫，預設 Asia/Taipei | `ReviewPlan V1`，含 dueAt、優先級及 `unavailable:*` 原因 |
 | `getTodayRecommendation(profile,reviewPlan,asOf)` | 明確本地日期的 instant | 已到期且可重播的題目、未知/弱項標籤 |
-| `buildAnswerableCatalog({records,questionCatalog,reservedQuestionRefs,validateAcademyQuestion,...})` | legacy 可回放快照；Academy 須獨立驗證 question | 實際可作答且鎖定來源/種子的題目清單 |
-| `planDailyTraining({profile,reviewPlan,records,questionCatalog,reservedQuestionRefs,minutes,seed,asOf,ruleRef,...})` | minutes=10/20/30/60，預設 30 | `{session:TrainingSession V1,sections,availableQuestionCount}` |
+| `buildAnswerableCatalog({records,questionCatalog,reservedQuestionRefs,registry,validateAcademyQuestion,...})` | legacy 可回放快照；Academy 須獨立驗證 question | 實際可作答且鎖定來源/種子的題目清單 |
+| `planDailyTraining({profile,reviewPlan,records,questionCatalog,reservedQuestionRefs,registry,minutes,seed,asOf,ruleRef,...})` | minutes=10/20/30/60，預設 30 | `{session:TrainingSession V1,sections,availableQuestionCount}` |
 | `transitionTrainingSession(session,status,{at,recordRefs,reason})` | 僅 planned→active→completed/aborted | 驗證合法轉移後的新 Session |
 | `createAcademyStore(storage,{registry,validateAcademyDecisionRecord,validateAcademyQuestion,profileId,timezone,migrations})` | 例如 localStorage | `load/loadStatus/persistScoredRecord/rebuild/saveSession/importJSON/exportJSON/readLegacy` |
 
@@ -67,6 +67,7 @@ if (!status.ok) {
 - `migrateAcademyState(input,{migrations})` 僅支援**有實際明確轉換函式的**來源 schema；目前沒有已發布的 Academy v0，絕不幻想自動遷移未知歷史格式。所有 migrator 輸出仍要通過 V1 驗證。
 - Interval 使用既有 `buildReviewQueue/advanceReview` 的 SM-2-inspired 規則，轉換為 IANA 日曆日；非正式人類遺忘曲線模型。無法重播的題目不刪除，ReviewPlan 保留 reason code `unavailable:*`，今日推薦排除它們。
 - `reservedQuestionRefs=[{questionId,questionVersion}]` 從 ReviewPlan 的今日推薦和可作答練習排除保留測驗題，防止在複習時洩漏未見題；獨立測驗流程再把實際紀錄引用放進 `assessmentRefs`，系統可檢測重做或先練過同題的污染證據。
+- 專項練習從**已驗證的不同題目**中尋找相同 `SkillTag` 的變化題；legacy 題型僅允許 AI3 Registry 的 `legacyMappings.taskTypes`，Academy 題目僅使用通過 `validateAcademyQuestion` 的 `skillTagIds`。錯題回顧保留時間配額，避免前面綜合練習耗盡題庫。
 - `TrainingSession.questionRefs` 保持選取順序；`extensions['adaptive.plan'].orderedSources` 附每題來源、section、seed、generatorVersion、估計分鐘數。題庫不足時保留不足分鐘數，不填入不存在 Bot 對局/未評分 scenario；Session status 只有實際作答且寫入 raw record 後才能引用 recordRef。
 - `QuestionPublic` / Answer Key / PlayerView 資安界線由 Learning Academy 與 UI 層維護；此 reducer 只消費分家族的受驗證作答，不處理隱藏牌。
 
