@@ -454,9 +454,12 @@ async function setupPWA() {
       });
     });
     $('#update-app').addEventListener('click', () => pendingWorker?.postMessage({ type: 'SKIP_WAITING' }));
+    const hadController = Boolean(navigator.serviceWorker.controller);
     let refreshed = false;
     navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (!refreshed) { refreshed = true; location.reload(); }
+      // First install must never interrupt an active exercise or browser smoke.
+      // Reload only when an already controlled client switches to a new release.
+      if (hadController && !refreshed) { refreshed = true; location.reload(); }
     });
     // Explicitly verify that a worker controls the page; registration alone is not an offline guarantee.
     if (!navigator.serviceWorker.controller) notice.textContent = '初次安裝快取中；重新載入後可使用離線模式。';
