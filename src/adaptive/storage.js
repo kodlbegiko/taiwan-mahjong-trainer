@@ -79,7 +79,7 @@ export function migrateAcademyState(input, { migrations = {}, validateAcademyDec
  */
 export function createAcademyStore(storage, {
   key = ACADEMY_STORAGE_KEY, validateAcademyDecisionRecord,
-  registry, profileId = 'local-academy-profile', timezone = 'Asia/Taipei',
+  registry, validateAcademyQuestion, profileId = 'local-academy-profile', timezone = 'Asia/Taipei',
   migrations = {},
 } = {}) {
   if (key === ARCHIVE_STORAGE_KEY || key === LEGACY_SESSION_KEY ||
@@ -155,6 +155,7 @@ export function createAcademyStore(storage, {
     });
     const reviewPlan = buildReviewPlan({
       profile, records, asOf, timezone, questionCatalog, validateAcademyDecisionRecord,
+      validateAcademyQuestion,
     });
     return { profile, reviewPlan, records };
   }
