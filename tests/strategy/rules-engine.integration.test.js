@@ -113,6 +113,23 @@ if (!rules) {
     assert.deepEqual(new Set(view.legalActions.map(a=>a.kind)),new Set(['discard']));
     const analysis=analyzePlayerView(view,opts);
     expectAnalysis(view,analysis);
+    // Public, reproducible example emitted by the REAL Rules API at this combined SHA.
+    // No wall, opponent concealed, private events or answers are logged.
+    const top=analysis.recommendations[0];
+    const selected=view.legalActions.find(a=>a.actionId===top.actionId);
+    console.log('STRATEGY_REAL_RULES_EXAMPLE '+JSON.stringify({
+      profileId:view.ruleRef.profileId,ruleVersion:view.ruleRef.ruleVersion,
+      rulesEngineVersion:rules.ENGINE_VERSION,
+      analysisId:analysis.analysisId,status:analysis.status,
+      viewRef:analysis.viewRef, actionId:top.actionId,actorSeat:selected.actorSeat,
+      expectedRevision:selected.expectedRevision,
+      shanten:get(top,'postDiscardShanten').value,
+      effectiveCopies:get(top,'oneTurnEffectiveCopies').value,
+      twoTurnEstimate:get(top,'twoTurnImprovementFrequency').value,
+      simulationSampleSize:get(top,'twoTurnImprovementFrequency').sampleSize,
+      dealInRisk:get(top,'dealInRisk').value,
+      expectedFans:get(top,'expectedFans').value,
+    }));
     assert.equal(analysis.status,'model-estimate');
     assert.equal(analysis.modelVersion,'public-unknown-draws/1.0.0');
     assert.equal(analysis.recommendations.length,view.legalActions.length);
