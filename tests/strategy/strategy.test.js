@@ -181,3 +181,25 @@ test('Claim interface compares only causally linked before/after public projecti
   assert.equal(compareClaimProjections(before,noEvent,'pong:fixture').status,'unavailable');
   assert.throws(()=>compareClaimProjections(before,after,'made-up-claim'),/不在 before/);
 });
+
+
+test('Public flower identities are separate from standard 0..33 and do not reduce standard draw counts',()=>{
+  const baseline=makePlayerView();
+  const flower=structuredClone(baseline);
+  flower.self.flowers.push({
+    schemaVersion:1,contractVersion:flower.contractVersion,
+    id:'f:season-spring:0',kind:'flower',flowerCode:'season-spring',copyIndex:0,
+  });
+  flower.publicEvents=[{
+    schemaVersion:1,contractVersion:flower.contractVersion,eventId:'flower-3',gameId:flower.gameId,
+    seq:3,ruleRef:flower.ruleRef,type:'flower',visibility:'public',
+    payload:{tileId:'f:season-spring:0'},
+  }];
+  const x=analyzePlayerView(baseline,{samples:0});
+  const y=analyzePlayerView(flower,{samples:0});
+  assert.deepEqual(x.recommendations.map(r=>getMetric(r,'oneTurnEffectiveCopies').value),
+    y.recommendations.map(r=>getMetric(r,'oneTurnEffectiveCopies').value));
+  const illegal=structuredClone(flower);
+  illegal.publicEvents[0].type='draw';
+  assert.throws(()=>validatePlayerView(illegal),/不得曝光/);
+});
