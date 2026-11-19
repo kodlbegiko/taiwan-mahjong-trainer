@@ -113,7 +113,21 @@ export function createAcademyBridge(facade,storage,{now=()=>new Date().toISOStri
       assert(this.dashboard.profile?.contractVersion===ACADEMY_CONTRACT
         &&this.dashboard.reviewPlan?.contractVersion===ACADEMY_CONTRACT,'Adaptive 公開資料未就緒');
       this.session=typeof facade.getTrainingSession==='function'?clone(facade.getTrainingSession({asOf})):null;
-      this.links=readLinks(storage);
+      // Only Adaptive's verified sidecar is authoritative in production.
+      // The deprecated ui-links:v1 storage key is ignored for evidence and
+      // never written by the production bridge. Fixture tests retain their
+      // isolated UI-only store, clearly marked fixtureOnly.
+      if (fixtureOnly) {
+        this.links=readLinks(storage);
+      } else {
+        assert(typeof facade.getProvenanceLinks==='function',
+          '正式整合必須提供可驗證的 provenance 來源');
+        const official=facade.getProvenanceLinks();
+        assert(Array.isArray(official),'正式來源對應必須為陣列');
+        const prior=this.selectedLessonId;
+        this.links={...emptyLinks(),links:clone(official),
+          selectedLessonId:prior??official.at(-1)?.lessonId??null};
+      }
       this.links.links=this.links.links.filter(link=>provenLessonLink(facade,storage,link,this.lessons));
       if(this.selectedLessonId===null) this.selectedLessonId=this.links.selectedLessonId;
       return this;
@@ -146,7 +160,8 @@ export function createAcademyBridge(facade,storage,{now=()=>new Date().toISOStri
       this.question=publicQ;this.choice=[];this.startedAt=Date.now();this.attemptId=null;
       this.phase='answering';this.error=null;this.warning=null;this.result=null;
       try {
-        this.links=writeLinks(storage,{...this.links,selectedLessonId:lessonId});
+        if (fixtureOnly) this.links=writeLinks(storage,{...this.links,selectedLessonId:lessonId});
+        else this.links.selectedLessonId=lessonId;
       }catch(e){this.warning='選課進度無法儲存；作答後需再次確認本機儲存狀態。';}
       return publicQ;
     },
@@ -183,13 +198,19 @@ export function createAcademyBridge(facade,storage,{now=()=>new Date().toISOStri
         this.phase='failed';this.error='原始作答尚未證實永久保存；目前僅能顯示評分，不計入課程進度。';
         return result;
       }
-      try {
-        const mapped={questionId:ref.questionId,questionVersion:ref.questionVersion,
-          lessonId:this.selectedLessonId,recordRef:clone(result.recordRef)};
-        const old=this.links.links.filter(x=>x.recordRef.id!==mapped.recordRef.id);
-        this.links=writeLinks(storage,{...this.links,links:[...old,mapped]});
-      } catch(e){
-        this.phase='partial';this.warning='v3 作答已保存，但課程進度關聯未保存，請重新載入核對。';
+      if (fixtureOnly) {
+        try {
+          const mapped={questionId:ref.questionId,questionVersion:ref.questionVersion,
+            lessonId:this.selectedLessonId,recordRef:clone(result.recordRef)};
+          const old=this.links.links.filter(x=>x.recordRef.id!==mapped.recordRef.id);
+          this.links=writeLinks(storage,{...this.links,links:[...old,mapped]});
+        } catch(e){
+          this.phase='partial';this.warning='Fixture v3 紀錄已保存，但測試課程關聯未保存。';
+          return result;
+        }
+      } else if (result.provenanceDurable!==true) {
+        this.phase='partial';
+        this.warning='正式 v3 作答已保存，但 Adaptive 的權威 provenance 尚未寫入並驗證；不更新課程進度。';
         return result;
       }
       if(result.derivedFresh!==true) {
@@ -216,11 +237,17 @@ export function createAcademyBridge(facade,storage,{now=()=>new Date().toISOStri
     },
     reviewLink(item){
       if(!item||!validRef(item))return null;
-      // AI4 review points to ex3-* while Academy lessons point to academy-q-*.
-      // Resolve only via this UI's verified durable record-to-question mapping.
+      // Adaptive now emits academy-q-* for verified provenance, but imported
+      // legacy v3 reviews may still use ex3-*; never guess the mapping.
       const matches=this.links.links.filter(l=>{
         const proof=recordProof(storage,l.recordRef.id);
-        return proof&&proof.exerciseId===item.questionId;
+        const sameQuestion=l.questionId===item.questionId &&
+          l.questionVersion===item.questionVersion;
+        const legacyMatch=item.questionVersion==='legacy-exercise-v3' &&
+          proof?.exerciseId===item.questionId;
+        const referenced=Array.isArray(item.sourceRecordRefs) &&
+          item.sourceRecordRefs.some(r=>r.kind===l.recordRef.kind&&r.id===l.recordRef.id);
+        return proof && referenced && (sameQuestion || legacyMatch);
       });
       return matches.length?matches[matches.length-1]:null;
     },
