@@ -28,7 +28,7 @@ jobs:
         with:
           node-version: '22'
       - name: Required full unit and integration suite
-        run: npm run check
+        run: STRATEGY_REQUIRE_RULES_INTEGRATION=1 npm run check
       - name: Mandatory real Rules Engine + Strategy same HEAD
         run: STRATEGY_REQUIRE_RULES_INTEGRATION=1 node --test tests/strategy/rules-engine.integration.test.js
       - name: Mandatory live Learning + Adaptive provenance failures and recovery

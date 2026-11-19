@@ -28,5 +28,18 @@
     "TalkBack",
     "new-TrainingSession-UI"
   ],
-  "sourceIdentityMethod": "Confirm the GitHub commit SHA pinned in the deployment provider's git metadata; this is a static test-scope manifest, not an authenticated signature."
+  "sourceIdentityMethod": "Confirm the GitHub commit SHA pinned in the deployment provider's git metadata; this is a static test-scope manifest, not an authenticated signature.",
+  "sourceCommit": "a06505c8579cf817440822692854786c9bd330bf",
+  "sourceBranch": "integration/mahjong-academy",
+  "sourceCommitRole": "Immutable application runtime tree verified on the exact SHA; preview Git checkout includes metadata/doc-only commits. Check provider Git metadata separately.",
+  "manifestGeneratedAtUtc": "2026-11-19T16:45:04.840Z",
+  "deployTimeEvidence": "Vercel API deployment.createdAt/buildingAt/ready (provider-attested, not a static build-time guess)",
+  "publicAssetVerification": {
+    "checkedAtUtc": "2026-11-19T16:45:04.840Z",
+    "origin": "https://taiwan-mahjong-academy-prerelease-5evl29gv1-sign2.vercel.app/",
+    "tileSvgCount": 34,
+    "tileSvgHttp200": 34,
+    "jsJsonSwManifestHttp200": 9,
+    "assetVerificationSource": "public HTTPS Vercel fetch; existing pinned preview, before this manifest-only revision"
+  }
 }
