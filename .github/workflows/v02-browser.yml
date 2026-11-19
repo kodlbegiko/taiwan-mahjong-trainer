@@ -1,0 +1,35 @@
+name: V0.2 Browser UI & PWA
+on:
+  pull_request:
+    paths:
+      - 'index.html'
+      - 'style.css'
+      - 'src/app.js'
+      - 'src/ui/**'
+      - 'public/**'
+      - 'sw.js'
+      - 'tests/browser-v02-ui.py'
+      - '.github/workflows/v02-browser.yml'
+  workflow_dispatch:
+jobs:
+  chromium:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: npm run check
+      - run: python -m pip install 'playwright==1.56.0'
+      - run: python -m playwright install --with-deps chromium
+      - run: python tests/browser-v02-ui.py --screenshots /tmp/tmt-v02-browser
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: v02-player-ui-screenshots
+          path: /tmp/tmt-v02-browser
+          retention-days: 14
