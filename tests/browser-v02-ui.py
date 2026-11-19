@@ -188,6 +188,8 @@ def offline_and_update(browser, base, app_dir):
 
     # Simulate a new deployment with a different atomic cache id.
     sw = app_dir / 'sw.js'
+    engine = app_dir / 'src/core/efficiency.js'
+    engine.write_text(engine.read_text() + '\\n// release-r2-asset-probe\\n')
     old = sw.read_text()
     sw.write_text(old.replace('tmt-v02-training-ui-20261119-r1', 'tmt-v02-training-ui-20261119-r2'))
     page.evaluate('''async () => { const r = await navigator.serviceWorker.ready; await r.update(); }''')
@@ -199,6 +201,12 @@ def offline_and_update(browser, base, app_dir):
     page.wait_for_function('''async () => (await caches.keys()).filter(k => k.startsWith('tmt-shell-')).length === 1''', timeout=20000)
     keys = page.evaluate('''async () => await caches.keys()''')
     check(any('r2' in key for key in keys), f'old worker cache not replaced: {keys}')
+    updated_engine = page.evaluate('''async () => {
+      const cache = await caches.open((await caches.keys()).find(k => k.startsWith('tmt-shell-')));
+      const response = await cache.match(new URL('./src/core/efficiency.js', location.href));
+      return response?.text();
+    }''')
+    check('release-r2-asset-probe' in updated_engine, 'new worker retained stale core algorithm bytes')
     context.close()
 
 
