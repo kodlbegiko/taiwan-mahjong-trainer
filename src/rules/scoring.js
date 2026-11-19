@@ -45,6 +45,7 @@ export function scoreWinningHand(profile,player,{winnerSeat,sourceSeat,via,deale
 export function settleWin(profile,scoring,{winnerSeat,sourceSeat,via,dealerSeat}={}){
   const s=configuration(profile);
   if(!scoring||scoring.scoringVersion!==profile.scoringPolicy.configRef||
+    scoring.via!==via||!['self-draw','discard'].includes(via)||
     !finiteNonnegative(scoring.tai))throw new RangeError('Missing scored winning hand');
   const payers=via==='self-draw'?[0,1,2,3].filter(x=>x!==winnerSeat):[sourceSeat];
   if(![0,1,2,3].includes(winnerSeat)||!payers.every(x=>[0,1,2,3].includes(x)&&x!==winnerSeat))
