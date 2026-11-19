@@ -13,7 +13,7 @@ import { V1, clone, checksum, ReplayError, REPLAY_VERSION, FRAME_VERSION,
   createReplayArchive, validateReplayArchive, replayStateAt, publicManifest } from './internal.js';
 
 export { ReplayError, REPLAY_VERSION, FRAME_VERSION, DECISION_VERSION,
-  ANALYSIS_VERSION, FINDING_VERSION, createReplayArchive, validateReplayArchive } from './internal.js';
+  ANALYSIS_VERSION, FINDING_VERSION } from './internal.js';
 export const REPLAY_API_VERSION='tw16-replay-api/1.0.0';
 const INDEX_KEY='tw-mahjong-replay:index:v1';
 const DATA_PREFIX='tw-mahjong-replay:archive:v1:';
