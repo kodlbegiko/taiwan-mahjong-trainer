@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="72" height="100" viewBox="0 0 72 100" role="img" aria-labelledby="tile-title"><title id="tile-title">一索</title><g stroke-linejoin="round" stroke-linecap="round">
+ <path d="M42 73Q26 70 16 86Q24 69 13 57Q24 61 31 53Q16 47 9 36Q28 45 35 37" fill="#2c856c" stroke="#175550" stroke-width="2"/>
+ <path d="M38 67Q49 76 58 88Q42 82 35 75ZM32 66Q31 83 24 92Q22 81 26 66Z" fill="#276b9a" stroke="#16435e" stroke-width="1.6"/>
+ <path d="M26 58Q22 43 29 31Q35 20 45 23Q53 27 51 36Q50 45 43 54Q45 65 40 73Q29 75 26 58Z" fill="#238653" stroke="#145d50" stroke-width="2"/>
+ <path d="M29 55Q31 40 44 36Q47 47 41 60Q36 66 31 67Z" fill="#286b9a" stroke="#1b5273" stroke-width="1.6"/>
+ <path d="M39 24Q37 14 31 13Q41 14 43 21Q46 12 53 11Q48 18 48 24" fill="#be393a" stroke="#8b303c" stroke-width="1"/>
+ <path d="M51 31L62 35L51 40Z" fill="#bd493e"/>
+ <circle cx="45" cy="30" r="2.7" fill="#fff2cd"/><circle cx="45.5" cy="30.2" r="1.3" fill="#173e50"/>
+ <path d="M34 76L31 85M40 74L43 85M29 86l-4 3m5-3l3 4m10-4l-3 5m3-5l5 2" fill="none" stroke="#b53d3c" stroke-width="2.1"/>
+ <path d="M18 47Q11 38 11 27Q20 36 24 42M20 68Q10 69 6 78Q16 77 25 72" fill="#2d7f69" stroke="#1a5859" stroke-width="1.2"/>
+ </g></svg>

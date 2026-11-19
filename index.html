@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#102c2b" />
+  <meta name="description" content="台灣 16 張麻將牌效率訓練：練習何切、比較向聽數與理論有效進張。" />
+  <meta name="color-scheme" content="dark" />
+  <link rel="icon" type="image/svg+xml" href="./public/icons/icon.svg" />
+  <link rel="apple-touch-icon" href="./public/icons/icon-180.png" />
+  <link rel="manifest" href="./public/manifest.webmanifest" />
+  <link rel="stylesheet" href="./style.css" />
+  <script type="module" src="./src/app.js"></script>
+  <title>台麻練習所 · Taiwan Mahjong Trainer</title>
+</head>
+<body>
+  <a class="skip-link" href="#practice">跳至訓練區</a>
+  <div class="layout">
+    <header class="topbar">
+      <a class="wordmark" href="./" aria-label="台麻練習所首頁">
+        <span class="brand-mark" aria-hidden="true">麻</span>
+        <span class="brand-text"><strong>台麻練習所</strong><small>TAIWAN MAHJONG TRAINER</small></span>
+      </a>
+      <div class="header-meta"><span class="version">OPEN SOURCE · V0.2 訓練測試版</span><a class="repo-link" href="https://github.com/kodlbegiko/taiwan-mahjong-trainer" target="_blank" rel="noopener noreferrer">GitHub <span aria-hidden="true">↗</span></a></div>
+    </header>
+    <nav class="mode-nav" aria-label="訓練模式">
+      <button type="button" class="mode-tab is-active" data-mode="discard" aria-pressed="true"><span class="tab-index">01</span> 何切訓練</button>
+      <button type="button" class="mode-tab" data-mode="tenpai" aria-pressed="false"><span class="tab-index">02</span> 聽牌判斷</button>
+      <button type="button" class="mode-tab" data-mode="multi_wait" aria-pressed="false"><span class="tab-index">03</span> 多面聽訓練</button>
+      <span class="mode-tab is-locked"><span class="tab-index">04</span> 攻防與複盤 <span class="soon">未開放</span></span>
+    </nav>
+    <div class="pwa-bar"><p id="offline-status" role="status" aria-live="polite">離線功能初始化中；首次安裝需先連線。</p><div><button id="update-app" type="button" hidden>更新至最新版本</button><button id="install-app" type="button" hidden>安裝應用程式</button></div></div>
+    <main id="main">
+      <section class="intro" aria-labelledby="intro-heading">
+        <div class="intro-copy"><span class="eyebrow">16 張台麻 · 結構性牌效率</span><h1 id="intro-heading">每一張捨牌，<em>都應該有理由。</em></h1><p>練習何切、聽牌判斷與多面聽，作答後檢查官方評分、牌型拆解及錯誤原因；所有計算均在裝置內進行。</p></div>
+        <div class="intro-note"><span class="note-label">本版的判斷範圍</span><p>只衡量一般牌型的結構性效率，不包含攻防、台數或對手資訊。</p></div>
+      </section>
+      <div class="columns">
+        <section class="panel exercise" id="practice" aria-labelledby="practice-heading">
+          <div class="section-top">
+            <div><span class="eyebrow">ACTIVE TRAINING / 01</span><h2 id="practice-heading">何切練習</h2><p id="mode-instruction" class="subheading">選擇你認為牌效率最好的捨牌</p></div>
+            <label class="select-wrap" for="difficulty"><span>題目難度</span><select id="difficulty"><option value="beginner">入門</option><option value="intermediate" selected>進階</option><option value="advanced">挑戰</option></select></label>
+          </div>
+          <ol class="steps" aria-label="訓練流程"><li id="step-decide" class="is-current" aria-current="step"><span>1</span>觀察並作答</li><li id="step-review"><span>2</span>檢查牌效率</li><li id="step-repeat"><span>3</span>前往下一題</li></ol>
+          <div class="instruction"><div><strong>你的手牌</strong><span id="hand-description">摸牌後 17 張 · 點牌立即作答</span></div><span class="hand-count" id="hand-count">17 / 17</span></div>
+          <div class="table-surface"><div id="hand" class="hand" role="group" aria-label="17 張手牌，選一張捨棄" aria-describedby="hand-help"></div></div>
+          <section id="wait-picker" class="wait-picker" aria-label="選擇可胡牌的張數" hidden><h3>選出所有可胡的牌</h3><p>可複選。選好後按「確認聽張」，答題前不顯示解答。</p><div id="wait-options" class="wait-options" role="group" aria-label="34 種牌可複選"></div><div class="wait-actions"><span id="wait-selected" aria-live="polite">已選 0 種</span><button id="submit-waits" type="button" class="primary">確認聽張</button></div></section>
+          <p class="hand-help" id="hand-help">何切模式點牌即作答；聽牌題請從下方選出所有可胡的牌。鍵盤 Tab、方向鍵、Home／End 可移動，Enter／空白鍵可作答。</p>
+          <div class="exercise-bottom"><p id="exercise-status" role="status" aria-live="polite" class="status">正在準備題目…</p><div class="button-row"><button class="secondary" id="skip" type="button">略過本題</button><button class="primary" id="next" type="button" hidden>下一題 <span aria-hidden="true">→</span></button></div></div>
+          <section id="answer" class="answer" aria-labelledby="answer-heading" hidden>
+            <div class="answer-heading"><span class="eyebrow">RESULT / 計算結果</span><h3 id="answer-heading" tabindex="-1">出牌比較</h3><p class="answer-description">使用已整合的 V0.2 正式牌效率及題庫契約，僅衡量一般五面子一將眼的結構效率，不代表攻防或實戰最佳策略。</p></div>
+            <div id="discard-comparison" class="comparison">
+              <article class="comparison-card yours"><span class="card-kicker">你的選擇</span><strong id="chosen-tile">—</strong><dl><div><dt>向聽</dt><dd id="chosen-shanten">—</dd></div><div><dt>有效種類</dt><dd id="chosen-kinds">—</dd></div><div><dt>理論張數</dt><dd id="chosen-copies">—</dd></div></dl></article>
+              <article class="comparison-card best"><span class="card-kicker">最高牌效率捨牌</span><strong id="best-tiles">—</strong><dl><div><dt>向聽</dt><dd id="best-shanten">—</dd></div><div><dt>有效種類</dt><dd id="best-kinds">—</dd></div><div><dt>理論張數</dt><dd id="best-copies">—</dd></div></dl></article>
+            </div>
+            <section id="wait-answer" class="wait-answer" hidden><h4>聽張核對</h4><p id="wait-grade"></p><p id="wait-expected"></p><p id="wait-chosen"></p><p id="wait-diff"></p></section>
+            <p id="feedback" class="feedback"></p>
+            <div id="discard-rankings"><div class="table-heading"><h4>全部捨牌方案</h4><span>依向聽 → 理論張數 → 進張種類排序</span></div>
+            <div class="table-scroll" tabindex="0" role="region" aria-label="所有捨牌方案比較表，表格可水平捲動"><table><caption class="sr-only">捨牌候選的向聽數、有效進張種類與理論張數</caption><thead><tr><th scope="col">排序</th><th scope="col">捨牌</th><th scope="col">向聽</th><th scope="col">進張種類</th><th scope="col">理論張數</th></tr></thead><tbody id="rankings"></tbody></table></div>
+            <p id="draw-details" class="detail"></p></div>
+            <section id="explanation-panel" class="explanation-panel" aria-labelledby="explanation-heading" hidden><span class="eyebrow">TEACHING / 已驗證的拆解資料</span><h4 id="explanation-heading">為什麼這樣選？</h4><div id="explanation-summary"></div><details id="explanation-details"><summary>展開完整拆解、搭子及進階判斷</summary><div id="explanation-advanced"></div></details></section>
+            <div class="result-footer"><button id="next-bottom" class="primary" type="button">繼續下一題 <span aria-hidden="true">→</span></button></div>
+          </section>
+        </section>
+        <aside class="sidebar" aria-label="進度與規則">
+          <section class="panel metrics" aria-labelledby="progress-heading"><span class="eyebrow">PERSONAL PROGRESS</span><h2 id="progress-heading">我的訓練進度</h2><p class="sidebar-caption">僅計算此瀏覽器已作答的題目</p><div class="metric-grid"><div><strong id="stat-total">0</strong><span>已完成題數</span></div><div><strong id="stat-perfect">—</strong><span>完整答對率（各模式）</span></div><div><strong id="stat-same">—</strong><span>何切向聽未變差率</span></div><div><strong id="stat-seconds">—</strong><span>平均作答時間</span></div></div><div class="privacy-note">新版答題紀錄以 v3 格式儲存在本機，包含題目快照；舊 v1 紀錄保留原樣，不補造不存在的答案與手牌。</div><p id="storage-status" class="storage-status" role="status" aria-live="polite" hidden></p><button class="text-btn" id="clear-stats" type="button">清除 v3 作答（保留歷史版）</button></section>
+          <section class="panel history" aria-labelledby="history-heading"><span class="eyebrow">LOCAL HISTORY</span><h2 id="history-heading">最近訓練紀錄</h2><p class="sidebar-caption">儲存在此瀏覽器，可展開查看題目與作答結果。</p><div id="history-list" class="history-list"></div><button id="export-history" type="button" class="text-btn">匯出 v3 訓練資料 JSON</button></section>
+          <section class="panel rules" aria-labelledby="rules-heading"><span class="eyebrow">HOW IT WORKS</span><h2 id="rules-heading">看懂三個指標</h2><dl><div><dt>向聽數</dt><dd>距離一般五面子一將眼還差多少步；0 代表聽牌。</dd></div><div><dt>有效進張</dt><dd>摸到後能讓向聽數降低的牌種。</dd></div><div><dt>理論張數</dt><dd>扣除手上已知牌後的有效牌數；尚未扣除其他玩家的明牌或河牌。</dd></div></dl></section>
+        </aside>
+      </div>
+      <section class="roadmap" aria-labelledby="roadmap-heading"><span class="eyebrow">COMING NEXT</span><h2 id="roadmap-heading">尚未開放的功能</h2><div class="roadmap-grid"><article><div class="roadmap-meta"><span>02</span><span class="soon">未開放</span></div><h3>情境攻防</h3><p>需更多公開牌與風險資料，尚未開放。</p></article><article><div class="roadmap-meta"><span>03</span><span class="soon">未開放</span></div><h3>逐巡複盤</h3><p>未來加入巡目、河牌與攻守取捨。</p></article><article><div class="roadmap-meta"><span>04</span><span class="soon">未開放</span></div><h3>個人化訓練</h3><p>預計支援逐巡回顧與決策比較。</p></article></div></section>
+    </main>
+    <footer><span>台麻練習所 · 開源專案 · 不需帳號與付費 API</span><span>一般 5 面子 + 1 將眼 · 暫不計特殊胡法、副露、台數與放槍風險</span></footer>
+  </div>
+</body>
+</html>
