@@ -23,7 +23,14 @@ def run(output):
             require(not page.locator('#practice').is_visible(),'old app overlaps Today')
             require(page.evaluate('document.body.scrollWidth <= innerWidth+1'),'390px overflow')
             page.screenshot(path=str(output/'academy-390-today.png'),full_page=True)
-            require("正式 Learning" in page.locator("#academy-root").inner_text(),"missing API must fail closed")
+            combined = (Path(__file__).resolve().parents[2] / 'src/integration/master-academy-facade.js').exists()
+            if combined:
+                page.locator('[data-academy-nav="lessons"]').click()
+                page.wait_for_function("() => document.querySelectorAll('[data-live-action=select-lesson]').length === 20",timeout=45000)
+                require(page.locator('.academy-level').count()==5,'real Learning API must expose 5 course levels')
+                page.locator('[data-academy-nav="today"]').click()
+            else:
+                require("正式 Learning" in page.locator("#academy-root").inner_text(),"missing API must fail closed")
             page.locator('[data-academy-nav="training"]').click()
             require(page.locator('#hand button[data-tile]').count()==17,'canonical hand unavailable')
             require(page.locator('#hand .tile-face-image').count()==17,'SVG tile assets missing')
@@ -34,11 +41,21 @@ def run(output):
             require(len(data['records'])==1,'v3 result not persisted')
             require(data['records'][0]['scoringVersion']=='efficiency-v2','non-canonical scorer')
             page.locator('[data-academy-nav="today"]').click()
-            require('正式 Learning' in page.locator('#academy-root').inner_text(),'unmerged source must not fabricate daily progress')
+            if not combined:
+                require('正式 Learning' in page.locator('#academy-root').inner_text(),'unmerged source must not fabricate daily progress')
+            else:
+                require('有效 RecordRef' in page.locator('#academy-root').inner_text(),'combined public dashboard missing')
             page.locator('[data-academy-nav="growth"]').click()
-            require('正式 Learning' in page.locator('#academy-root').inner_text(),'unmerged source must not invent AbilityProfile')
+            if not combined:
+                require('正式 Learning' in page.locator('#academy-root').inner_text(),'unmerged source must not invent AbilityProfile')
+            else:
+                require('AbilityProfile' in page.locator('#academy-root').inner_text(),'combined AbilityProfilePublic missing')
             page.locator('[data-academy-nav="lessons"]').click()
-            require(page.locator('.academy-lesson-pick').count()==0,'fake LessonPublic visible without AI3/AI6 source')
+            if combined:
+                page.wait_for_function("() => document.querySelectorAll('[data-live-action=select-lesson]').length === 20",timeout=45000)
+                require(page.locator('.academy-lesson-pick').count()==20,'real LessonPublic source missing')
+            else:
+                require(page.locator('.academy-lesson-pick').count()==0,'fake LessonPublic visible without AI3/AI6 source')
             page.locator('[data-academy-nav="strategy"]').click()
             require('Fixture-only' in page.locator('#academy-root').inner_text(),'fixture disclosure missing')
             require(page.locator('.academy-mini-hand .tile-face-image').count()==17,'PlayerView preview missing')
@@ -47,7 +64,10 @@ def run(output):
             require('未開放實戰模式' in page.locator('#academy-root').inner_text(),'fake bots enabled')
             page.reload(wait_until='networkidle')
             page.locator('[data-academy-nav="growth"]').click()
-            require('正式 Learning' in page.locator('#academy-root').inner_text(),'must not invent dashboard after reload')
+            if not combined:
+                require('正式 Learning' in page.locator('#academy-root').inner_text(),'must not invent dashboard after reload')
+            else:
+                require('AbilityProfile' in page.locator('#academy-root').inner_text(),'real Adaptive profile disappeared after reload')
             page.screenshot(path=str(output/'academy-390-growth.png'),full_page=True)
             require(not errors,'page errors '+str(errors))
             # Seed historical score by calling the REAL canonical scorer and archive
