@@ -3,7 +3,7 @@
 > **Phase 0 基線稽核｜2026-11-19（Asia/Taipei）｜MASTER ACADEMY 尚未整合完成。**
 > 契約 `master-academy/1.0.0` 已經由 [PR #32](https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/32) 合併。這是具有精確 GitHub 證據的階段快照，不是最終產品驗收或 v0.2.0 發布授權。完整契約：[MASTER_ACADEMY_V1.md](../contracts/MASTER_ACADEMY_V1.md)，依賴圖：[MASTER_ACADEMY_ARCHITECTURE.md](../MASTER_ACADEMY_ARCHITECTURE.md)。
 
-> **最新狀態請優先看第 10 節。** 五個來源 PR 均已建立；本報告前述「來源尚未出現」僅代表 Phase 0 歷史快照，不是目前事實。
+> **最新狀態請優先看第 11 節。** 五個來源 PR 均已建立；本報告前述「來源尚未出現」僅代表 Phase 0 歷史快照，不是目前事實。
 
 ## 1. 最新 GitHub 主線與版本界線
 
@@ -156,3 +156,52 @@
 | 實體 iPhone/Android、VoiceOver/TalkBack | `NOT_RUN` | 使用者已決定暫緩；Issue #12 維持 Open |
 
 **Phase 2 進展：Learning + Adaptive 在隔離組合的 backend 單一 v3 學習流程已獲得可重播測試證據。Rules／Strategy／UI 仍未通過跨模組放行，五個來源 PR 均未合併 main；完整 12 步 Master Academy 尚未完成、正式 Release 不授權。**
+
+
+---
+
+## 11. 2026-11-19 最新五來源真實整合稽核（覆蓋上方舊版歷史快照）
+
+**注意**：前述 1–10 節是逐次歷史查核；以本節為最新狀態。共同權威契約仍為 `master-academy/1.0.0`；正式 main `25870862b6499f7e699967aa76429ae5dcfc5db4` 未動，Protect main ruleset #27611325 維持 Active。既有 Draft [PR #33](https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/33) 尚未合併；下方**實際已測整合程式碼 HEAD** `a06505c8579cf817440822692854786c9bd330bf`。
+
+### 11.1 最新五個來源與安全納入
+
+| PR | 固定來源 SHA | 來源 CI／審查 |
+| --- | --- | --- |
+| [Rules #34](https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/34) | `a8e5aaa59c3cd55fa99a57bc50bb9fb83f8bd544` | [Verify #44553905187](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44553905187) SUCCESS。原 Replay JSON key-order、花牌 code 型別兩個 review threads 均已 resolved；`sameJson` 及 flower type guard 和 regression 已核對。四席遊戲仍僅 experimental draw/discard |
+| [Strategy #36](https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/36) | `4f2029fcd54c5e43d5d17beb54f7f32dcd78d624` | [Verify #44555251088](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44555251088) SUCCESS。最新真實 Rules PlayerView→Strategy 測試在整合 HEAD 強制啟用，來源 PR 單獨測試不能冒充組合通過 |
+| [Learning #35](https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/35) | `172f6221fbd2d1363f4a0d04681f0b773293d486` | [Verify #44554576924](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44554576924) SUCCESS。20 個 Lesson／100 題有真實 seed、版本、v3 scorer、Learning-owned immutable provenance；scenario scorer count=0 |
+| [Adaptive #37](https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/37) | `03ee8408a8ce28a09be3439c640d768c31f5054e` | [Verify #44557070257](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44557070257) SUCCESS。正式 `createAdaptiveLearningAdapter`；`pendingProvenance[]` write-ahead、`provenanceLinks[]`、故障重建、正式 Academy 題目 ReviewPlan |
+| [UI #38](https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/38) | `634e3c4f80063beb709406210b210e77b7ceb979` | [Verify #44557077672](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44557077672) SUCCESS。來源 PR 的 Fixture-only UI E2E **不是**正式 Academy 端到端證據 |
+
+已從以上五個固定來源 HEAD 保留原版 blob 導入 **64 個指定來源檔案**，未用整合分支舊 #35/#37 實作覆寫新提交。另有明確、獨立的整合者 Façade、UI Bridge 最小必要接縫、Service Worker 版本、真實 browser / Node 測試與 CI，未直接推送 main、未更動 V0.2 預發布 [PR #26](https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/26)。
+
+### 11.2 唯一可信資料來源
+
+- 正式分數：原始 `tw-mahjong-trainer:archive:v3` 裡的 `DecisionRecord v3`；歷史 `session:v1` 和 v2/v3 原有 bytes 在讀取／重建時不得被覆寫。
+- 課程／作答關聯：唯一權威是 Adaptive `tw-mahjong-master-academy:state:v1` 的 `provenanceLinks[]`，必須先保留 `pendingProvenance[]` 意圖，再寫入並驗證正式 v3 RecordRef，最後建立來源映射與重建未校準 AbilityProfile／ReviewPlan。中斷後 `recoverPending` 僅依真正 durable v3 記錄恢復。
+- Integrator `src/integration/master-academy-facade.js` 注入 Learning 公開 callback 至 Adaptive owner；任何來源映射再以 Learning `createAcademyProvenance/validateAcademyProvenance` 和 Adaptive `validateLearningProvenance` 及原始 v3 記錄雙重驗證。
+- 正式 UI `academy-bridge.js` 不再讀寫 `tw-mahjong-master-academy:ui-links:v1` 作成績真相，而由 Façade `getProvenanceLinks()` 重新建構；僅 `fixtureOnly:true` 獨立測試保留舊 link key。修復需求已回報 UI 來源 PR #38。正式 `ReviewPlan` 已依 `academy-q-*` 指向可重播原題，歷史未連結 `ex3-*` 不會被偽造成 Academy 學習。
+- `getTrainingSession()` 目前只傳回既有已儲存 TrainingSession 或 null；**不宣稱新玩家每日 Session 已自動建立**。無 verified scenario scorer 時 `submitScenarioAnswer` 必須拒絕正式計分。
+
+### 11.3 同一實際整合 HEAD 的完整 Gates
+
+| Gate | 真實 Actions 與證據 | 結果 |
+| --- | --- | --- |
+| Required Verify／REG-01 | [Verify #44562519930](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44562519930)：**207 tests、206 PASS、0 FAIL、1 opt-in skipped、0 TODO** | `CI_PASS` |
+| 兩個各 10,000 題獨立 Oracle、Golden、P0 | 同一 Verify log 明確 `required: 10,000`、`integration: 10,000`，既有 Q-001/Q-002/I-003；選擇性 stress 未執行 | `CI_PASS` |
+| R-01／R-02／S-01 | [combined #44562520086](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44562520086) Node job：強制 `STRATEGY_REQUIRE_RULES_INTEGRATION=1`，真實 createGame → allowlist PlayerView → canonical 策略／合法 actionId → applyAction → replay；opponent／wall 暗牌隔離，stale／非法 ID 擋下 | `CI_PASS`，僅 experimental 四席 draw/discard |
+| L-01／A-01 | 同一 combined Node job：真實 20 Lesson、100 題、QuestionPublic 無 answerKey；正式 v3 score → durable readback → write-ahead／provenance → AbilityProfile → 依 AcademyQuestionRef ReviewPlan；冪等、故障恢復、quota、壞 provenance、過期版本、未驗證 scenario 拒絕 | `CI_PASS` |
+| 真實 UI-01／12 步／離線新分頁 | 同一 [combined #44562520086](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44562520086) browser job SUCCESS：**390px mobile emulation、1440px desktop**，操作官方 Lesson→選牌→正式 grade→持久化→來源 mapping→Profile/Plan→reload→原課程／同題 replay，以及桌面 Chrome 離線新分頁；**沒有使用 fixture provider**；截圖和 JSON 在 `academy-combined-real-e2e` artifact | `BROWSER_PASS` |
+| Academy UI regression | [Academy UI #44562519917](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44562519917) SUCCESS，合成來源須真有 20 Lesson，來源單獨不能接 Façade 時仍 fail closed | `BROWSER_PASS` |
+| REG-02／V0.2 功能與 PWA | [Tile Faces #44562519997](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44562519997)、[Independent UI #44562519987](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44562519987)、[V0.2 Browser/PWA #44562519844](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44562519844) 全部 SUCCESS；34 SVG、三題型、鍵盤、V0.2 regression 保留 | `CI_PASS` |
+
+`sw.js` 新版 `tmt-v02-realistic-tiles-master-academy-20261119-r2` 保留原 V0.2 Tile QA 必需命名、34 SVG 與原快取，**額外 precache 30 個真正 Academy／Adaptive／Rules／Strategy／Integration JS/JSON**。每次變更 cache version 隨必要檔案同步升級。Chrome 模擬不代表實際 iOS/Android 或輔助科技通過。
+
+### 11.4 可操作範圍、預發布與 NO-GO 邊界
+
+- **已驗證可操作**：真正選擇正式 Academy 20 Lesson、100 題結構題，與舊何切／聽牌／多面聽共存；官方 v3 score/explanation、RecordRef 和原始 bytes，經驗證的 curriculum provenance、未校準能力／複習、重新載入回原課程、原題複習；390/1440 Chrome、PWA offline Chrome。
+- **仍未完成**：完整 verified 台灣四人桌規／自摸放槍／吃碰槓補花／台數、經認證 scenario scorer、正式 Bot 與全資訊複盤、真人校準，以及從 UI 正式建立每天 TrainingSession。實體 Android/iOS、VoiceOver、TalkBack、完整裝置升版驗收全部 `NOT_RUN`；[Issue #12](https://github.com/kodlbegiko/taiwan-mahjong-trainer/issues/12) 保持 Open。
+- **Academy 專屬 HTTPS 固定 SHA 預發布**尚未有真實可驗證網址，因此 `BLOCKED`，不能使用舊 [V0.2 GitHub Pages](https://kodlbegiko.github.io/taiwan-mahjong-trainer/) 當新學院網站。只有獨立 HTTPS、明確 commit SHA、`release:false`、真實 live browser/source/offline 證據後才能標 `PREVIEW_DEPLOYED`。
+- `package.json` 仍 `0.1.0`；沒有 `v0.2.0` Tag/GitHub Release，main 保護未降低，PR #33 **Draft** 未合併。
+- **工程判定**：僅「結構題 V1 Learning＋Adaptive＋實驗性 Rules/Strategy 公開界線＋Chromium 的 12 步」範圍具 `CI_PASS/BROWSER_PASS`；**整體 Master Academy 正式工程整合仍為 NO-GO**（專屬預覽、正式 Session、完整四人玩法／scenario scorer 未達），不得發行或關閉品質 gate。
