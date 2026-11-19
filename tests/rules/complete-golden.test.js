@@ -258,3 +258,38 @@ test('R3-C next round: explicit linked seed/revision, dealer retains on self-win
   assert.equal(validateGameState(rotated),true);
   assert.deepEqual(replayGame(rotated),rotated);
 });
+
+
+test('R3-B exhaustive draw Golden: reserve exactly 16 tail tiles, zero settlement, replay and dealer retention',()=>{
+  let s=fixture({},[],'exhaustive-draw');
+  let steps=0;
+  while(s.round.phase!=='settled'&&steps++<400){
+    const phase=s.round.phase,seat=s.round.currentSeat;
+    if(phase==='await_discard'){
+      s=act(s,seat,'discard');
+    }else if(phase==='claim_window'){
+      const window=s.extensions.tw16.window;
+      const actor=[0,1,2,3].find(x=>x!==window.fromSeat&&
+        !window.decisions.some(d=>d.seat===x));
+      assert.notEqual(actor,undefined);
+      s=act(s,actor,'pass');
+    }else if(phase==='await_draw')s=act(s,seat,'draw');
+    else if(phase==='replacement')
+      s=act(s,seat,selected(s,seat,'replace_flower')?'replace_flower':'draw');
+    else throw new Error('Unexpected phase '+phase);
+  }
+  assert.ok(steps<400,'must settle rather than loop forever');
+  assert.equal(s.round.phase,'settled');
+  assert.equal(s.extensions.tw16.result.reason,'exhaustive-draw');
+  assert.equal(s.wall.length,16);
+  assert.deepEqual(s.extensions.tw16.result.delta,[0,0,0,0]);
+  assert.equal(s.events.at(-1).type,'settle');
+  assert.equal(s.events.at(-1).payload.reason,'exhaustive-draw');
+  assert.equal(validateGameState(s),true);
+  assert.deepEqual(replayGame(s),s);
+  assert.ok(s.events.every((e,i)=>e.seq===i+1));
+  const following=startNextRound(s,{gameId:'next-draw-hand',seed:'next-draw-seed'});
+  assert.equal(following.round.dealerSeat,s.round.dealerSeat);
+  assert.equal(following.round.handIndex,1);
+  assert.equal(validateGameState(following),true);
+});
