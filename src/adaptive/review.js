@@ -125,8 +125,7 @@ export function buildReviewPlan({
   items.sort((a, b) => b.priority - a.priority || a.dueAt.localeCompare(b.dueAt) ||
     a.questionId.localeCompare(b.questionId) || a.questionVersion.localeCompare(b.questionVersion));
   return {
-    ...V1, planId: stableId('review', profile.profileId, generatedAsOf, timezone,
-      normalized.map(x => canonicalJson(x.record)).join(',')),
+    ...V1, planId: stableId('review', profile.profileId, generatedAsOf, timezone, canonicalJson(items)),
     profileId: profile.profileId, generatedAsOf, algorithmVersion: REVIEW_ALGORITHM_VERSION,
     items, settings: { dailyLimit, timezone }, method: 'sm2-inspired',
     calibrationStatus: profile.calibrationStatus,
