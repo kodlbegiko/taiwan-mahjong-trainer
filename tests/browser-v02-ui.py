@@ -221,7 +221,7 @@ def main():
     url = f'http://127.0.0.1:{port}/taiwan-mahjong-trainer/'
     try:
         with sync_playwright() as playwright:
-            browser = playwright.chromium.launch(headless=True, args=['--no-sandbox'])
+            browser = playwright.chromium.launch(channel='chrome', headless=True, args=['--no-sandbox'])
             for width in [1440, 390]:
                 exercise_flow(browser, url, width, screenshots)
                 print(f'PASS {width}px discard / tenpai / multi_wait / keyboard / history')
