@@ -55,6 +55,19 @@ function scenario() {
     recordKind: 'academy-scenario',
   };
 }
+function scenarioQuestion() {
+  return {
+    schemaVersion: 1, contractVersion: 'master-academy/1.0.0',
+    questionId: 'scenario-a', questionVersion: 'v1', taskType: 'scenario',
+    status: 'validated', skillTagIds: ['waits.enumeration'],
+    ruleRef: { profileId: 'rules', ruleVersion: 'v1' },
+    generator: { seed: 'fixed', index: 0, generatorVersion: 'fixture-v1' },
+    source: { kind: 'player-view-snapshot', snapshotRef: 'fixed' },
+    prompt: { options: ['a'] },
+    answerKey: { scorerId: 'fixture', scoringVersion: 'fixture-v1',
+      correctnessBasis: 'exact', acceptedActionIds: ['a'] },
+  };
+}
 // A deterministic mock of Learning Academy's independent scorer for adapter tests.
 // Real production must inject AI3's actual scorer/fixture validator.
 const validator = rec => rec.scorerId === 'fixture' && rec.scoringVersion === 'fixture-v1' &&
@@ -147,19 +160,21 @@ test('Academy first write + readback survive second write failure; rebuild recov
   const storage = makeStorage();
   const store = createAcademyStore(storage, { registry, validateAcademyDecisionRecord: validator });
   storage.setFailAt(2);
-  const result = store.persistScoredRecord({ kind: 'academy-v1', record: scenario() }, { asOf: clock });
+  const result = store.persistScoredRecord({ kind: 'academy-v1', record: scenario(), question: scenarioQuestion() }, { asOf: clock });
   assert.equal(result.durable, true);
   assert.equal(result.derivedFresh, false);
   assert.equal(result.errorCode, 'WRITE_DENIED');
   const before = store.load();
   assert.equal(before.academyRecords.length, 1);
+  assert.equal(before.academyQuestions.length, 1);
+  assert.deepEqual(before.academyQuestions[0], scenarioQuestion());
   assert.equal(before.abilityProfile, null);
   storage.setFailAt(-1);
   const recovered = store.rebuild({ asOf: clock });
   assert.equal(recovered.durable, true);
   assert.equal(store.load().academyRecords.length, 1);
   assert.equal(store.load().abilityProfile.skills[0].attempts, 1);
-  const again = store.persistScoredRecord({ kind: 'academy-v1', record: scenario() }, { asOf: clock });
+  const again = store.persistScoredRecord({ kind: 'academy-v1', record: scenario(), question: scenarioQuestion() }, { asOf: clock });
   assert.equal(again.derivedFresh, true);
   assert.equal(store.load().academyRecords.length, 1);
 });
@@ -182,7 +197,7 @@ test('quota denied on raw record write reports failure without pretending succes
   const storage = makeStorage();
   storage.setFailAt(1);
   const store = createAcademyStore(storage, { registry, validateAcademyDecisionRecord: validator });
-  assert.throws(() => store.persistScoredRecord({ kind: 'academy-v1', record: scenario() }, { asOf: clock }),
+  assert.throws(() => store.persistScoredRecord({ kind: 'academy-v1', record: scenario(), question: scenarioQuestion() }, { asOf: clock }),
     error => error.code === 'WRITE_DENIED');
   assert.equal(storage.getItem(ACADEMY_STORAGE_KEY), null);
 });
@@ -267,4 +282,22 @@ test('persisted v1 validators reject incomplete profile, review and session stat
   });
   assert.equal(validateTrainingSession(session), true);
   assert.throws(() => validateTrainingSession({ ...session, questionRefs: [{ questionId: '' }] }));
+});
+
+test('Academy write refuses missing/modified immutable question snapshots', () => {
+  const storage = makeStorage();
+  const store = createAcademyStore(storage, { registry, validateAcademyDecisionRecord: validator });
+  assert.throws(() => store.persistScoredRecord({
+    kind: 'academy-v1', record: scenario(),
+  }, { asOf: clock }), /question snapshot is required/);
+  assert.equal(storage.getItem(ACADEMY_STORAGE_KEY), null);
+  store.persistScoredRecord({
+    kind: 'academy-v1', record: scenario(), question: scenarioQuestion(),
+  }, { asOf: clock });
+  assert.throws(() => store.persistScoredRecord({
+    kind: 'academy-v1', record: scenario(), question: {
+      ...scenarioQuestion(), generator: { ...scenarioQuestion().generator, seed: 'changed' },
+    },
+  }, { asOf: clock }), /Conflicting immutable/);
+  assert.equal(store.load().academyQuestions.length, 1);
 });
