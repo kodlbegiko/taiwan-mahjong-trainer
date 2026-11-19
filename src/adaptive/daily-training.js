@@ -68,8 +68,17 @@ export function createDailyTrainingController(storage, {
 
   function publishedCatalog() {
     const lessons=learning.listLessons().filter(l=>l.status==='published');
+    // A published lesson is not automatically unlocked. Do not infer
+    // completion from quiz scores: use durable canonical provenance only.
+    const answered=new Set((adaptive.load().provenanceLinks??[])
+      .map(link=>id(link.academyQuestionRef)));
+    const completedLessons=new Set(lessons.filter(lesson=>
+      lesson.questionRefs.length>0 && lesson.questionRefs.every(ref=>answered.has(id(ref))))
+      .map(lesson=>lesson.lessonId));
+    const unlocked=lessons.filter(lesson=>
+      (lesson.prerequisiteLessonIds??[]).every(dep=>completedLessons.has(dep)));
     const unique=new Map();
-    for(const lesson of lessons)for(const ref of learning.listQuestionRefs({lessonId:lesson.lessonId})){
+    for(const lesson of unlocked)for(const ref of learning.listQuestionRefs({lessonId:lesson.lessonId})){
       if(!lesson.questionRefs.some(r=>id(r)===id(ref))) continue;
       const q=learning.toPublicQuestion(ref);
       if(!sourceVerified(q)) continue;
