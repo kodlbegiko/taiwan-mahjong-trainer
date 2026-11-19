@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## Unreleased — V0.2 product candidate merged, release blocked (2026-11-19)
+
+- **Engineering only, NOT a v0.2.0 release**. QA-only [PR #10](https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/10) merged `bd0759b945ad85fabb1333c435773cfbe2f74ac8` (post-main Verify #44453401006 success: 88/87 pass/0 fail/1 skipped).
+- Player feature [PR #21](https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/21) merged `7903ab14ffda01da281e8023daf37db385323226`: discard/tenpai/multi_wait interactive UI, canonical teach/grade and tie-best results, immutable v3 DecisionRecord history/export with v1 preservation, keyboard controls and installable/offline-capable SW shell (post-main Verify #44454192502 success: 91/90 pass/0 fail/1 skipped).
+- Independent QA [PR #22](https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/22) merged `745d89d5cf6f8754563660ede9c92b836048efae`. Final main Verify #44454406093 success: 94/93 pass/0 fail/0 TODO/1 optional skipped. Same-SHA Independent UI/PWA #44454406103 success: Chrome 1440px/mobile-emulated 390px, canonical tie/wrong/multi-wait, v3 archive/export/reload, real offline fresh tab, record preservation and atomic SW/core asset updates.
+- Reviewed release staging [Draft PR #23](https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/23) `b4f6410b89302a6ef916f9bffb12ade9c4021b57` passed Verify #44453751858, UI browser #44453751914, Independent #44453751860; its Git Tree `164a67e8915352034e3f293cc4e867dacb332785` is **identical** to merged main tree. Closed as superseded **without duplicate merge**.
+- Release still **NO-GO**: #12 physical iPhone/Android PWA and assistive-technology evidence missing; #13 main `protected=false` and rulesets `[]`; no v0.2.0 tag, GitHub Release or version bump. `package.json.version` stays `0.1.0`.
+
+
 ## Unreleased — V0.2 verified integration work (2026-11-19, third audit)
 
 ### Actually merged to main

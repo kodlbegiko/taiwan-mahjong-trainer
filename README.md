@@ -1,5 +1,8 @@
 # 台麻練習所 · Taiwan Mahjong Trainer
 
+> **最新工程整合快照（2026-11-19，正式 V0.2 尚未發布）：** PR #10／#21／#22 已合併至 main `745d89d5cf6f8754563660ede9c92b836048efae`；main 現有三種玩家訓練題型、可解說的正式評分、v3 作答紀錄及離線 Service Worker。[main Verify #44454406093](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44454406093) 94 項／93 通過／0 失敗／0 TODO／1 選擇性 skipped，[main Independent UI/PWA #44454406103](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44454406103) 真 Chrome 離線／新分頁／更新測試成功。**V0.2 仍 NO-GO**：[Issue #12](https://github.com/kodlbegiko/taiwan-mahjong-trainer/issues/12) 的 iPhone Safari／Android Chrome 實機 PWA 與輔助使用技術驗收，及 [Issue #13](https://github.com/kodlbegiko/taiwan-mahjong-trainer/issues/13) 的 main Rulesets 強制保護尚未完成；`package.json.version` 保留 `0.1.0`、無 `v0.2.0` Tag/Release。下文的 V0.1 與舊稽核描述屬已發布版本／歷史快照。
+
+
 [![Verify](https://img.shields.io/badge/status-MVP%20v0.1-2d6d5e)](#)
 
 一個開源、離線優先、不需要帳號或付費 API 的 **台灣 16 張麻將真人訓練平台**。

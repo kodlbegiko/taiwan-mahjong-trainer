@@ -1,5 +1,8 @@
 # Taiwan Mahjong Trainer — V0.2 整合計畫
 
+> **最新整合快照（2026-11-19）：** #10、#21、#22 均已逐個審查、通過相依驗證並合併；已驗證的整合候選與正式 main **Git Tree 完全相同**。第六輪紀錄與剩餘 Release Gate 見文末，舊 main SHA 是歷史稽核基準，不應當成今日 HEAD。
+
+
 > 建立：2026-11-19。此計畫與 `docs/API_CONTRACT.md` 在 `integration/v0.2-contracts` 建立；**不得把文件 PR 視為已整合五個功能 PR**。
 
 ## 基線與擁有權
@@ -104,3 +107,12 @@ Staging `808e245ec99ec7512a544ae6beac1ee77f4b40cb` 的 [Chromium CI #44359395885
 ## 第五輪測試 PR 與 staging 原子整合（2026-11-19）
 
 PR #15 原 head `b96b5ded38aeeb83fcd980048e495623ceba1d36` 針對舊修復前基準，原紅色 CI 為歷史紀錄。以當時 main `825332530407bd23fea94137ba9f2f8f43e9591d` 作 tree base，只取六個 tests/benchmark 檔案、排除過期 `tests/golden-scoring.test.js` 與過時文件，保留舊 head/new main 作 commit parents 並以 expected SHA 快轉 ref，**無 force push/production 修改**。新增常駐 10k mixed-family oracle，PR #15 HEAD `32bd48b14844458d53f7523e0fee2d5c87130215` [Verify #44444307232](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44444307232) SUCCESS 後才 squash merge main `067c8bbcc5026e542ae5b6688a7aceb5dd33e5b7`；main [Verify #44444529115](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44444529115) SUCCESS（82/81 pass/0 fail/0 TODO/1 skip）。Draft #10 以此 main tree＋四個獨立 integration/browser QA 檔案重建 staging，SHA `b62979a0cd2fec75451f37a4f5e594a0a7e820ea`，[Verify #44444678634](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44444678634) SUCCESS（88/87 pass/0 fail/0 TODO/1 skip），同 SHA [Chromium #44444678821](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44444678821) SUCCESS。Issue #12 與 #13 仍阻擋 V0.2 GO；新 main 合併後不得引用舊 SHA 的成功紀錄充當新 CI。
+
+
+## 第六輪：PR #10、#21、#22 的安全合併與獨立 Release Gate（2026-11-19）
+
+1. PR #10 當時 HEAD `48992bf614089ff421e45c9f01ebde5e7322075b`；確認只有四個 integration/Chromium QA 檔案，原 staging [Verify #44445809213](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44445809213) 與 [Browser #44445809209](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44445809209) SUCCESS 後解除 Draft、squash merge main `bd0759b945ad85fabb1333c435773cfbe2f74ac8`。主線 Verify #44453401006 success。
+2. PR #21 HEAD `8d2360490a4d1aca979d6b3f2692a9d15462a4f1`、PR #22 HEAD `662b52e245a1bc0c86f72af46ec62c05218da257` 各自仍是 Draft 時，分別有 Verify + 專用 Chrome/PWA SUCCESS。檔案路徑 11 與 6 不重疊；以 PR #10 合併後 main 作 base，**原封不動**取兩者 blob，組合 `integration/v0.2-release` `b4f6410b89302a6ef916f9bffb12ade9c4021b57`，開 Draft PR #23；沒有推改 AI 4/AI 5 分支。
+3. PR #23 真正的 [Verify #44453751858](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44453751858) success 94/93 pass/0 fail/0 TODO/1 skip、[AI4 browser #44453751914](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44453751914) success、[AI5 independent #44453751860](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44453751860) success。GitHub Actions checkout PR 合成測試 merge `749960f2d72c3a782777496ccd0e2393732dd893` 與 PR #23 HEAD 的 Git Tree 都是 `164a67e8915352034e3f293cc4e867dacb332785`，故程式碼快照完全一致。
+4. 審查後 PR #21 合併 `7903ab14ffda01da281e8023daf37db385323226`，合併後 [Verify #44454192502](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44454192502) success 91/90 pass/0 fail/1 skip；PR #22 合併 `745d89d5cf6f8754563660ede9c92b836048efae`，合併後 [main Verify #44454406093](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44454406093) success 94/93 pass/0 fail/0 TODO/1 skipped、[main Independent UI/PWA #44454406103](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44454406103) success，涵蓋獨立實際 Chrome/離線新分頁/SW 更新/v3 紀錄。**最終 main Git Tree 與 PR #23 經驗證 Git Tree 完全相同**，無超出先前已驗證版本的程式碼差異。
+5. PR #23 僅作合成整合稽核，已關閉 **未合併**，避免重複 PR merge。發布仍 NO-GO：#12 實機 iOS/Android 與輔助技術缺證據、#13 main rulesets 尚未啟用。管理員在 [Rulesets](https://github.com/kodlbegiko/taiwan-mahjong-trainer/settings/rules) 設定 Active main、require PR、required **Verify / test**、up-to-date、resolve conversations、no force-push/delete，並用故意失敗 PR 確認阻擋；AI5 Release workflow 具有 PR paths filter，除非保證每種 PR 都會執行，不宜設為無條件 required check。未有實測結果之前不能標為完成。

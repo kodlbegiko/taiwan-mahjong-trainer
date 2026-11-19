@@ -1,5 +1,8 @@
 # Taiwan Mahjong Trainer — 產品與工程藍圖
 
+> **最新開發狀態（第六輪，2026-11-19）：** 已完成 V0.2 UI／獨立 PWA QA 的**工程合併**，正式版本仍是 V0.1，V0.2 Release Gate = **NO-GO**（待實機、輔助技術及 main Ruleset 生效驗證）。請以文末第 14 節為本輪最新進度，早期「未接線」項目保留其歷史快照性質。
+
+
 > 狀態：規劃文件（2026-11-19）；已完成與計畫中功能必須分開標記。  
 > Repository: https://github.com/kodlbegiko/taiwan-mahjong-trainer
 
@@ -172,3 +175,14 @@
 - [x] 新必跑 10,000 題獨立 Oracle（6,000 uniform、2,000 constructed、2,000 adversarial quads），PR #15 HEAD `32bd48b14844458d53f7523e0fee2d5c87130215` Verify #44444307232 通過、main merge `067c8bbcc5026e542ae5b6688a7aceb5dd33e5b7`、main [Verify #44444529115](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44444529115) 82 total /81 pass/0 fail/0 TODO/1 skipped。
 - [x] Draft #10 精確 staging SHA `b62979a0cd2fec75451f37a4f5e594a0a7e820ea` [Verify #44444678634](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44444678634) 88/87 pass/0 fail/0 TODO/1 skipped，含兩套獨立 10k Oracle；[Chromium #44444678821](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44444678821) desktop 1440 / mobile emulator 390 PASS。
 - [ ] Issue #12 進階教學／新題型／v3 紀錄 UI／手機實機／離線 PWA，Issue #13 main branch ruleset，均未完成。未符合全部發布門檻前維持 **NO-GO**。
+
+
+## 14. 第六輪：已合併產品候選，但尚未發布（2026-11-19）
+
+- [x] [PR #10](https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/10) 測試基礎設施經審查後合併 `bd0759b945ad85fabb1333c435773cfbe2f74ac8`，合併後 [main Verify #44453401006](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44453401006) 成功（88/87 pass/0 fail/1 skipped）。
+- [x] [PR #21](https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/21) 三題型玩家 UI／教學／v3 紀錄／離線 SW 合併 `7903ab14ffda01da281e8023daf37db385323226`，其 [main Verify #44454192502](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44454192502) 成功（91/90 pass/0 fail/1 skipped）。
+- [x] [PR #22](https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/22) 獨立 Release Gate 合併 `745d89d5cf6f8754563660ede9c92b836048efae`；[main Verify #44454406093](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44454406093) 成功（94 tests / 93 pass / 0 fail / 0 TODO / 1 opt-in skip），[main Independent UI/PWA #44454406103](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44454406103) 完成桌面、手機模擬、離線新分頁作答、快取升版及 v3 記錄保留。
+- [x] 隔離 [PR #23](https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/23) 先以 11 個 UI／6 個獨立 QA 檔案組合 `b4f6410b89302a6ef916f9bffb12ade9c4021b57`，三項完整 CI 成功，且 Git Tree `164a67e8915352034e3f293cc4e867dacb332785` 與最終 main **完全相同**；已安全關閉 PR #23，未重複合併。
+- [ ] #12：iPhone Safari iOS 安裝/飛航冷啟動、Android Chrome PWA 安裝/恢復、VoiceOver/TalkBack 的實體裝置實測證據。
+- [ ] #13：在 GitHub 管理界面啟用 `main` Active Ruleset、強制 `Verify / test`、禁 force push/delete、實際用失敗 PR 驗證 enforcement。GitHub 讀取 `protected=false`、`rulesets=[]`。
+- [ ] 依所有 release gate 完成後才允許 `package.json.version=0.2.0`／tag／GitHub Release。此時保持 **NO-GO／version 0.1.0**。

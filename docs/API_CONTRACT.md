@@ -1,5 +1,8 @@
 # Taiwan Mahjong Trainer — 跨模組 API Contract（提案 v0.2）
 
+> **第六輪現況（2026-11-19）：** 原提案已在 main 工程整合，最新主線 `745d89d5cf6f8754563660ede9c92b836048efae`；新增 UI consumer 已接 `createExercise`、`gradeAnswer`、`explainDiscard`、v3 `DecisionRecord` 與本機封存，並經獨立 Chrome/PWA 驗收。**注意不是已發行 v0.2.0**；本文件原始提案及前期未完成說明為當時時間點之紀錄，見文末第 I 節。
+
+
 > 截止基準：2026-11-19；main `ff177b8e9dc59f3ad796f78d6dab9420ab677a7c`（v0.1）。
 > 本文件區分「目前已發布的 v0.1 行為」及「候選 PR 的 v0.2 介面」。在正式合併與跨模組回歸前，候選 API **不是 main 已交付功能**。
 > 相容性規則：函式名稱、參數順序、同步性、輸出欄位與異常語意必須保留；修復錯誤數值時要有版本與遷移決策。
@@ -99,3 +102,10 @@ PR #4 `a7836da22ce2f7dfa602b87b87bc7cf2eb47fb40` 經過相依 #1/#5/#3 同版整
 ## H. 第五輪 API/Scoring 契約稽核（2026-11-19）
 
 本輪 PR #15 **未更動正式 API、schema 或 scoringVersion**，只合併獨立測試與 Benchmark。公開同步呼叫簽名維持 V0.1 相容，Exercise schema v3、scoringVersion `efficiency-v2` 不變，歷史評分快照不可無聲重算。新混合分布 10k Oracle 在 main [Verify #44444529115](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44444529115) 與 staging [Verify #44444678634](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44444678634) 都通過；staging 還有另一項獨立 10k Oracle、Q-001/Q-002/I-003 全候選契約。**注意 Consumer 邊界：** `src/app.js` 仍只接 `generateHand/rankDiscards/gradeAnswer` 的 v1 何切流程，尚未接 `explainDiscard` 完整呈現、`tenpai/multi_wait` UI、v3 DecisionRecord 持久化。Chromium 390px 模擬不等於實機／離線安裝。
+
+
+## I. 第六輪已整合 UI Consumer 與版本相容性（2026-11-19）
+
+main `745d89d5cf6f8754563660ede9c92b836048efae` 已包含 PR #21 的 `src/app.js`，**實際接線** `createExercise({taskType:'discard'|'tenpai'|'multi_wait'})`、`gradeAnswer`／`explainDiscard`、`createDecisionRecord` 及 `createLocalTrainingStore`；捨牌教學對每一個候選的 shanten/kinds/copies/draws 與正式排名核對，並列最佳遵循同一 grade。聽牌/多面聽評分由正式 Exercise 的正確等待集合支援。產生的紀錄為 Exercise/DecisionRecord schema v3，scoringVersion `efficiency-v2`，使用 `tw-mahjong-trainer:archive:v3` 封存與正式 JSON **匯出**；原 `tw-mahjong-trainer:session:v1` 位元資料不覆寫。正式儲存模組可匯入但**沒有玩家可點擊的 JSON 匯入 UI**，不可宣稱已交付。
+
+PR #22 的獨立 Node 回歸測試與瀏覽器測試驗證完整快照、重複 ID/竄改評分拒絕、腐壞 JSON/儲存配額受限不毀壞既有檔案，以及 Chrome 實際下載和重載。[main Verify #44454406093](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44454406093) 成功（94/93 passed/0 failed/0 TODO/1 optional skipped）；[main Independent UI/PWA #44454406103](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44454406103) 同 SHA 成功。既有 V0.1 同步 API 仍通過回歸。**此為已合併的未發行候選**，不是 V0.2 GO。
