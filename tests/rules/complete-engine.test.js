@@ -195,7 +195,7 @@ test('R3-B minimal ScoringPolicy Golden positive and negative cases, zero-sum se
   const openSelfDraw=scoreWinningHand(P,opened,{winnerSeat:1,sourceSeat:1,via:'self-draw',dealerSeat:0});
   assert.equal(openSelfDraw.tai,1);
   const payments=settleWin(P,selfDraw,{winnerSeat:1,sourceSeat:1,via:'self-draw',dealerSeat:0});
-  assert.deepEqual(payments.delta,[-180,520,-160,-180+20]); // replace with exact below
+  assert.deepEqual(payments.delta,[-180,500,-160,-160]);
   assert.equal(payments.delta.reduce((x,y)=>x+y,0),0);
   const ron=settleWin(P,concealedRon,{winnerSeat:1,sourceSeat:2,via:'discard',dealerSeat:0});
   assert.deepEqual(ron.delta,[0,120,-120,0]);
