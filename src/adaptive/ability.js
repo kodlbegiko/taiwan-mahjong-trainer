@@ -63,10 +63,18 @@ export function buildAbilityProfile({
   const buckets = new Map([...byTag.keys()].sort().map(tagId => [tagId, {
     tagId, attempts: 0, correct: 0, scoreSum: 0, totalDuration: 0,
     evidenceRefs: [], questionIds: new Set(), practiceAttempts: 0,
-    assessmentAttempts: 0, assessmentQuestionIds: new Set(),
+    assessmentAttempts: 0, unseenAssessmentAttempts: 0,
+    contaminatedAssessmentAttempts: 0, assessmentQuestionIds: new Set(),
   }]));
+  const seenPracticeQuestions = new Set(), seenAssessmentQuestions = new Set();
   for (const entry of normalized) {
     const ref = makeRecordRef(entry.kind, entry.record);
+    const questionKey = entry.kind === 'academy-v1'
+      ? entry.record.questionRef.questionId + '@' + entry.record.questionRef.questionVersion
+      : entry.record.exerciseId + '@legacy-exercise-v3';
+    const isAssessment = assessment.has(recordKey(ref));
+    const trulyUnseen = isAssessment && !seenPracticeQuestions.has(questionKey) &&
+      !seenAssessmentQuestions.has(questionKey);
     const tags = mappedTags(entry, registry, byTag);
     for (const tagId of tags) {
       const bucket = buckets.get(tagId);
@@ -77,11 +85,15 @@ export function buildAbilityProfile({
       bucket.evidenceRefs.push(ref);
       const questionId = entry.kind === 'academy-v1' ? entry.record.questionRef.questionId : entry.record.exerciseId;
       bucket.questionIds.add(questionId);
-      if (assessment.has(recordKey(ref))) {
+      if (isAssessment) {
         bucket.assessmentAttempts++;
+        if (trulyUnseen) bucket.unseenAssessmentAttempts++;
+        else bucket.contaminatedAssessmentAttempts++;
         bucket.assessmentQuestionIds.add(questionId);
       } else bucket.practiceAttempts++;
     }
+    if (isAssessment) seenAssessmentQuestions.add(questionKey);
+    else seenPracticeQuestions.add(questionKey);
   }
   const skills = [...buckets.values()].map(bucket => {
     const n = bucket.attempts;
@@ -107,7 +119,10 @@ export function buildAbilityProfile({
       unmappedRecordCount: normalized.filter(x => mappedTags(x, registry, byTag).length === 0).length,
       skillBreakdown: [...buckets.values()].map(b => ({
         tagId: b.tagId, practiceAttempts: b.practiceAttempts,
-        assessmentAttempts: b.assessmentAttempts, uniqueQuestionCount: b.questionIds.size,
+        assessmentAttempts: b.assessmentAttempts,
+        unseenAssessmentAttempts: b.unseenAssessmentAttempts,
+        contaminatedAssessmentAttempts: b.contaminatedAssessmentAttempts,
+        uniqueQuestionCount: b.questionIds.size,
         assessmentQuestionCount: b.assessmentQuestionIds.size, humanCalibrated: false,
       })),
     } },
