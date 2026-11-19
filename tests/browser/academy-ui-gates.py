@@ -65,9 +65,9 @@ def run(output):
             page.reload(wait_until='networkidle')
             page.locator('[data-academy-nav="training"]').click()
             require(page.locator('#hand button[data-tile]').count()==17,'legacy training missing after reload')
-            page.evaluate("document.querySelector('#hand button[data-tile]').click()")
-            # The legacy v3 replay workflow is independently covered by the V0.2 gate.
-            page.locator('#skip').click()
+            page.locator('#hand button[data-tile]').first.click()
+            # Legacy v3 modes are independently verified; next is enabled after grading.
+            page.locator('#next').click()
             require(page.locator('#hand button[data-tile]').count()==17,'old exercise not replayed')
             page.locator('#hand button[data-tile]').first.click()
             data=page.evaluate("JSON.parse(localStorage.getItem('tw-mahjong-trainer:archive:v3'))")
