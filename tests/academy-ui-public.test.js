@@ -53,3 +53,39 @@ test('Unverified PlayerView fixture has no legal moves or opponent secrets',()=>
   tampered.opponents[0].concealed=['t:0:0'];
   assert.throws(()=>projectScenarioForUI(tampered),/PlayerView/);
 });
+
+
+test('Official UI bridge uses strict public Q shape and fails closed on answer keys', async ()=>{
+  const {createAcademyBridge,ACADEMY_CONTRACT}=await import('../src/academy-ui/academy-bridge.js');
+  const fakeStorage=new Map();
+  const storage={getItem:k=>fakeStorage.get(k)??null,setItem:(k,v)=>fakeStorage.set(k,v)};
+  const lesson={schemaVersion:1,contractVersion:ACADEMY_CONTRACT,lessonId:'academy-l1-01',
+    lessonVersion:'1.0.0',titleZhTW:'正式介面測試',objectives:['test'],
+    prerequisiteLessonIds:[],questionRefs:[{questionId:'academy-q-001',questionVersion:'1.0.0'}],
+    contentBlocks:[],status:'published'};
+  const q={schemaVersion:1,contractVersion:ACADEMY_CONTRACT,questionId:'academy-q-001',
+    questionVersion:'1.0.0',status:'validated',taskType:'discard',
+    prompt:{legacyHand:[...Array(17)].map((_,i)=>i),options:['0','1'],visibleTiles:[]}};
+  let bad=false;
+  const source={contractVersion:ACADEMY_CONTRACT,getLessons:()=>[lesson],
+    getQuestionRefs:()=>lesson.questionRefs,
+    getPublicQuestion:()=>bad?{...q,answerKey:{acceptedTileTypes:[0]}}:q,
+    getDashboard:({asOf})=>({contractVersion:ACADEMY_CONTRACT,
+      profile:{schemaVersion:1,contractVersion:ACADEMY_CONTRACT,profileId:'fixture',
+        updatedAt:asOf,calibrationStatus:'uncalibrated',skills:[]},
+      reviewPlan:{schemaVersion:1,contractVersion:ACADEMY_CONTRACT,planId:'fixture',
+        settings:{timezone:'Asia/Taipei'},items:[]}}),
+    submitStructuralAnswer:()=>{throw new Error('test-only no grade')},
+  };
+  const bridge=createAcademyBridge(source,storage,{fixtureOnly:true});
+  assert.equal(bridge.lessons.length,1);
+  bad=true;
+  assert.throws(()=>bridge.startLesson(lesson.lessonId),/QuestionPublic/);
+  bad=false;
+  const publicQ=bridge.startLesson(lesson.lessonId);
+  assert.equal(Object.hasOwn(publicQ,'answerKey'),false);
+  assert.deepEqual(bridge.select(0),[0]);
+  assert.equal(bridge.submit(),null);
+  assert.equal(bridge.phase,'failed');
+  assert.equal(bridge.result,null);
+});
