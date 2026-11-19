@@ -62,6 +62,12 @@ test('R3 Profile V1 is explicit experimental, 144 physical unique tiles and no v
   const deck=createDeck(P);
   assert.equal(deck.length,144);
   assert.equal(new Set(deck).size,144);
+  const unsupported=cloned(P);
+  unsupported.extensions.tw16.robAddedKong=true;
+  assert.throws(()=>validateRuleProfile(unsupported),/experimental table policy/);
+  const unversioned=cloned(P);
+  unversioned.ruleVersion='unreviewed-change';
+  assert.throws(()=>validateRuleProfile(unversioned),/experimental table policy/);
   assert.equal(deck.filter(id=>parsePhysicalTileId(id).kind==='flower').length,8);
 });
 
@@ -196,6 +202,9 @@ test('R3-B minimal ScoringPolicy Golden positive and negative cases, zero-sum se
   assert.equal(openSelfDraw.tai,1);
   const payments=settleWin(P,selfDraw,{winnerSeat:1,sourceSeat:1,via:'self-draw',dealerSeat:0});
   assert.deepEqual(payments.delta,[-180,500,-160,-160]);
+  assert.throws(()=>settleWin(P,selfDraw,{
+    winnerSeat:1,sourceSeat:2,via:'discard',dealerSeat:0,
+  }),/Missing scored winning hand/);
   assert.equal(payments.delta.reduce((x,y)=>x+y,0),0);
   const ron=settleWin(P,concealedRon,{winnerSeat:1,sourceSeat:2,via:'discard',dealerSeat:0});
   assert.deepEqual(ron.delta,[0,120,-120,0]);
