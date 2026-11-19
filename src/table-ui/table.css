@@ -108,14 +108,17 @@ body[data-table-view="replay"] .roadmap { display: none !important; }
   .table-felt strong { font-size:16px; }
   .table-felt span, .table-felt small { font-size:10px; }
   .table-river { grid-template-columns:repeat(4,minmax(0,1fr)); }
-  .table-hand { grid-template-columns:repeat(8,minmax(0,1fr)); gap:5px 4px; }
+  .table-hand { grid-template-columns:repeat(7,minmax(0,1fr)); gap:5px 4px; }
   .table-hand .table-tile { min-height:52px; }
   .table-self, .table-actions { padding:10px; }
   .table-meld .table-tile { width:15px; min-height:23px; }
   .table-facts span { font-size:11px; padding:5px 7px; }
 }
-@media(max-width:359px) {
+@media(max-width:375px) {
   .table-hand { grid-template-columns:repeat(6,minmax(0,1fr)); }
+}
+@media(max-width:359px) {
+  .table-hand { grid-template-columns:repeat(5,minmax(0,1fr)); }
   .table-grid { grid-template-columns:minmax(0,1fr) minmax(0,1.1fr) minmax(0,1fr); }
 }
 @media(prefers-reduced-motion: reduce) {
