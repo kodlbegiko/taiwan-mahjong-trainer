@@ -301,3 +301,30 @@ test('Academy write refuses missing/modified immutable question snapshots', () =
   }, { asOf: clock }), /Conflicting immutable/);
   assert.equal(store.load().academyQuestions.length, 1);
 });
+
+test('held-out unseen questions are excluded from practice and review, not invented as sessions', () => {
+  const reservedQuestionRefs = [{ questionId: exercise.id, questionVersion: 'legacy-exercise-v3' }];
+  const profile = makeProfile();
+  const plan = buildReviewPlan({ profile, records: entries, asOf: clock, reservedQuestionRefs });
+  assert(plan.items[0].reasonCodes.includes('unavailable:held-out'));
+  assert.equal(getTodayRecommendation(profile, plan, clock).dueQuestions.length, 0);
+  assert.equal(buildAnswerableCatalog({ records: entries, reservedQuestionRefs }).length, 0);
+  const schedule = planDailyTraining({
+    profile, reviewPlan: plan, records: entries, reservedQuestionRefs,
+    minutes: 10, asOf: clock, seed: 'hold-out', ruleRef,
+  });
+  assert.equal(schedule.availableQuestionCount, 0);
+  assert.deepEqual(schedule.session.questionRefs, []);
+  assert.equal(schedule.session.extensions['adaptive.plan'].unallocatedMinutes, 10);
+});
+test('assessment provenance distinguishes first unseen test from practiced/repeated question', () => {
+  const profile = buildAbilityProfile({
+    records: entries, registry, asOf: clock,
+    assessmentRefs: [{ kind: 'legacy-v3', id: bad.id }],
+  });
+  const evidence = profile.extensions['adaptive.evidence'].skillBreakdown[0];
+  assert.equal(evidence.practiceAttempts, 1);
+  assert.equal(evidence.assessmentAttempts, 1);
+  assert.equal(evidence.unseenAssessmentAttempts, 0);
+  assert.equal(evidence.contaminatedAssessmentAttempts, 1);
+});
