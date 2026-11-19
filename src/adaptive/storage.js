@@ -131,7 +131,19 @@ export function createAcademyStore(storage, {
     if (!(state.provenanceLinks?.length)) return true;
     const { archive, hasCanonicalV3 } = readLegacy();
     if (!hasCanonicalV3) throw new AcademyStorageError('ORPHAN_PROVENANCE', 'Missing canonical archive:v3');
-    return validateProvenanceLinks(state.provenanceLinks, archive.records.filter(r => r.schemaVersion === 3));
+    const records = archive.records.filter(r => r.schemaVersion === 3);
+    validateProvenanceLinks(state.provenanceLinks, records);
+    // An unavailable historical version remains frozen and unscorable; an
+    // available official source that DISAGREES is corruption and must be denied.
+    if (learning) for (const link of state.provenanceLinks) {
+      let question;
+      try { question = learning.toPublicQuestion(link.academyQuestionRef); }
+      catch { continue; } // retired/missing version: reviewed as unavailable
+      if (question == null) continue;
+      const record = records.find(r => r.id === link.recordRef.id);
+      validateLearningProvenance(link, record, learning);
+    }
+    return true;
   }
   function loadStatus() {
     try { return { ok: true, durable: present, state: load() }; }
@@ -274,6 +286,19 @@ export function createAcademyStore(storage, {
     }
     const link = createLearningProvenance({ record: stored, recordRef, academyQuestionRef, learning, sessionId });
     let state = load();
+    if (sessionId) {
+      const session = state.trainingSessions.find(s => s.sessionId === sessionId);
+      if (!session || !session.questionRefs.some(q =>
+        canonicalJson(q) === canonicalJson(link.academyQuestionRef)) ||
+        ['completed', 'aborted'].includes(session.status)) {
+        throw new RangeError('Provenance cannot claim an invalid or terminal TrainingSession');
+      }
+      if ((state.provenanceLinks ?? []).some(p => p.sessionId === sessionId &&
+        canonicalJson(p.academyQuestionRef) === canonicalJson(link.academyQuestionRef) &&
+        p.recordRef.id !== link.recordRef.id)) {
+        throw new RangeError('Duplicate Academy question submission in session');
+      }
+    }
     const links = state.provenanceLinks ?? [];
     const previous = links.find(p => p.recordRef.kind === recordRef.kind && p.recordRef.id === recordRef.id);
     if (previous && canonicalJson(previous) !== canonicalJson(link)) {
@@ -318,6 +343,23 @@ export function createAcademyStore(storage, {
     ]);
     if (!Array.isArray(session.recordRefs) || session.recordRefs.some(ref =>
       !validRefs.has(ref.kind + ':' + ref.id))) throw new RangeError('Session references a non-persisted record');
+    const usedQuestions = new Set();
+    for (const ref of session.recordRefs) {
+      const p = (state.provenanceLinks ?? []).find(link =>
+        link.recordRef.kind === ref.kind && link.recordRef.id === ref.id);
+      const qref = p?.academyQuestionRef ??
+        (ref.kind === 'legacy-v3'
+          ? { questionId: legacy.archive.records.find(r => r.id === ref.id)?.exerciseId,
+            questionVersion: 'legacy-exercise-v3' } : null);
+      if (!qref || !session.questionRefs.some(q => canonicalJson(q) === canonicalJson(qref))) {
+        throw new RangeError('Session RecordRef is unrelated to planned question');
+      }
+      const qkey = qref.questionId + '@' + qref.questionVersion;
+      if (usedQuestions.has(qkey)) throw new RangeError('Session has duplicate submitted question');
+      usedQuestions.add(qkey);
+      if (p?.sessionId && p.sessionId !== session.sessionId)
+        throw new RangeError('RecordRef provenance belongs to another Session');
+    }
     const sessions = state.trainingSessions.filter(s => s.sessionId !== session.sessionId);
     const previous = state.trainingSessions.find(s => s.sessionId === session.sessionId);
     if (previous) {
