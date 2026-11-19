@@ -118,6 +118,7 @@ function onClick(event) {
       lastError = '動作已過期，請重新選牌。'; selection = null;
     } else { selection = selection === actionId ? null : actionId; lastError = ''; }
     draw();
+    if (selection) root.querySelector('[data-submit-action]')?.focus({ preventScroll: true });
     return;
   }
   if (button.hasAttribute('data-clear-selection')) { selection = null; draw(); return; }
