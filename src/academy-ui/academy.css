@@ -120,3 +120,36 @@ body[data-academy-page=training] #main > .roadmap{display:none}
 @media(prefers-reduced-motion:reduce){
   html{scroll-behavior:auto!important}
 }
+
+/* Official Lesson/Question interaction, shared 34 original SVGs. */
+.academy-level-stack{display:grid;gap:18px;min-width:0}
+.academy-level h2{font-size:17px;color:var(--gold);margin:0 0 8px}
+.academy-level-lessons{display:grid;gap:7px}
+.academy-live-hand{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:6px;margin:12px 0 20px;max-width:720px}
+.academy-hand-tile.tile{width:100%;min-height:0;aspect-ratio:.72;pointer-events:none}
+.academy-choice-grid{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:9px 6px;margin:15px 0}
+.academy-choice-grid .tile{min-height:60px;aspect-ratio:.72}
+.academy-choice-grid .tile[aria-pressed=true]{outline:3px solid var(--gold);outline-offset:1px}
+.academy-success{color:#b9efcb;font-weight:750;padding:12px 0}
+#academy-question{margin-top:18px;scroll-margin-top:20px}
+#academy-question h3{font-size:16px;margin:15px 0 7px}
+#academy-question .academy-action{margin:7px 7px 7px 0}
+#academy-grade{margin-top:18px}
+.academy-lesson-pick{min-width:0}
+.academy-lesson-pick:focus-visible,.academy-choice-grid button:focus-visible{outline:3px solid var(--gold);outline-offset:3px}
+@media(min-width:1200px){.academy-live-hand{grid-template-columns:repeat(17,minmax(0,1fr))}.academy-choice-grid{grid-template-columns:repeat(12,minmax(0,1fr))}}
+@media(max-width:640px){
+  .academy-nav{position:fixed;bottom:0;left:0;right:0;z-index:30;gap:4px;
+    background:#102e2a;box-shadow:0 -3px 16px #0008;border-top:1px solid #698276;
+    padding:6px max(12px,env(safe-area-inset-left,0px))
+      max(8px,env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-right,0px))}
+  body{padding-bottom:calc(76px + env(safe-area-inset-bottom,0px))}
+  .academy-live-hand{grid-template-columns:repeat(8,minmax(0,1fr));gap:5px}
+  .academy-choice-grid{grid-template-columns:repeat(7,minmax(0,1fr));gap:7px 4px}
+  .academy-choice-grid .tile{min-height:51px}
+  .academy-page{scroll-margin-bottom:85px}
+}
+@media(max-width:359px){
+  .academy-live-hand{grid-template-columns:repeat(7,minmax(0,1fr))}
+  .academy-choice-grid{grid-template-columns:repeat(6,minmax(0,1fr))}
+}

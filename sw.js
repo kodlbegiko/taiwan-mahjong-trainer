@@ -1,7 +1,7 @@
 /* Offline-first, atomic shell for GitHub Pages root or /repo/ deployments.
  * IMPORTANT: change CACHE_VERSION whenever any precached file changes.
  * The install event only succeeds if the entire listed release is cached. */
-const CACHE_VERSION = 'tmt-v02-realistic-tiles-academy-ui-20261119-r2';
+const CACHE_VERSION = 'tmt-v02-realistic-tiles-academy-learning-20261119-r3';
 const SHELL_CACHE = `tmt-shell-${CACHE_VERSION}`;
 const BASE = new URL('./', self.location.href);
 const SHELL = [
@@ -45,6 +45,7 @@ const SHELL = [
   './src/tile-visuals.js', './src/app.js', './src/tiles.js', './src/practice.js', './src/shanten.js',
   './src/academy-ui/main.js', './src/academy-ui/academy.css',
   './src/academy-ui/public-facade.js', './src/academy-ui/scenario.js',
+  './src/academy-ui/academy-bridge.js', './src/academy-ui/academy-live.js',
   './src/core/efficiency.js', './src/analysis/explain.js',
   './src/training/exercises.js', './src/training/waits.js',
   './src/training/random.js', './src/training/records.js',
