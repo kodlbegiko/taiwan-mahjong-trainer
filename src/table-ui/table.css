@@ -52,6 +52,11 @@ body[data-table-view="replay"] .roadmap { display: none !important; }
 .table-river { display: grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:2px; align-content:start;
   min-width:0; margin-top:8px; }
 .table-river .table-tile { width:100%; min-height:0; aspect-ratio:.72; padding:0; border-bottom-width:2px; }
+.table-river > .table-quiet { grid-column:1 / -1; white-space:nowrap; }
+.table-history-grid { margin: 12px 0; }
+.table-replay-self, .table-round-summary { padding:12px; margin:12px 0; border:1px solid #648778; border-radius:12px; background:#21443d; }
+.table-replay-self h3, .table-round-summary h2 { font-size:15px; margin:0 0 8px; }
+.table-round-summary p, .table-settlements p { margin: 5px 0; }
 .table-melds { display:flex; flex-wrap:wrap; align-items:center; gap:2px; min-width:0; margin-top:5px; }
 .table-meld { display:flex; max-width:100%; gap:2px; }
 .table-meld .table-tile { width:22px; min-height:33px; border-bottom-width:2px; }
