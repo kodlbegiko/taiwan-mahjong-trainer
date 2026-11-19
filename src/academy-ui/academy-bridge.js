@@ -33,7 +33,10 @@ function recordProof(storage,id) {
   if(typeof raw!=='string') return null;
   const verified=importTrainingJSON(raw);
   const actual=verified.records.find(x=>x.schemaVersion===3&&x.id===id);
-  return actual ? {id:actual.id,exerciseId:actual.exerciseId,taskType:actual.taskType} : null;
+  return actual ? {id:actual.id,exerciseId:actual.exerciseId,taskType:actual.taskType,
+    hand:actual.exerciseSnapshot.hand,visibleTiles:actual.exerciseSnapshot.visibleTiles,
+    seed:actual.exerciseSnapshot.seed,index:actual.exerciseSnapshot.index,
+    generatorVersion:actual.exerciseSnapshot.generatorVersion} : null;
 }
 function readLinks(storage){
   if(!storage||typeof storage.getItem!=='function') throw new Error('本機儲存不可使用');
@@ -72,6 +75,24 @@ function assertPublicQuestion(q,ref) {
   visit(q);
   return { ...clone(q), prompt:{...clone(q.prompt),options:numbers}};
 }
+/** UI-owned linkage is not trusted evidence until it matches both a v3 raw
+ * record AND AI3's public immutable question projection. */
+function provenLessonLink(facade,storage,link,lessons){
+  try {
+    const record=recordProof(storage,link.recordRef.id);
+    const ref={questionId:link.questionId,questionVersion:link.questionVersion};
+    const publicQ=assertPublicQuestion(facade.getPublicQuestion(ref),ref);
+    const lesson=lessons.find(x=>x.lessonId===link.lessonId);
+    if(!record||!lesson||!lesson.questionRefs.some(x=>key(x)===key(ref))) return false;
+    if(publicQ.lessonRef?.lessonId!==link.lessonId||publicQ.taskType!==record.taskType) return false;
+    if(JSON.stringify(publicQ.prompt.legacyHand)!==JSON.stringify(record.hand)||
+       JSON.stringify(publicQ.prompt.visibleTiles??[])!==JSON.stringify(record.visibleTiles)) return false;
+    if(publicQ.generator && (publicQ.generator.seed!==record.seed||
+       publicQ.generator.index!==record.index||
+       publicQ.generator.generatorVersion!==record.generatorVersion)) return false;
+    return true;
+  }catch{return false;}
+}
 /** Use only the source contract's public methods, never internal grading imports. */
 export function createAcademyBridge(facade,storage,{now=()=>new Date().toISOString(),fixtureOnly=false}={}){
   assert(facade&&facade.contractVersion===ACADEMY_CONTRACT,'整合 Façade 契約版本不符');
@@ -93,6 +114,7 @@ export function createAcademyBridge(facade,storage,{now=()=>new Date().toISOStri
         &&this.dashboard.reviewPlan?.contractVersion===ACADEMY_CONTRACT,'Adaptive 公開資料未就緒');
       this.session=typeof facade.getTrainingSession==='function'?clone(facade.getTrainingSession({asOf})):null;
       this.links=readLinks(storage);
+      this.links.links=this.links.links.filter(link=>provenLessonLink(facade,storage,link,this.lessons));
       if(this.selectedLessonId===null) this.selectedLessonId=this.links.selectedLessonId;
       return this;
     },
@@ -176,6 +198,10 @@ export function createAcademyBridge(facade,storage,{now=()=>new Date().toISOStri
       }
       try{this.refresh();}catch(e){
         this.phase='partial';this.warning='作答已保存，但能力與複習資料無法確認：'+e.message;
+        return result;
+      }
+      if(!this.links.links.some(link=>link.recordRef.id===result.recordRef.id)){
+        this.phase='partial';this.warning='紀錄雖已持久化，但課程題目與官方來源無法核對；不計入完成度。';
         return result;
       }
       this.phase='saved';this.warning=null;
