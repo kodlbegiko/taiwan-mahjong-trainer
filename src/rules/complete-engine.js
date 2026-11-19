@@ -32,6 +32,17 @@ function profileFor(ref){
     ||p.turnPolicy.replacementDraw!=='configured'
     ||p.winningPolicy.mode!=='configured'||p.scoringPolicy.mode!=='configured'
     ||!p.extensions?.tw16)throw new RangeError('Unsupported experimental complete table profile');
+  const c=p.extensions.tw16;
+  // Refuse unsupported or contradictory policy variants rather than silently
+  // behaving as if they had passed Goldens for another table.
+  if(!Array.isArray(c.claimOrder)||c.claimOrder.join(',')!=='win,kong,pong,chi'||
+    c.singleWinner!==true||c.chiFromPreviousSeatOnly!==true||
+    c.robAddedKong!==false||c.passWinLock!=='until-own-discard'||
+    c.replacementFromTail!==true||!Number.isInteger(c.reserveTail)||
+    c.reserveTail<0||c.reserveTail>32||
+    !Array.isArray(c.specialHands)||c.specialHands.length>0||
+    c.dealerRetentionOnDraw!==true)
+    throw new RangeError('Unsupported or contradictory experimental table policy');
   return p;
 }
 const policyOf=state=>profileFor(state.ruleRef).extensions.tw16;
@@ -226,7 +237,7 @@ function registerWin(state,winnerSeat,sourceSeat,via,tileId,actionId){
 function resolveClaim(state,triggerActionId){
   const w=ext(state).window;
   if(w.decisions.length!==3)return;
-  const priority={win:0,kong:1,pong:2,chi:3,pass:9};
+  const priority={...Object.fromEntries(policyOf(state).claimOrder.map((kind,index)=>[kind,index])),pass:9};
   const choices=w.decisions.filter(d=>d.kind!=='pass').sort((a,b)=>
     priority[a.kind]-priority[b.kind]||
     ((a.seat-w.fromSeat+4)%4)-((b.seat-w.fromSeat+4)%4));
