@@ -5,7 +5,7 @@ import { createDecisionRecord } from '../../src/training/records.js';
 import { createLocalTrainingStore } from '../../src/storage/local.js';
 import { ARCHIVE_STORAGE_KEY, LEGACY_SESSION_KEY } from '../../src/storage/archive.js';
 import {
-  V1, ACADEMY_STORAGE_KEY, createAdaptiveLearningAdapter, createLearningProvenance,
+  V1, ACADEMY_STORAGE_KEY, createAcademyStore, createAdaptiveLearningAdapter, createLearningProvenance,
   validateLearningProvenance, validateProvenanceShape,
   buildAbilityProfile, buildReviewPlan, planDailyTraining,
 } from '../../src/adaptive/index.js';
@@ -200,16 +200,18 @@ test('wrong Academy question version/seed and an unauthenticated lookup are refu
 });
 test('raw canonical record survives provenance QuotaExceeded; retry links without duplicate score', () => {
   const storage = backing();
-  storage.onAcademyWrite(1);
+  storage.onAcademyWrite(2); // prepared intent succeeds, canonical v3 appends, final sidecar fails
   const first = submit(setup(storage));
   assert.equal(first.durable, true);
   assert.equal(first.provenanceDurable, false);
   assert.equal(first.errorCode, 'WRITE_DENIED');
   assert.equal(storage.map.has(ARCHIVE_STORAGE_KEY), true);
-  assert.equal(storage.map.has(ACADEMY_STORAGE_KEY), false);
+  assert.equal(storage.map.has(ACADEMY_STORAGE_KEY), true);
+  assert.equal(setup(storage).load().pendingProvenance.length, 1);
+  assert.equal(setup(storage).load().provenanceLinks.length, 0);
   storage.onAcademyWrite(-1);
-  const recovered = submit(setup(storage));
-  assert.equal(recovered.provenanceDurable, true);
+  const recovered = setup(storage).rebuild({ asOf: at });
+  assert.equal(recovered.pendingRecovery.results[0].recovered, true);
   const state = setup(storage).load();
   assert.equal(state.provenanceLinks.length, 1);
   assert.equal(state.abilityProfile.skills.find(x=>x.tagId==='waits.enumeration').attempts, 1);
@@ -217,7 +219,7 @@ test('raw canonical record survives provenance QuotaExceeded; retry links withou
 });
 test('interrupted derived update leaves validated provenance and correct rebuild after restart', () => {
   const storage = backing();
-  storage.onAcademyWrite(2); // provenance write succeeds; derived snapshot write fails.
+  storage.onAcademyWrite(3); // intent + provenance succeed; derived snapshot write fails.
   const answer = submit(setup(storage));
   assert.equal(answer.durable, true);
   assert.equal(answer.provenanceDurable, true);
@@ -234,7 +236,7 @@ test('interrupted Session write after canonical/provenance/derived is reconciled
   const storage = backing();
   const first = setup(storage);
   first.saveSession(session());
-  storage.onAcademyWrite(3);
+  storage.onAcademyWrite(4); // prepared, provenance, profile then interrupted Session write
   const answer = submit(first, { sessionId: 'academy-session-fixture' });
   assert.equal(answer.provenanceDurable, true);
   assert.equal(answer.derivedFresh, true);
@@ -296,4 +298,60 @@ test('Academy-linked reviews provide replay-safe TrainingSession questionRefs an
   const saved = a.saveSession(planned.session);
   assert.equal(saved.durable, true);
   assert.deepEqual(setup(storage).getSession(planned.session.sessionId).questionRefs, [ref]);
+});
+
+test('crash after canonical v3 append before provenance finalize is repaired without UI state', () => {
+  const storage = backing();
+  const learning = fixtureLearning();
+  const canonical = createDecisionRecord(ex, ex.answer.expectedTiles, {
+    timestamp, durationMs: 400, attemptId: 'prepared-crash-attempt',
+  });
+  const recordRef = { kind: 'legacy-v3', id: canonical.id };
+  const sidecar = createAcademyStore(storage, { registry, learning });
+  const pre = sidecar.prepareLearningProvenance({
+    recordRef, record: canonical, academyQuestionRef: ref,
+  });
+  assert.equal(pre.durable, true);
+  assert.equal(sidecar.load().pendingProvenance.length, 1);
+  assert.equal(sidecar.load().provenanceLinks.length, 0);
+  const saved = createLocalTrainingStore(storage).addDecision(ex, ex.answer.expectedTiles, {
+    timestamp, durationMs: 400, attemptId: 'prepared-crash-attempt',
+  });
+  assert.deepEqual(saved, canonical);
+  const oldBytes = storage.getItem(ARCHIVE_STORAGE_KEY);
+  // Simulate a completely fresh browser start: no in-memory link or callback state.
+  const reloaded = setup(storage);
+  const result = reloaded.rebuild({ asOf: at });
+  assert.equal(result.pendingRecovery.results[0].recovered, true);
+  assert.equal(result.pendingRecovery.remaining, 0);
+  assert.equal(reloaded.load().provenanceLinks.length, 1);
+  assert.equal(reloaded.load().pendingProvenance.length, 0);
+  const item = result.reviewPlan.items.find(q=>q.questionId===ref.questionId);
+  assert.equal(reloaded.resolveReviewQuestion(item).lesson.lessonId, lessonRef.lessonId);
+  assert.equal(storage.getItem(ARCHIVE_STORAGE_KEY), oldBytes);
+});
+test('pending intent without a durable canonical record is never counted or fabricated', () => {
+  const storage = backing();
+  const raw = createDecisionRecord(ex, ex.answer.expectedTiles, {
+    timestamp, durationMs: 400, attemptId: 'pending-without-record',
+  });
+  const draft = createAcademyStore(storage, { registry, learning: fixtureLearning() });
+  draft.prepareLearningProvenance({ recordRef:{kind:'legacy-v3',id:raw.id},
+    record:raw, academyQuestionRef:ref });
+  const restart = setup(storage);
+  const rebuilt = restart.rebuild({ asOf: at });
+  assert.equal(rebuilt.pendingRecovery.results[0].errorCode, 'AWAIT_CANONICAL');
+  assert.equal(restart.load().pendingProvenance.length, 1);
+  assert.equal(restart.load().provenanceLinks.length, 0);
+  assert.equal(rebuilt.profile.skills.find(s=>s.tagId==='waits.enumeration').attempts, 0);
+  assert.equal(storage.getItem(ARCHIVE_STORAGE_KEY), null);
+});
+test('no quota space for intent prevents an unrecoverable canonical append', () => {
+  const storage = backing();
+  storage.onAcademyWrite(1);
+  const result = submit(setup(storage));
+  assert.equal(result.durable, false);
+  assert.equal(result.errorCode, 'WRITE_DENIED');
+  assert.equal(storage.map.has(ARCHIVE_STORAGE_KEY), false);
+  assert.equal(storage.map.has(ACADEMY_STORAGE_KEY), false);
 });
