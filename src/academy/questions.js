@@ -74,7 +74,7 @@ function explain(q,exercise,record,choice) {
     answerSummary='全部可和牌牌種：'+expected.map(name).join('、');
     primaryReason='對 16 張手牌逐一加入可用牌種，使用獨立五面子一將眼和牌判定。'+
       '本題共有 '+expected.length+' 種和牌牌種，'+winning.reduce((s,x)=>s+x.copies,0)+' 張已知剩餘副本。';
-    alternatives=[...new Set([...choice,...expected])].sort((a,b)=>a-b).map(tile=>({
+    alternatives=[...new Set([...choice,...expected,...q.prompt.options.map(Number).filter(tile=>!expected.includes(tile)).slice(0,5)])].sort((a,b)=>a-b).map(tile=>({
       tile,label:name(tile),copies:winning.find(x=>x.tile===tile)?.copies??0,
       reason:expected.includes(tile)?'可完成合法五面子一將眼':'加入後仍不能完成合法五面子一將眼'
     }));
