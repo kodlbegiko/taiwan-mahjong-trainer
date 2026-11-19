@@ -162,7 +162,7 @@ function action(a, v) {
 function countVisible(v) {
   const hand = v.self.concealed.map(t => t.tileType);
   const seen = new Set(v.self.concealed.map(t => t.id));
-  const meldIds = new Set([...v.self,...v.opponents].flatMap(p=>p.melds.flatMap(m=>m.tileIds)));
+  const meldIds = new Set([v.self,...v.opponents].flatMap(p=>p.melds.flatMap(m=>m.tileIds)));
   const visible = [];
   const add = tileId => {
     if (seen.has(tileId)) throw new RangeError('相同 physical tileId 在多個實體區域重複出現');
