@@ -1,7 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
-  <title id="title">台麻練習所</title>
-  <rect width="512" height="512" rx="112" fill="#102c2b"/>
-  <rect x="106" y="82" width="300" height="348" rx="38" fill="#e7dfc5"/>
-  <path d="M150 154h212M152 355h208" stroke="#bfab7e" stroke-width="16" stroke-linecap="round"/>
-  <text x="256" y="312" text-anchor="middle" font-family="serif" font-size="172" font-weight="700" fill="#245348">麻</text>
-</svg>
