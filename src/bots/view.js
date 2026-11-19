@@ -72,6 +72,27 @@ function detached(input) {
   };
   return visit(input);
 }
+function checkPublicZones(p) {
+  for (const meld of p.melds) {
+    allow(meld,['kind','tileIds','open','sourceSeat','sourceEventId'],'meld');
+    required(['sequence','triplet','kong'].includes(meld.kind) &&
+      typeof meld.open==='boolean' && Array.isArray(meld.tileIds) &&
+      meld.tileIds.length===(meld.kind==='kong'?4:3) &&
+      meld.tileIds.every(id=>/^t:(?:[0-9]|[12][0-9]|3[0-3]):[0-3]$/.test(id)),
+      'public meld');
+  }
+  for (const river of p.river) {
+    allow(river,['tileId','seq','claimedByEventId'],'river');
+    required(typeof river.tileId==='string' &&
+      /^t:(?:[0-9]|[12][0-9]|3[0-3]):[0-3]$/.test(river.tileId) &&
+      Number.isInteger(river.seq), 'river physical tile');
+  }
+  for (const t of p.flowers) {
+    allow(t,['schemaVersion','contractVersion','id','kind',
+      'flowerCode','copyIndex'],'public flower');
+    required(validId(t)&&t.kind==='flower','public flower identity');
+  }
+}
 function replacementView(input) {
   const v = detached(input);
   allow(v,rootKeys,'root');allow(v.round,roundKeys,'round');
@@ -92,11 +113,17 @@ function replacementView(input) {
     Array.isArray(v.self.concealed) &&
     v.self.concealed.some(t=>t?.kind==='flower') &&
     v.self.concealed.every(validId), 'own physical tiles');
+  for(const t of v.self.concealed)
+    allow(t,t.kind==='flower'?
+      ['schemaVersion','contractVersion','id','kind','flowerCode','copyIndex']:
+      ['schemaVersion','contractVersion','id','kind','tileType','copyIndex'],
+      'own tile');
   const physicalIds = new Set(v.self.concealed.map(t=>t.id));
   required(physicalIds.size===v.self.concealed.length, 'duplicate own tile');
   required(Array.isArray(v.self.melds) && Array.isArray(v.self.river) &&
     Array.isArray(v.self.flowers) && v.self.flowers.every(validId),
     'self public zones');
+  checkPublicZones(v.self);
   required(Array.isArray(v.opponents) && v.opponents.length===3, 'opponents');
   const seats=new Set([v.audienceSeat]);
   for (const p of v.opponents) {
@@ -105,12 +132,14 @@ function replacementView(input) {
       Number.isInteger(p.concealedCount) && p.concealedCount>=0 &&
       Array.isArray(p.melds) && Array.isArray(p.river) &&
       Array.isArray(p.flowers) && !seats.has(p.seat), 'opponent redaction');
+    checkPublicZones(p);
     seats.add(p.seat);
   }
   required(Array.isArray(v.publicEvents), 'public events');
   for (const e of v.publicEvents) {
     allow(e,publicEventKeys,'event');
     allow(e.payload,publicPayloadKeys,'event payload');
+    allow(e.ruleRef,['profileId','ruleVersion'],'event ruleRef');
     required(e.visibility==='public' && e.gameId===v.gameId &&
       Number.isInteger(e.seq) && e.seq<=v.asOfEventSeq &&
       e.ruleRef?.profileId===v.ruleRef.profileId &&
