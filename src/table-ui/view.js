@@ -116,7 +116,7 @@ export function TableView(snapshot,{selection=null,busy=false,error='',botStatus
   const humanCanAct=actions.length>0;
   const ended=view.round.phase==='settled';
   const claim=view.round.phase==='claim_window';
-  const phaseLabel=ended?'本局已結束':humanCanAct?
+  const phaseLabel=snapshot.paused?'對局已暫停':ended?'本局已結束':humanCanAct?
     (claim?'請回應合法宣告':'輪到你'):botConnected?'等待三位 Bot':'等待 Bot API';
   return '<header class="table-heading"><div><span class="table-overline">EXPERIMENTAL / '+
     escapeHtml(profile.ruleVersion)+'</span><h1 id="table-heading" tabindex="-1">四人牌桌</h1>'+
@@ -140,7 +140,7 @@ export function TableView(snapshot,{selection=null,busy=false,error='',botStatus
     OpponentSeat(opponents.get(1),view.round.currentSeat,view.round.dealerSeat)+'</div>'+
     PlayerHand(view.self,actions,selection)+
     (ended?'<section class="table-actions"><h3>正式 Rules 已結算本局</h3></section>':
-      humanCanAct?ActionBar(actions,selection,busy):
+      humanCanAct?ActionBar(actions,selection,busy||snapshot.paused):
         '<section class="table-actions" aria-label="等待其他玩家"><h3>'+
         (botConnected?'三名 Bot 自動執行中':'Bot API 尚未連接')+'</h3><p>'+
         (botConnected?'請等待正式 Controller 的合法回合與宣告，不會跳過關鍵 Claim。':
@@ -154,7 +154,11 @@ export function TableView(snapshot,{selection=null,busy=false,error='',botStatus
         '此 Sandbox 不具正式胡牌計分能力。')+
     (replayConnected?' 已建立官方 Replay 歷史封存。':' 尚無完成的 Replay。')+'</p>'+
     RoundSummary(snapshot.result)+
-    '<div class="table-footer-controls"><button type="button" class="secondary" data-show-replay>'+
+    '<div class="table-footer-controls">'+
+    (botConnected&&!ended?'<button type="button" class="secondary" data-'+
+      (snapshot.paused?'resume-bots':'pause-bots')+'>'+
+      (snapshot.paused?'繼續 Bot／玩家':'暫停 Bot')+'</button>':'')+
+    '<button type="button" class="secondary" data-show-replay>'+
     '查看牌局複盤</button><button type="button" class="secondary" data-return-academy>返回課程學院</button></div>';
 }
 /**
