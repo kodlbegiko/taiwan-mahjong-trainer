@@ -51,6 +51,7 @@ const PRESETS = [
     scoringPolicy: { mode: 'configured', configRef: 'tw16-minimal-tai-v1' },
     extensions: { tw16: {
       housePolicyVersion: 'tw16-table-experimental/1.0.0',
+      startingPrevailingWind: 'east', windAdvancePolicy: 'explicit',
       claimOrder: ['win','kong','pong','chi'], singleWinner: true,
       chiFromPreviousSeatOnly: true,
       passWinLock: 'until-own-discard',
