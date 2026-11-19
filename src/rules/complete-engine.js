@@ -42,7 +42,8 @@ function profileFor(ref){
     c.replacementFromTail!==true||!Number.isInteger(c.reserveTail)||
     c.reserveTail<0||c.reserveTail>32||
     !Array.isArray(c.specialHands)||c.specialHands.length>0||
-    c.dealerRetentionOnDraw!==true)
+    c.dealerRetentionOnDraw!==true||
+    c.startingPrevailingWind!=='east'||c.windAdvancePolicy!=='explicit')
     throw new RangeError('Unsupported or contradictory experimental table policy');
   return p;
 }
@@ -114,7 +115,7 @@ function exhaustIfNeeded(state,triggerActionId){
 export function completeCreateGame({
   gameId='game-complete-1',seed,profileId='tw16-configurable-table',
   ruleVersion='experimental-full-v1',dealerSeat=0,fixtureDeck=null,
-  handIndex=0,previousRoundRef=null,
+  handIndex=0,previousRoundRef=null,prevailingWind=null,
 }={}){
   if(typeof gameId!=='string'||!/^[A-Za-z0-9_-]+$/.test(gameId))throw new TypeError('Invalid gameId');
   assertSeat(dealerSeat);
@@ -123,6 +124,9 @@ export function completeCreateGame({
     (typeof previousRoundRef.gameId!=='string'||!Number.isInteger(previousRoundRef.revision)||
     typeof previousRoundRef.roundId!=='string'))throw new RangeError('Invalid previousRoundRef');
   const profile=profileFor({profileId,ruleVersion});
+  const roundWind=prevailingWind??profile.extensions.tw16.startingPrevailingWind;
+  if(!['east','south','west','north'].includes(roundWind))
+    throw new RangeError('Invalid prevailing wind');
   const shuffled=shuffleDeck(createDeck(profile),seed),rng=shuffled.rng;
   if(fixtureDeck!==null){
     const inventory=new Set(createDeck(profile));
@@ -140,7 +144,8 @@ export function completeCreateGame({
   players[dealerSeat].concealed.push(tiles[index++]);
   const state={...V1,gameId,ruleRef:{profileId,ruleVersion},
     round:{...V1,roundId:gameId+'-round-'+handIndex,handIndex,dealerSeat,
-      currentSeat:dealerSeat,phase:'await_discard',lastPublicEventSeq:0},
+      currentSeat:dealerSeat,phase:'await_discard',lastPublicEventSeq:0,
+      prevailingWind:roundWind},
     players,wall:tiles.slice(index),events:[],rng,revision:0,
     extensions:{tw16:{initialFlowers:true,pendingReplacement:false,
       window:null,afterClaim:null,passLocks:[false,false,false,false],
@@ -399,6 +404,7 @@ export function completeReplayGame(config){
     fixtureDeck:config.events[0]?.payload?.fixtureDeck??null,
     handIndex:config.round?.handIndex??0,
     previousRoundRef:config.events[0]?.payload?.previousRoundRef??null,
+    prevailingWind:config.round?.prevailingWind??null,
   });
   if(!same(config.events[0],state.events[0]))
     throw new RangeError('Replay mismatch: deal event');
@@ -432,6 +438,7 @@ export function completeValidateGameState(state,{replay=true}={}){
   if(!Number.isInteger(state.round.handIndex)||state.round.handIndex<0||
     state.round.roundId!==state.gameId+'-round-'+state.round.handIndex||state.round.schemaVersion!==1||
     state.round.contractVersion!==CONTRACT_VERSION||
+    !['east','south','west','north'].includes(state.round.prevailingWind)||
     !['await_draw','await_discard','claim_window','replacement','settled'].includes(state.round.phase))
     throw new RangeError('Invalid complete RoundState');
   assertSeat(state.round.currentSeat);assertSeat(state.round.dealerSeat);
@@ -533,7 +540,7 @@ export function completeValidateGameState(state,{replay=true}={}){
  * not an append to the previous hand's immutable TurnEvent ledger.
  * A fresh explicit seed and unique gameId are mandatory.
  */
-export function completeStartNextRound(previous,{seed,gameId}={}){
+export function completeStartNextRound(previous,{seed,gameId,prevailingWind}={}){
   completeValidateGameState(previous);
   if(previous.round.phase!=='settled'||!ext(previous).result)
     throw new RangeError('Only a settled hand can advance');
@@ -547,6 +554,7 @@ export function completeStartNextRound(previous,{seed,gameId}={}){
   const dealerSeat=retain?previous.round.dealerSeat:afterSeat(previous.round.dealerSeat);
   return completeCreateGame({gameId,seed,profileId:previous.ruleRef.profileId,
     ruleVersion:previous.ruleRef.ruleVersion,dealerSeat,
+    prevailingWind:prevailingWind??previous.round.prevailingWind,
     handIndex:previous.round.handIndex+1,
     previousRoundRef:{gameId:previous.gameId,roundId:previous.round.roundId,
       revision:previous.revision}});
