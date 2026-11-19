@@ -141,3 +141,26 @@
 - [ ] 按整合驗證結果更新 README、CHANGELOG 與最終合併 PR / SHA；不得先標記 V0.2 完成。
 
 註：以上勾選僅是整合審查／契約文件已建立，不是功能實作已併入正式版。
+
+## 12. 第三輪整合驗證（2026-11-19；第 11 節保留為歷史稽核快照）
+
+- [x] PR #16：在核心分支啟用 Q-001 必過 Golden Regression；PR #1 核心合併 main `f15e8fc3404ec380b65bc1493a87e76da6b4a1c2`，主線 Verify #44363444102 success。
+- [x] PR #17：在題庫分支啟用 Q-002 必過 Golden Regression；PR #5 題庫及 v3 版本化資料合併 main `9f74e528291e3a2a945ed5d63b99fdaa3eba5d35`，主線 Verify #44364507850 success。
+- [x] PR #3 解說從 canonical `rankDiscards/gradeAnswer` 取得數值與評分；合併 main `ed47593c0f209d295e9e0da941f0d0d1aa6b5638`，主線 Verify #44364857547 success。
+- [x] Draft PR #10 以最新 main＋#4 UI 的正式原始 blob 重建 staging，保留整合專用測試，SHA `7564f0c840129c8bc20b4ca86c74aa253f12f4b3`；[Verify #44365221250](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44365221250) 81/80 pass/0 fail/1 opt-in skip/0 TODO；含 10,000 題數值級 Oracle、Q-001/Q-002/I-003 強制一致性檢查。
+- [ ] PR #4 最終手機 Chromium 模擬、鍵盤、v1 localStorage 保存與主線合併後回歸驗收；不可沿用歷史 SHA 代替。
+- [ ] 牌型拆解教學與聽牌／多面聽新題型的**瀏覽器 UI 接線**；新版 DecisionRecord 實際 UI 儲存仍未完成（底層純函式和 adapter 不等於已向玩家提供）。
+- [ ] iOS/Android 實機操作與完整離線 PWA 安裝（Service Worker 尚未提供），以及 Issue #13 的 main 強制保護規則。
+- [ ] 最新正式品質報告、CHANGELOG、主線 CI 及所有 V0.2 必要功能驗收；通過後才能把里程碑從 NO-GO 改為 GO。
+
+**註：第 11 節當時未修的 Q-001/Q-002 現已由第 12 節處理；不要將舊勾選狀態讀成現在的狀態。**
+
+### 12.1 前端正式合併後的新增事實（保留 12 節驗收時點）
+
+- [x] #4 UI 最新 source `a7836da22ce2f7dfa602b87b87bc7cf2eb47fb40` 的 Verify #44365062359 SUCCESS；同組來源的 Draft staging `7564f0c840129c8bc20b4ca86c74aa253f12f4b3` [Verify #44365221250](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44365221250) SUCCESS（81/80 pass/0 fail/0 TODO/1 skip），[Chromium #44365221412](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44365221412) SUCCESS（桌面 1440、手機模擬 390、全套答題與 v1 儲存）。
+- [x] PR #4 已合併 main `fa1646111178c668ee2744b72546692ff148e850`；主線 [Verify #44366663851](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44366663851) SUCCESS：75 total / 74 pass / 0 fail / 0 TODO / 1 skipped。
+- [x] Issues [#7](https://github.com/kodlbegiko/taiwan-mahjong-trainer/issues/7) Q-001、[#8](https://github.com/kodlbegiko/taiwan-mahjong-trainer/issues/8) Q-002、[#9](https://github.com/kodlbegiko/taiwan-mahjong-trainer/issues/9) I-003 均已關閉，附實測與合併證據。
+- [ ] UI 將 `explainDiscard`、`tenpai/multi_wait`、v3 DecisionRecord 實際接入玩家訓練體驗，並分別驗收。
+- [ ] 實體手機、完整離線可安裝 PWA 與 main 分支保護；若要從 V0.2 排除，需先明確正式變更驗收範圍，不可無聲改寫里程碑。
+
+**工程分支合併不等於里程碑發布：目前 V0.2 NO-GO。**
