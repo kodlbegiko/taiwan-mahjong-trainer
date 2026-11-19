@@ -7,7 +7,7 @@
 const finiteNonnegative=n=>typeof n==='number'&&Number.isFinite(n)&&n>=0;
 const source='docs/rules/TW16_TABLE_POLICY.md#minimal-scoring';
 function configuration(profile){
-  if(profile?.status!=='experimental'||profile?.scoringPolicy?.configRef!=='tw16-minimal-tai-v1')
+  if(profile?.status!=='experimental'||profile?.scoringPolicy?.mode!=='configured'||profile?.scoringPolicy?.configRef!=='tw16-minimal-tai-v1')
     throw new RangeError('Unsupported or unverified ScoringPolicy');
   const s=profile.extensions?.tw16?.scoring;
   if(!s||Object.values(s).some(v=>!finiteNonnegative(v)))
