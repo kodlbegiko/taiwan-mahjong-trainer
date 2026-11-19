@@ -16,3 +16,5 @@ export {
   ACADEMY_STORAGE_KEY, ACADEMY_STATE_FORMAT, AcademyStorageError,
   emptyAcademyState, validateAcademyState, migrateAcademyState, createAcademyStore,
 } from './storage.js';
+
+export { validateAbilityProfile, validateReviewPlan, validateTrainingSession } from './validate.js';
