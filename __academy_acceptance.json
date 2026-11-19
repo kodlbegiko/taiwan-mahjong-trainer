@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "contractVersion": "master-academy/1.0.0",
+  "release": false,
+  "deploymentClass": "isolated-academy-prerelease",
+  "sourceRepository": "kodlbegiko/taiwan-mahjong-trainer",
+  "branch": "integration/mahjong-academy",
+  "verifiedApplicationCommit": "a06505c8579cf817440822692854786c9bd330bf",
+  "baselineMainCommit": "25870862b6499f7e699967aa76429ae5dcfc5db4",
+  "provenanceAuthority": "tw-mahjong-master-academy:state:v1",
+  "originalRecordAuthority": "tw-mahjong-trainer:archive:v3",
+  "verifiedAutomaticGates": {
+    "verifyRun": 44562519930,
+    "combinedRealBrowserRun": 44562520086,
+    "academyUiRun": 44562519917,
+    "tileAssetsRun": 44562519997,
+    "independentUiRun": 44562519987,
+    "v02BrowserPwaRun": 44562519844
+  },
+  "scope": "canonical-structural-academy-only",
+  "notVerified": [
+    "full-four-player-rules",
+    "official-tai-scoring",
+    "scenario-scorer",
+    "four-bot-game",
+    "real-mobile-device",
+    "VoiceOver",
+    "TalkBack",
+    "new-TrainingSession-UI"
+  ],
+  "sourceIdentityMethod": "Confirm the GitHub commit SHA pinned in the deployment provider's git metadata; this is a static test-scope manifest, not an authenticated signature.",
+  "sourceCommit": "a06505c8579cf817440822692854786c9bd330bf",
+  "sourceBranch": "integration/mahjong-academy",
+  "sourceCommitRole": "Immutable application runtime tree verified on the exact SHA; preview Git checkout includes metadata/doc-only commits. Check provider Git metadata separately.",
+  "manifestGeneratedAtUtc": "2026-11-19T16:45:04.840Z",
+  "deployTimeEvidence": "Vercel API deployment.createdAt/buildingAt/ready (provider-attested, not a static build-time guess)",
+  "publicAssetVerification": {
+    "checkedAtUtc": "2026-11-19T16:45:04.840Z",
+    "origin": "https://taiwan-mahjong-academy-prerelease-5evl29gv1-sign2.vercel.app/",
+    "tileSvgCount": 34,
+    "tileSvgHttp200": 34,
+    "jsJsonSwManifestHttp200": 9,
+    "assetVerificationSource": "public HTTPS Vercel fetch; existing pinned preview, before this manifest-only revision"
+  }
+}
