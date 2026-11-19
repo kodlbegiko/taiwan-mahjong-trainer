@@ -27,7 +27,13 @@ export async function runBotTurn({ bot, playerView, submitAction }) {
       expectedRevision: decision.expectedRevision,
     });
     return { status: 'acted', decision, decisionMs };
-  } catch {
+  } catch (error) {
+    // A new R3 capability is explicitly unsupported (e.g. simultaneous
+    // multiwinner). Never misreport it as a terminal hand or silently PASS.
+    if (error?.code === 'UNSUPPORTED_RULE_CAPABILITY' &&
+        typeof error.capability === 'string')
+      return {status:'unsupported',reason:'unsupported-rule-capability',
+        capability:error.capability,decision,decisionMs};
     // Fail closed; no fallback, no retry using the same revision.
     return { status: 'submission-rejected', decision, decisionMs };
   }
@@ -40,6 +46,7 @@ export async function runBotTurn({ bot, playerView, submitAction }) {
  */
 export function createBotController({
   bots, humanSeat = 0, getActingSeat, getPlayerView, submitAction,
+  getPendingClaimResponders = null,
   checkpoint = null, maxRevision = 2048,
   yieldControl = () => new Promise(resolve => setTimeout(resolve, 0)),
 } = {}) {
@@ -52,7 +59,8 @@ export function createBotController({
       new Set(bots.map(bot => bot.seat)).size !== 3) {
     throw new TypeError('Exactly three distinct non-human bots required');
   }
-  if ([getActingSeat,getPlayerView,submitAction,yieldControl].some(x => typeof x !== 'function'))
+  if ([getActingSeat,getPlayerView,submitAction,yieldControl].some(x => typeof x !== 'function') ||
+      (getPendingClaimResponders!==null && typeof getPendingClaimResponders!=='function'))
     throw new TypeError('Authoritative adapter and yieldControl callbacks required');
   if (checkpoint !== null && (!checkpoint || Object.keys(checkpoint).some(k => k !== 'paused') ||
       typeof checkpoint.paused !== 'boolean')) throw new TypeError('Invalid controller checkpoint');
@@ -100,8 +108,17 @@ export function createBotController({
     if (initial.ruleRef.profileId !== 'tw16-configurable-table' ||
         initial.ruleRef.ruleVersion !== 'experimental-full-v1')
       return {status:'claim-adjudication-unavailable'};
-    for (let i = 0; i < 4; i++) {
-      const seat = (preferred+i)%4;
+    // When available, the trusted Rules host may offer the newer R3
+    // listPendingClaimResponders(state) result as an ordered seat list.
+    // Otherwise scan only the four per-seat public PlayerViews (older R3).
+    const pending = getPendingClaimResponders===null ?
+      Array.from({length:4},(_,i)=>(preferred+i)%4) :
+      await getPendingClaimResponders();
+    if (!Array.isArray(pending) || pending.length>3 && getPendingClaimResponders!==null ||
+        pending.some(s=>!Number.isInteger(s)||s<0||s>3) ||
+        new Set(pending).size!==pending.length)
+      return {status:'unsupported',reason:'invalid-Rules-claim-responder-list'};
+    for (const seat of pending) {
       const v = seat===preferred ? initial : await readSeat(seat);
       if (v.gameId !== initial.gameId ||
           v.asOfEventSeq !== initial.asOfEventSeq ||
@@ -114,6 +131,8 @@ export function createBotController({
           return {status:'unsupported',reason:'claim-response-without-pass'};
         return {seat,view:v};
       }
+      if (getPendingClaimResponders!==null)
+        return {status:'unsupported',reason:'Rules-reported-responder-without-LegalActions'};
     }
     return {status:'unsupported',reason:'claim-window-deadlock-no-responders'};
   }
@@ -137,7 +156,9 @@ export function createBotController({
       });
       record(result.decision);
       return {status:result.status,seat,decision:result.decision,
-        decisionMs:result.decisionMs};
+        decisionMs:result.decisionMs,
+        ...(result.reason?{reason:result.reason}:{}),
+        ...(result.capability?{capability:result.capability}:{})};
     } finally {
       busy=false;
     }
@@ -149,7 +170,7 @@ export function createBotController({
     for (; actions < maxActions;) {
       if (paused) return { status: 'paused', actions };
       const result = await tick();
-      if (result.status !== 'acted') return { status: result.status, actions };
+      if (result.status !== 'acted') return { ...result, actions };
       actions++;
       if (actions < maxActions) await yieldControl(); // macrotask yielding for PWA responsiveness
     }
@@ -182,7 +203,11 @@ export function createBotController({
     try {
       await submitAction({actorSeat:humanSeat,actionId,expectedRevision});
       return {status:'acted'};
-    } catch {
+    } catch (error) {
+      if (error?.code==='UNSUPPORTED_RULE_CAPABILITY' &&
+          typeof error.capability==='string')
+        return {status:'unsupported',reason:'unsupported-rule-capability',
+          capability:error.capability};
       return {status:'submission-rejected'};
     }
   }
