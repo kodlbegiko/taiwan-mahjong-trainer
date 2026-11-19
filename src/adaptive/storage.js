@@ -8,6 +8,7 @@ import {
 import { validateScoredRecord, makeRecordRef, normalizeRecordEntries } from './records.js';
 import { buildAbilityProfile } from './ability.js';
 import { buildReviewPlan } from './review.js';
+import { validateAbilityProfile, validateReviewPlan, validateTrainingSession } from './validate.js';
 
 export const ACADEMY_STORAGE_KEY = 'tw-mahjong-master-academy:state:v1';
 export const ACADEMY_STATE_FORMAT = 'taiwan-mahjong-master-academy-sidecar';
@@ -44,27 +45,16 @@ export function validateAcademyState(state, { validateAcademyDecisionRecord } = 
     if (recordIds.has(record.id)) throw new RangeError('Duplicate Academy record ID');
     recordIds.add(record.id);
   }
-  if (state.abilityProfile !== null) requireV1(state.abilityProfile, 'AbilityProfile');
+  if (state.abilityProfile !== null) validateAbilityProfile(state.abilityProfile);
   if (state.reviewPlan !== null) {
-    requireV1(state.reviewPlan, 'ReviewPlan');
+    validateReviewPlan(state.reviewPlan);
     if (state.abilityProfile && state.abilityProfile.profileId !== state.reviewPlan.profileId) {
       throw new RangeError('Inconsistent derived profile and review plan');
     }
   }
   const sessionIds = new Set();
   for (const session of state.trainingSessions) {
-    requireV1(session, 'TrainingSession');
-    requireId(session.sessionId); requireId(session.profileId);
-    requireObject(session.ruleRef, 'TrainingSession.ruleRef');
-    requireId(session.ruleRef.profileId); requireId(session.ruleRef.ruleVersion);
-    if (!['planned', 'active', 'completed', 'aborted'].includes(session.status) ||
-      !Array.isArray(session.questionRefs) || !Array.isArray(session.recordRefs) ||
-      !Array.isArray(session.generatorVersions) || !session.generatorVersions.every(x => typeof x === 'string') ||
-      !['academy', 'legacy-migrated'].includes(session.source)) throw new RangeError('Invalid TrainingSession');
-    requireId(session.seed);
-    if (session.status === 'active' || session.status === 'completed') requireUtc(session.startedAt, 'startedAt');
-    if (session.status === 'aborted' || session.status === 'completed') requireUtc(session.endedAt, 'endedAt');
-    if (session.startedAt && session.endedAt && session.startedAt > session.endedAt) throw new RangeError('Session time reversed');
+    validateTrainingSession(session);
     if (sessionIds.has(session.sessionId)) throw new RangeError('Duplicate TrainingSession ID');
     sessionIds.add(session.sessionId);
   }
@@ -220,7 +210,7 @@ export function createAcademyStore(storage, {
     }
   }
   function saveSession(session) {
-    requireV1(session, 'TrainingSession');
+    validateTrainingSession(session);
     const state = load();
     const legacy = readLegacy();
     const validRefs = new Set([
@@ -231,8 +221,21 @@ export function createAcademyStore(storage, {
       !validRefs.has(ref.kind + ':' + ref.id))) throw new RangeError('Session references a non-persisted record');
     const sessions = state.trainingSessions.filter(s => s.sessionId !== session.sessionId);
     const previous = state.trainingSessions.find(s => s.sessionId === session.sessionId);
-    if (previous && (previous.status === 'completed' || previous.status === 'aborted') &&
-      canonicalJson(previous) !== canonicalJson(session)) throw new RangeError('Terminal session is immutable');
+    if (previous) {
+      const oldBytes = canonicalJson(previous), newBytes = canonicalJson(session);
+      if (oldBytes !== newBytes) {
+        const allowed = { planned: ['active', 'aborted'], active: ['completed', 'aborted'],
+          completed: [], aborted: [] };
+        if (!allowed[previous.status].includes(session.status)) throw new RangeError('Illegal persisted status transition');
+        if (previous.seed !== session.seed ||
+          canonicalJson(previous.ruleRef) !== canonicalJson(session.ruleRef) ||
+          canonicalJson(previous.questionRefs) !== canonicalJson(session.questionRefs) ||
+          previous.recordRefs.some(ref => !session.recordRefs.some(next =>
+            next.kind === ref.kind && next.id === ref.id))) {
+          throw new RangeError('Session cannot rewrite question provenance or past attempts');
+        }
+      }
+    }
     return save({ ...state, revision: state.revision + 1,
       trainingSessions: [...sessions, cloneJson(session)].sort((a,b) => a.sessionId.localeCompare(b.sessionId)) });
   }
