@@ -5,12 +5,13 @@
  *
  * A fixed seed is the only random input. This file never inspects UI or Strategy.
  */
-import {SCHEMA_VERSION, CONTRACT_VERSION, ENGINE_VERSION} from './tile-constants.js';
+import {SCHEMA_VERSION, CONTRACT_VERSION} from './tile-constants.js';
 import {createDeck, shuffleDeck, parsePhysicalTileId, makeTileIdentity, typeOf, RNG_ALGORITHM_VERSION} from './tile-identity.js';
 import {getRuleProfile} from './profiles.js';
 import {calculateShanten} from '../core/efficiency.js';
 import {settleWin, scoreWinningHand} from './scoring.js';
 
+export const COMPLETE_ENGINE_VERSION='rules-engine/0.2.0-experimental';
 const V1={schemaVersion:SCHEMA_VERSION,contractVersion:CONTRACT_VERSION};
 const clone=x=>JSON.parse(JSON.stringify(x));
 const seatOK=s=>Number.isInteger(s)&&s>=0&&s<=3;
@@ -68,7 +69,7 @@ function action(state,seat,kind,tileIds=[],reason='TABLE_ACTION',claimEventId){
   return {...V1,actionId,kind,actorSeat:seat,expectedRevision:state.revision,
     tileIds:ids,...(claimEventId?{claimEventId}:{}),
     ruleRef:clone(state.ruleRef),
-    legalityBasis:{engineVersion:ENGINE_VERSION,reasonCodes:[reason]}};
+    legalityBasis:{engineVersion:COMPLETE_ENGINE_VERSION,reasonCodes:[reason]}};
 }
 function combos(ids,n){
   if(n===0)return [[]];
