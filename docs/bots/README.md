@@ -63,6 +63,8 @@ const controller=createBotController({
   })),
   getActingSeat:()=>authoritative.round.currentSeat,
   getPlayerView:seat=>createPlayerView(authoritative,seat),
+  // With latest R3 #43, trusted host can optionally supply:
+  // getPendingClaimResponders:()=>listPendingClaimResponders(authoritative),
   submitAction:submission=>{
     authoritative=applyAction(authoritative,submission).state;
   },
@@ -82,7 +84,7 @@ during other phases the human must be Rules' current actor.
   has bounded `maxActions=32` (allowed 1–128) and yields between steps.
 - `maxRevision=2048` by default (allowed 1–100000) bounds cumulative
   event growth. `duplicate-revision-blocked` blocks re-submission.
-- Mixed PlayerView revisions, no active responder, impossible action set,
+- A newer Rules host may pass `getPendingClaimResponders` backed by\n  `listPendingClaimResponders(authoritative)` (Rules #43). The callback returns\n  *only a seat array* and is checked against that seat's current PlayerView.\n  Older pinned R3 versions remain compatible through PlayerView-only scanning.\n- A Rules `RuleCapabilityError` (e.g. multiple legitimate WIN intents) is\n  returned as `{status:'unsupported',reason:'unsupported-rule-capability',\n  capability:'multiple_winners'}`; no invented priority, settlement, or PASS.\n- Mixed PlayerView revisions, no active responder, impossible action set,
   or exceeding event budget return typed `{status:'unsupported',reason:'...'}`
   rather than false win/draw.
 - Missing R3 capabilities in old draw/discard sandbox still fail closed as
@@ -121,3 +123,14 @@ real-device latency, or universal Taiwanese rules compliance.
 special winning hands, comprehensive regional tai, venue-specific penalties,
 and certified multi-round match/real hardware behavior. No Phase 3 release
 may be inferred from this module's isolated green CI.
+
+## Pinning and newer Rules #43 API
+
+The verified 100-hand example above uses the R3 Rule source pinned in Phase 3
+Integration #44 at Rules SHA `be033d3e51eaa78e0c04abf6ce49bcb64640e93e`.
+Rules #43 subsequently published `listPendingClaimResponders`,
+`getClaimWindowPublic` and typed `RuleCapabilityError` (its newer SHA must
+be pinned by the integrator). The optional host callback and typed response are
+Bot-owned compatibility changes, **not** evidence that the latest combined
+source has passed the same 100 seed run. AI 6 must retest against one exact
+integrated SHA, replacing its now-stale negative claim-window gate.
