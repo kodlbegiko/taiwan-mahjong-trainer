@@ -1,6 +1,44 @@
 import { knownTileCounts } from '../tiles.js';
 
 export const CONTRACT_VERSION = 'master-academy/1.0.0';
+
+/**
+ * A detached JSON snapshot is the ONLY object consumed by the analysis.
+ * Reject accessors, non-JSON values, custom array metadata, and cycles before
+ * serialization so JSON.stringify cannot silently drop a private field.
+ */
+function detachedPublicSnapshot(input) {
+  const ancestors=new WeakSet();
+  function walk(v,depth) {
+    if (depth>64) throw new RangeError('PlayerView 巢狀深度異常');
+    if (v===null || typeof v==='string' || typeof v==='boolean') return;
+    if (typeof v==='number' && Number.isFinite(v)) return;
+    if (typeof v!=='object') throw new TypeError('PlayerView 只能含 JSON 資料');
+    if (!Array.isArray(v) && Object.getPrototypeOf(v)!==Object.prototype) throw new TypeError('PlayerView 只接受普通 JSON 物件');
+    if (ancestors.has(v)) throw new TypeError('PlayerView 不接受循環參照');
+    ancestors.add(v);
+    if (Array.isArray(v)) {
+      for (const key of Reflect.ownKeys(v)) {
+        if (typeof key !== 'string' || (key!=='length' && !/^(0|[1-9]\d*)$/.test(key)))
+          throw new TypeError('陣列含非 JSON 欄位');
+      }
+      for (let i=0;i<v.length;i++) {
+        const d=Object.getOwnPropertyDescriptor(v,String(i));
+        if (!d || !('value' in d)) throw new TypeError('陣列不允許空洞或 accessor');
+        walk(d.value,depth+1);
+      }
+    } else for (const key of Reflect.ownKeys(v)) {
+      if (typeof key!=='string') throw new TypeError('物件不允許 Symbol 欄位');
+      const d=Object.getOwnPropertyDescriptor(v,key);
+      if (!d.enumerable || !('value' in d)) throw new TypeError('物件不允許隱藏欄位或 accessor');
+      walk(d.value,depth+1);
+    }
+    ancestors.delete(v);
+  }
+  walk(input,0);
+  return JSON.parse(JSON.stringify(input));
+}
+
 const types = new Set(['discard', 'draw', 'chi', 'pong', 'kong', 'win', 'pass', 'replace_flower']);
 const phases = new Set(['dealing', 'await_draw', 'await_discard', 'claim_window', 'replacement', 'settled']);
 const plain = v => v !== null && typeof v === 'object' && !Array.isArray(v) && Object.getPrototypeOf(v) === Object.prototype;
@@ -37,7 +75,7 @@ function physical(s) {
   return Number(match[1]);
 }
 function identity(t, kind = 'standard') {
-  object(t, 'TileIdentity', ['schemaVersion','contractVersion','id','kind','tileType','flowerCode','copyIndex','extensions'],
+  object(t, 'TileIdentity', ['schemaVersion','contractVersion','id','kind','tileType','flowerCode','copyIndex'],
     ['schemaVersion','contractVersion','id','kind','copyIndex']);
   v1(t, 'TileIdentity');
   if (kind !== t.kind) throw new TypeError('TileIdentity.kind 不符');
@@ -103,7 +141,7 @@ function publicEvent(e, asOf) {
   for (const k of ['kind','claimEventId','reasonCode']) if (e.payload[k] !== undefined) id(e.payload[k], k);
 }
 function action(a, v) {
-  object(a, 'LegalAction', ['schemaVersion','contractVersion','actionId','kind','actorSeat','expectedRevision','tileIds','claimEventId','ruleRef','legalityBasis','extensions'],
+  object(a, 'LegalAction', ['schemaVersion','contractVersion','actionId','kind','actorSeat','expectedRevision','tileIds','claimEventId','ruleRef','legalityBasis'],
     ['schemaVersion','contractVersion','actionId','kind','actorSeat','expectedRevision','tileIds','ruleRef','legalityBasis']);
   v1(a, 'LegalAction'); id(a.actionId, 'actionId');
   if (!types.has(a.kind) || a.actorSeat !== v.audienceSeat) throw new RangeError('非法 actor/action kind');
@@ -136,7 +174,8 @@ function countVisible(v) {
 }
 
 /** Rejects GameState and non-allowlisted nested data; never consults a wall or opponent private hand. */
-export function readPlayerView(v) {
+export function readPlayerView(input) {
+  const v=detachedPublicSnapshot(input);
   object(v, 'PlayerView', ['schemaVersion','contractVersion','viewId','gameId','ruleRef','audienceSeat','asOfEventSeq','round','self','opponents','publicEvents','legalActions','knownUnavailableTypes','capabilities'],
     ['schemaVersion','contractVersion','viewId','gameId','ruleRef','audienceSeat','asOfEventSeq','round','self','opponents','publicEvents','legalActions','knownUnavailableTypes','capabilities']);
   v1(v, 'PlayerView'); id(v.viewId, 'viewId'); id(v.gameId, 'gameId');
