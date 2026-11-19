@@ -143,6 +143,40 @@ test('R3 contested chi/pong claim and pass group: no hidden intent or future mel
   code(()=>api.getReplayFrame(manifest.replayId,1,{perspective:'postgame'}),'POSTGAME_UNAVAILABLE');
 });
 
+test('R3 successful chi and open kong expose only Rules-public resolved melds at action boundaries',()=>{
+  let chi=fixed({0:['t:4:3'],1:['t:3:0','t:5:0']},'actual-chi');
+  chi=act(chi,0,'discard','t:4:3');
+  const before=chi.revision;
+  chi=resolve(chi,{1:{kind:'chi'}});
+  const a=service(chi,1);
+  const prior=a.api.getReplayFrame(a.manifest.replayId,before);
+  assert.equal(prior.playerView.self.melds.length,0);
+  const last=a.api.getReplayFrame(a.manifest.replayId,chi.revision);
+  assert.equal(last.playerView.self.melds.length,1);
+  assert.equal(last.playerView.self.melds[0].kind,'sequence');
+  assert.equal(chi.round.currentSeat,1);
+  assert.equal(chi.round.phase,'await_discard');
+  assert.equal(a.api.getPlayerDecision(a.manifest.replayId,before+1).kind,'chi');
+  assert.deepEqual(last.playerView,createPlayerView(chi,1));
+
+  let open=fixed({0:['t:4:3'],1:['t:4:0','t:4:1','t:4:2']},'open-kong');
+  open=act(open,0,'discard','t:4:3');
+  open=resolve(open,{1:{kind:'kong',reason:'OPEN_KONG'}});
+  assert.equal(open.round.phase,'replacement');
+  assert.equal(open.players[1].melds.at(-1).kind,'kong');
+  assert.equal(open.players[1].melds.at(-1).open,true);
+  const k=service(open,1);
+  assert.equal(k.api.getReplayFrame(k.manifest.replayId,open.revision)
+    .playerView.self.melds.at(-1).kind,'kong');
+  assert.equal(k.api.getDecisionAnalysis(k.manifest.replayId,3).analysisStatus,
+    'advisory-legal-only');
+  open=act(open,1,'draw',undefined,'TAIL_KONG_REPLACEMENT');
+  const supplemented=service(open,1);
+  assert.deepEqual(supplemented.api.getReplayFrame('replay:'+open.gameId,open.revision)
+    .playerView,createPlayerView(open,1));
+  assert.deepEqual(replayGame(open),open);
+});
+
 test('R3 concealed kong, replacement draw and flower replacement project correct full-round boundaries',()=>{
   let kong=fixed({0:copies(6,4)},'kong');
   kong=act(kong,0,'kong',undefined,'CONCEALED_KONG');
