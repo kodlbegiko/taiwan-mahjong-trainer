@@ -1,5 +1,7 @@
 import {getAcademySnapshot, getScenarioLayoutFixture, ACADEMY_LESSONS, TASK_NAMES, ERROR_NAMES} from './public-facade.js';
 import {projectScenarioForUI, renderTileStrip} from './scenario.js';
+import {loadAcademyBridge} from './academy-bridge.js';
+import {renderLiveAcademy} from './academy-live.js';
 
 const root = document.querySelector('#academy-root');
 const nav = document.querySelector('#academy-navigation');
@@ -14,6 +16,8 @@ const percent = n => Number.isFinite(n) ? Math.round(100*n)+'%' : '—';
 // Public deep link used for legacy regression and for bookmarks to the canonical trainer.
 let page = new URLSearchParams(window.location.search).get('academy') === 'training' ? 'training' : 'today';
 let lessonId = ACADEMY_LESSONS[0].id;
+let academyLoad = {status:'loading',reason:'正在檢查正式來源…'};
+const officialPages = new Set(['today','lessons','growth']);
 
 function storage() { try { return window.localStorage; } catch { return null; } }
 function snapshot() { return getAcademySnapshot(storage()); }
@@ -126,9 +130,8 @@ function render() {
   document.body.dataset.academyPage = page;
   renderNavigation();
   const data = snapshot();
-  root.innerHTML = page==='today'?todayView(data):page==='training'?trainingView()
-    :page==='lessons'?lessonsView():page==='strategy'?strategyView()
-    :page==='growth'?growthView(data):simulationView();
+  root.innerHTML = officialPages.has(page)?renderLiveAcademy(page,academyLoad)
+    :page==='training'?trainingView():page==='strategy'?strategyView():simulationView();
 }
 function show(next, focus=true) {
   if (!PAGES.some(p=>p[0]===next)) return;
@@ -150,12 +153,61 @@ nav?.addEventListener('click',event=>{
 });
 root?.addEventListener('click',event=>{
   const button=event.target.closest('button[data-action]');
-  if(!button) return;
+  if (!button) return;
   if(button.dataset.action==='page') show(button.dataset.page);
   if(button.dataset.action==='lesson') {lessonId=button.dataset.id;show('lessons',false);}
   if(button.dataset.action==='launch') launch(button.dataset.task,button.dataset.id?decodeURIComponent(button.dataset.id):null);
   if(button.dataset.action==='review') launch(button.dataset.task,decodeURIComponent(button.dataset.id));
 });
+
+root?.addEventListener('click',event=>{
+  const btn=event.target.closest('button[data-live-action]');
+  if(!btn)return;
+  const action=btn.dataset.liveAction;
+  if(action==='open-legacy'){show('training');return;}
+  if(academyLoad.status!=='ready')return;
+  const bridge=academyLoad.bridge;
+  try{
+    if(action==='select-lesson'){
+      bridge.selectedLessonId=btn.dataset.lesson;
+      bridge.question=null;bridge.phase='idle';bridge.error=null;
+    } else if(action==='go-lesson'){
+      bridge.selectedLessonId=btn.dataset.lesson;
+      bridge.question=null;bridge.phase='idle';show('lessons');return;
+    } else if(action==='begin-lesson'){
+      bridge.startLesson(btn.dataset.lesson);
+    } else if(action==='choose'){
+      bridge.select(Number(btn.dataset.tile));
+    } else if(action==='submit'){
+      bridge.submit();
+    } else if(action==='next'){
+      bridge.startLesson(bridge.selectedLessonId);
+    } else if(action==='return-lesson'){
+      bridge.question=null;bridge.phase='idle';bridge.error=null;
+    } else if(action==='review-question'){
+      bridge.startLesson(btn.dataset.lesson,{questionRef:{
+        questionId:btn.dataset.question,questionVersion:btn.dataset.version}});
+      show('lessons');return;
+    } else if(action==='reload'){
+      window.location.reload();return;
+    }
+    render();
+    if(['begin-lesson','submit','next'].includes(action)){
+      document.querySelector(bridge.phase==='answering'?'#academy-question':'#academy-grade')?.scrollIntoView({block:'start'});
+    }
+  }catch(error){
+    bridge.error='正式操作無法完成：'+error.message;
+    render();
+  }
+});
+loadAcademyBridge(storage()).then(result=>{
+  academyLoad=result;
+  render();
+}).catch(error=>{
+  academyLoad={status:'unavailable',reason:'正式來源載入失敗：'+error.message};
+  render();
+});
+
 window.addEventListener('academy:legacy-changed',()=>render());
 window.addEventListener('storage',event=>{
   if(['tw-mahjong-trainer:archive:v3','tw-mahjong-trainer:archive:v2','tw-mahjong-trainer:session:v1'].includes(event.key)) render();
