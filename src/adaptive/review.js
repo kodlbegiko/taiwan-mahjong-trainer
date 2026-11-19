@@ -40,7 +40,8 @@ function replayableLegacy(snapshot) {
  */
 export function buildReviewPlan({
   profile, records = [], asOf, timezone = DEFAULT_TIMEZONE, dailyLimit = 20,
-  questionCatalog = [], validateAcademyDecisionRecord, validateAcademyQuestion,
+  questionCatalog = [], reservedQuestionRefs = [],
+  validateAcademyDecisionRecord, validateAcademyQuestion,
 } = {}) {
   requireV1(profile, 'AbilityProfile');
   requireId(profile.profileId, 'profileId');
@@ -48,6 +49,11 @@ export function buildReviewPlan({
   requireTimezone(timezone);
   if (!Number.isSafeInteger(dailyLimit) || dailyLimit < 0 || dailyLimit > 10000) throw new RangeError('Invalid dailyLimit');
   if (!Array.isArray(questionCatalog)) throw new TypeError('questionCatalog must be an array');
+  if (!Array.isArray(reservedQuestionRefs)) throw new TypeError('reservedQuestionRefs must be an array');
+  const reserved = new Set(reservedQuestionRefs.map(q => {
+    requireId(q?.questionId); requireId(q?.questionVersion);
+    return q.questionId + '@' + q.questionVersion;
+  }));
   const catalog = new Map();
   for (const question of questionCatalog) {
     requireId(question.questionId, 'questionId'); requireId(question.questionVersion, 'questionVersion');
@@ -91,7 +97,7 @@ export function buildReviewPlan({
     const sourceRecordRefs = uniqueRefs(group.refs);
     const catalogEntry = catalog.get(questionKey(group.qref));
     // Legacy snapshots can replay without Academy's as-yet-unmerged question bank.
-    const available = first.kind === 'legacy-v3'
+    const available = !reserved.has(questionKey(group.qref)) && (first.kind === 'legacy-v3'
       ? replayableLegacy(recent.record.exerciseSnapshot) && catalogEntry?.available !== false
       : catalogEntry?.available === true && catalogEntry.taskType === 'scenario' &&
         catalogEntry.questionSnapshot?.status === 'validated' &&
@@ -99,14 +105,16 @@ export function buildReviewPlan({
         catalogEntry.questionSnapshot.questionVersion === group.qref.questionVersion &&
         catalogEntry.questionSnapshot.answerKey?.correctnessBasis !== 'unverified' &&
         typeof validateAcademyQuestion === 'function' &&
-        validateAcademyQuestion(catalogEntry.questionSnapshot) === true;
+        validateAcademyQuestion(catalogEntry.questionSnapshot) === true);
     const isDue = localDayKey(dueAt, timezone) <= today;
     const reasons = [];
     if (isDue) reasons.push('due');
     if (state.lapses) reasons.push('repeated-error');
     if (recent.record.score < 0.8) reasons.push('recent-mistake');
     if (state.repetitions >= 3) reasons.push('interval-extended');
-    if (!available) reasons.push(first.kind === 'legacy-v3' ? 'unavailable:legacy-replay' : 'unavailable:question-catalog');
+    if (reserved.has(questionKey(group.qref))) reasons.push('unavailable:held-out');
+    else if (!available) reasons.push(first.kind === 'legacy-v3' ?
+      'unavailable:legacy-replay' : 'unavailable:question-catalog');
     const priority = (isDue ? 100 : 0) + Math.min(state.lapses, 10) * 20 +
       (recent.record.score < 0.8 ? 15 : 0) + (state.repetitions === 0 ? 5 : 0);
     items.push({
