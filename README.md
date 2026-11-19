@@ -87,3 +87,8 @@ tests/                  Node 內建測試
 [API Contract](docs/API_CONTRACT.md) · [整合計畫](docs/INTEGRATION_PLAN.md) · [V0.2 品質報告](docs/quality/V0.2_INTEGRATION_REPORT.md) 詳列每次測試 SHA、已合併 PR、未完成項。main 尚未啟用 GitHub branch ruleset（[Issue #13](https://github.com/kodlbegiko/taiwan-mahjong-trainer/issues/13)）。
 
 > 這是**已合併的 V0.2 工程核心與改善後 V0.1 答題介面**，尚未宣告 V0.2 正式發布或更新 `package.json.version`。Issue #7/#8/#9 P0 已修復關閉，但 [Issue #12](https://github.com/kodlbegiko/taiwan-mahjong-trainer/issues/12) 的新訓練模式 UI、v3 作答紀錄接線、完整可操作進階教學、實機與離線 PWA 尚未完成；[Issue #13](https://github.com/kodlbegiko/taiwan-mahjong-trainer/issues/13) 的 main 分支保護尚未啟用。**正式發布仍 NO-GO。**
+
+
+### 第五輪 QA 稽核（2026-11-19）
+
+PR [#15](https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/15) 已補強**必跑**的 10,000 題混合分布獨立 Oracle（6,000 隨機、2,000 構造/擾動、2,000 四槓對抗）；main merge SHA `067c8bbcc5026e542ae5b6688a7aceb5dd33e5b7`，主線 [Verify #44444529115](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44444529115) 成功（82 題、81 pass、0 fail、0 TODO、1 skipped）。Draft #10 最新已驗證 staging `b62979a0cd2fec75451f37a4f5e594a0a7e820ea` 的 [Verify #44444678634](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44444678634) 成功（88 題、87 pass、0 fail、0 TODO、1 skipped，包含兩套各 10,000 題 Oracle）；[同 SHA Chromium #44444678821](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44444678821) 桌面 1440px／手機模擬 390px 成功。這些是**既有何切流程與核心契約**的證據，不代表 V0.2 完整 UI、v3 DecisionRecord 接線、手機實機或離線 PWA 已完成。**發布仍 NO-GO。**

@@ -94,3 +94,8 @@
 PR #4 `a7836da22ce2f7dfa602b87b87bc7cf2eb47fb40` 經過相依 #1/#5/#3 同版整合後，合併 main SHA `fa1646111178c668ee2744b72546692ff148e850`。同來源組合的 staging `7564f0c840129c8bc20b4ca86c74aa253f12f4b3` [Verify #44365221250](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44365221250) 81/80 pass/0 fail/0 TODO/1 opt-in skip；[Chromium browser #44365221412](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44365221412) 完成 desktop 1440、mobile emulation 390、`generateHand → rankDiscards → gradeAnswer` 互動、v1 localStorage 保留／重載。正式 main push [Verify #44366663851](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44366663851) 75/74 pass/0 fail/0 TODO/1 skip。
 
 **仍不符合「完整 V0.2 UI 契約」：** 現有 `src/app.js` 只進行 V0.1 何切與 v1 session 總結寫入，沒有接入新版 `Exercise` 的 `tenpai/multi_wait` 題型、`explainDiscard` 逐步可核對的完整教學視圖或 `DecisionRecord v3` 的本地儲存。此為 [Issue #12](https://github.com/kodlbegiko/taiwan-mahjong-trainer/issues/12) 的功能／驗收缺口，並非缺少底層函式。尚未取得 iOS/Android 實機、Service Worker 離線 PWA 安裝證據。
+
+
+## H. 第五輪 API/Scoring 契約稽核（2026-11-19）
+
+本輪 PR #15 **未更動正式 API、schema 或 scoringVersion**，只合併獨立測試與 Benchmark。公開同步呼叫簽名維持 V0.1 相容，Exercise schema v3、scoringVersion `efficiency-v2` 不變，歷史評分快照不可無聲重算。新混合分布 10k Oracle 在 main [Verify #44444529115](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44444529115) 與 staging [Verify #44444678634](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44444678634) 都通過；staging 還有另一項獨立 10k Oracle、Q-001/Q-002/I-003 全候選契約。**注意 Consumer 邊界：** `src/app.js` 仍只接 `generateHand/rankDiscards/gradeAnswer` 的 v1 何切流程，尚未接 `explainDiscard` 完整呈現、`tenpai/multi_wait` UI、v3 DecisionRecord 持久化。Chromium 390px 模擬不等於實機／離線安裝。
