@@ -203,9 +203,32 @@
 | `status` | `"draft"\|"validated"\|"unscorable"` | 必填；`unverified` 或未知 scoring 不可提供正式滿分判決 |
 | `extensions?` | object | 可選，必須 namespaced |
 
-**關鍵契約**：`source.kind=legacy-exercise-v3` 使用 `createExercise/replayExercise/validateExercise` 並以其 `answerRules.version` 及 `createDecisionRecord` 評分，**不得重新推導舊分數**；`scenario` 必須以 Rule Engine 合法 player-view-fixture + 支援的 scorer 產生答案，否則標為 `unscorable`，不計入能力曲線。策略分析引用 `analysisId + viewId + asOfEventSeq + engineVersion + ruleRef` 的不可變來源；禁止 Lesson 把 model-estimate 當 Golden。給 UI 的 `QuestionPublic` 經 allowlist 移除 `answerKey`、未公開完整局面、grading internal fields，作答後才傳 `GradingResult`（包含原結果與授權的解說）。
+**關鍵契約**：`source.kind=legacy-exercise-v3` 使用 `createExercise/replayExercise/validateExercise` 並以其 `answerRules.version` 及 `createDecisionRecord` 評分，**不得重新推導舊分數**；`scenario` 必須以 Rule Engine 合法 player-view-fixture + 支援的 scorer 產生答案，並另建通過驗證的 `AcademyDecisionRecord` V1（**不能**使用舊的 `createDecisionRecord` v3），否則標為 `unscorable`，不計入能力曲線。策略分析引用 `analysisId + viewId + asOfEventSeq + engineVersion + ruleRef` 的不可變來源；禁止 Lesson 把 model-estimate 當 Golden。給 UI 的 `QuestionPublic` 經 allowlist 移除 `answerKey`、未公開完整局面、grading internal fields，作答後才傳 `GradingResult`（包含原結果與授權的解說）。
 
 **重播**：questionId 單獨不是種子，題目完整快照需存 `questionVersion`、`ruleRef`、`generator.seed/index/version`、對應 `source.snapshotRef`；相同輸入應生成同一題／同一答案，若 engine 版本變更仍能依原版本檢驗；缺舊版本只能顯示 frozen historical snapshot 並標「無法重算」，不能靜默升級。
+
+
+### AcademyDecisionRecord — owner: Learning Academy grading + Adaptive storage adapter，V1，visibility: private-to-user
+
+**必要的情境題新紀錄類型**：既有 `createDecisionRecord` / `validateDecisionRecord` v3 的 `Exercise.taskType` 只接受 `discard`、`tenpai`、`multi_wait`，且只接受現行結構 `ruleVersion/scoringVersion`。**絕不能傳入 `scenario` 假裝能通過 v3 驗證**。情境題若有可信 scorer，須由獨立的 `createAcademyDecisionRecord` / `validateAcademyDecisionRecord` 與新 sidecar 實作，未實作前一律 `unscorable`，不計入學習閉環。
+
+| 欄位 | 型別 | 說明 |
+| --- | --- | --- |
+| `schemaVersion`／`contractVersion` | V1 | 必填，**不是** legacy `RECORD_SCHEMA_VERSION=3` |
+| `id`／`questionRef` | `string`／`{questionId,questionVersion}` | 必填、穩定且唯一，引用永久題目快照 |
+| `ruleRef`、`scorerId`、`scoringVersion`、`engineVersion` | `RuleRef`、`string`、`string`、`string` | 必填；獨立評分器版本與規則版本逐項相等 |
+| `sourceViewRef` | `{gameId,viewId,asOfEventSeq,audienceSeat}` | 必填，評分只依當時玩家可見資訊 |
+| `chosenActionId`／`legalActionIds` | `string`／`string[]` | 必填，選擇必屬合法 action 集合且依原 snapshot 核對 |
+| `timestamp`／`durationMs` | UTC／`integer≥0` | 必填，時間不是事件合法性的來源 |
+| `grade`／`score` | `"perfect"\|"acceptable"\|"improve"`／`number in [0,1]` | 必填，須能由**同一版正式情境 scorer** 重新驗證 |
+| `errorTypeIds`／`skillTagIds` | `string[]`／`string[]` | 必填，只能由已驗證 registry 映射，不得臆測 |
+| `sourceAnalysisRef?` | `{analysisId,engineVersion,viewId}` | 若情境正解引用策略結果則必填；分析不得是未校準概率的「唯一正解」 |
+| `scoringEvidence` | `{basis:"exact"|"expert-reviewed",fixtureId:string,answerSnapshotDigest:string}` | 必填；`fixtureId` 指向版本化且**受限保存**之答案/評分快照；digest 不證明秘密性 |
+| `recordKind` | `"academy-scenario"` | 必填，供 record dispatcher 類型分辨 |
+
+`RecordRef={kind:"legacy-v3"|"academy-v1",id:string}` 是新跨模組唯一引用型別。`kind="legacy-v3"` 只能對應已通過 `validateDecisionRecord` 的正式 v3，`kind="academy-v1"` 只能對應已通過 `validateAcademyDecisionRecord` 的 Academy V1；不可只憑 ID 前綴猜版本或混成同一 validator。`AcademyDecisionRecord` 僅供 `scenario`；其不可變原始資料和對應的 question snapshot 存新 `academy-state:v1` 命名空間，**不寫進舊 `archive:v3.records[]`**。未有可靠 scorer/RuleProfile/快照時拒絕生成此 record，UI 只可顯示「情境題尚無正式評分」。
+
+**驗證與重播**：在原始 `questionVersion/ruleRef/scorerId/scoringVersion/engineVersion` 載入固定答題快照；比對 `legalActionIds`、`chosenActionId`、grade/score/errorTypeIds，禁止讀任何未公開 GameState；驗證失敗的紀錄不得供 AbilityProfile/ReviewPlan。舊版本 scorer 已不可用時保留 frozen record 並標註不能重算，**不可改成新版分數**。新實作要新增負面測試：把 scenario 傳給 v3 函式必須拒絕、使用錯誤版本/非法動作拒絕、重複 RecordRef 不重計能力、舊 v3 bytes 原樣保留。
 
 ## 5. Adaptive Training：避免把啟發式冒充人類能力量測
 
@@ -215,12 +238,12 @@
 | --- | --- | --- |
 | V1、`profileId`、`updatedAt` | V1、`string`、UTC | 必填，不含遠端真實身分資訊 |
 | `algorithmVersion`、`calibrationStatus` | `string`／`"uncalibrated"\|"human-calibrated"` | 必填；預設 `uncalibrated`，未經獨立校準不得更改 |
-| `skills` | `{tagId,attempts:integer≥0,scoreSum:number,correct:integer≥0,meanDurationMs:number|null,evidenceRecordIds:string[],estimatedProficiency:number|null,uncertainty?:{low,high}}[]` | 必填；`estimatedProficiency` 非精確實力、不能保證提升 |
-| `sourceRecordIds` | `string[]` | 必填，去重、引用合法舊 DecisionRecord |
+| `skills` | `{tagId,attempts:integer≥0,scoreSum:number,correct:integer≥0,meanDurationMs:number|null,evidenceRefs:RecordRef[],estimatedProficiency:number|null,uncertainty?:{low,high}}[]` | 必填；`estimatedProficiency` 非精確實力、不能保證提升 |
+| `sourceRecordRefs` | `RecordRef[]` | 必填，去重，辨識 v3 舊題與 V1 情境題兩種紀錄家族 |
 | `policyVersion` | `string` | 必填；同批資料重放必須得同結果 |
 | `legacyImported` | `boolean` | 必填，legacy v1 stats 只有 aggregate，不得虛構逐題 tag |
 
-**驗證**：只有 `validateDecisionRecord` 通過的 v3 records 可提供逐題證據；在映射 registry 中由 `(taskType,errorTypes,question.skillTagIds)` 產生唯一 skill evidence。單一 record 同一 tag 只算一次；批次更新順序固定、相同 ID 不重覆加權；不得由缺 `question.skillTagIds` 的未知資料臆造題目能力。歷史 aggregate 只可於 `legacyImported=true` 計入分離統計，不能反推錯誤類型／SkillTag。任何精熟度、學習成長曲線都標為 **估計**／`uncalibrated`，不能只靠刷題次數宣稱大師級。
+**驗證**：只有 `validateDecisionRecord` 通過的 v3 紀錄，或 `validateAcademyDecisionRecord` 通過且有 verified scorer 的 V1 情境紀錄可提供逐題證據；由 `(recordKind,taskType,errorTypeIds或原errorTypes,question.skillTagIds)` 對照經審核 registry 產生唯一 skill evidence。單一 record 同一 tag 只算一次；批次更新順序固定、相同 ID 不重覆加權；不得由缺 `question.skillTagIds` 的未知資料臆造題目能力。歷史 aggregate 只可於 `legacyImported=true` 計入分離統計，不能反推錯誤類型／SkillTag。任何精熟度、學習成長曲線都標為 **估計**／`uncalibrated`，不能只靠刷題次數宣稱大師級。
 
 ### ReviewPlan — owner: Adaptive Training，V1，visibility: private-to-user
 
@@ -228,11 +251,11 @@
 | --- | --- | --- |
 | V1、`planId`、`profileId` | V1、`string`、`string` | 必填 |
 | `generatedAsOf`／`algorithmVersion` | UTC／`string` | 必填，顯式時間輸入使重播穩定 |
-| `items` | `{questionId,questionVersion,skillTagIds:string[],dueAt:UTC,priority:integer,sourceRecordIds:string[],reasonCodes:string[]}[]` | 必填 |
+| `items` | `{questionId,questionVersion,skillTagIds:string[],dueAt:UTC,priority:integer,sourceRecordRefs:RecordRef[],reasonCodes:string[]}[]` | 必填 |
 | `settings` | `{dailyLimit:integer≥0,timezone:string}` | 必填；時區 IANA，如 `Asia/Taipei` |
 | `method`／`calibrationStatus` | `"sm2-inspired"\|"rules-based"`／`"uncalibrated"\|"human-calibrated"` | 必填；不可說是臨床或已實測記憶模型 |
 
-與現有 `advanceReview / buildReviewQueue(records,{asOf})` 相容方式是把其已核對 `dueAt/repetitions/ease/lapses` 轉換成 **ReviewPlan 快照**（保留 `sourceRecordIds`），而不是覆寫原始 `DecisionRecord`。如果題目不存在、題庫不支援該 ruleVersion，標 `unavailable` 並顯示具體原因，不得安排無法作答的題目。
+與現有 `advanceReview / buildReviewQueue(records,{asOf})` 相容方式是把其已核對 `dueAt/repetitions/ease/lapses` 轉換成 **ReviewPlan 快照**（保留 `sourceRecordRefs` 及其家族標記），而不是覆寫原始 `DecisionRecord`。如果題目不存在、題庫不支援該 ruleVersion，標 `unavailable` 並顯示具體原因，不得安排無法作答的題目。
 
 ### TrainingSession — owner: Adaptive Training orchestrator，V1，visibility: private-to-user
 
@@ -242,13 +265,13 @@
 | `status` | `"planned"\|"active"\|"completed"\|"aborted"` | 必填，單向合法轉移 |
 | `startedAt?`／`endedAt?` | UTC | active 起有 start；completed/aborted 有 end |
 | `questionRefs` | `{questionId,questionVersion}[]` | 必填，原始順序不重排 |
-| `recordIds` | `string[]` | 必填，僅引用已驗證並持久化的 DecisionRecord，ID 唯一 |
+| `recordRefs` | `RecordRef[]` | 必填，引用已驗證及持久化的 v3／Academy 紀錄，各 `(kind,id)` 唯一 |
 | `seed`／`generatorVersions` | `string`／`string[]` | 必填，重播與來源一致 |
 | `abilityProfileBeforeRef?`／`abilityProfileAfterRef?` | `string` | 如宣稱能力變化，兩者都必填且資料版本可追溯 |
 | `reviewPlanRef?`／`statusReason?` | `string` | 明確引用復習計畫或中止原因 |
 | `source` | `"academy"\|"legacy-migrated"` | 必填，不可將 v1 只有總計的紀錄偽造為 session |
 
-**驗證**：`recordIds` 都存在於受保護的 v3 archive，及時序合法，session/records/question/ruleRef 可對上；未作答 session 不得憑空增能力；失敗記錄寫入採**原子流程**：先持久化 record，再以 idempotent reducer 更新 AbilityProfile 與 ReviewPlan，若後步失敗允許由 records 重建衍生結果，不能讓一半寫入毀掉舊 archive。禁止把本型別直接存進原本 `tw-mahjong-trainer:archive:v3` 的 `records[]`；應用**獨立命名空間、獨立 schema／遷移器**（提議 `tw-mahjong-master-academy:state:v1`，正式命名前須檢查既有 key 衝突）。
+**驗證**：`recordRefs` 依 `kind` 分別存在於既有 v3 archive 或 Academy V1 sidecar，通過對應 validator 且時間序合法，session/records/question/ruleRef 可對上；未作答 session 不得憑空增能力；失敗記錄寫入採**原子流程**：先持久化 record，再以 idempotent reducer 更新 AbilityProfile 與 ReviewPlan，若後步失敗允許由 records 重建衍生結果，不能讓一半寫入毀掉舊 archive。禁止把本型別直接存進原本 `tw-mahjong-trainer:archive:v3` 的 `records[]`；應用**獨立命名空間、獨立 schema／遷移器**（提議 `tw-mahjong-master-academy:state:v1`，正式命名前須檢查既有 key 衝突）。
 
 ## 6. 端到端 API 與責任邊界（提議介面，不代表程式已存在）
 
@@ -258,8 +281,9 @@
 | Rules Engine → UI | `listLegalActions(state, seat):LegalAction[]` 經 PlayerView 投影；`applyAction(state,action):{state,event}` | UI 用 actionId + expectedRevision 送回引擎，絕非信任客戶端合法性 |
 | Strategy → Academy | `StrategyAnalysis` immutable ref | 保存 engine/model/rule/view 版本；非精確量化不得用作確定答案 |
 | Academy → UI | `toPublicQuestion(question):QuestionPublic`、`LessonPublic` | allowlist 清除 answerKey、full GameState、未公開 TurnEvent |
-| UI → canonical grading | `submitAnswer(questionRef,choice)` → `GradingResult` → `createDecisionRecord` | 舊三題型不更改現有 v3 grading；scenario 無已驗證 scorer 則拒絕 |
-| DecisionRecord → Adaptive | `applyEvidence(profile,validatedRecord,registry):AbilityProfile` | 證據去重且版本化；純 reducer，同輸入同結果 |
+| UI → canonical grading | `submitAnswer(questionRef,choice)` → `GradingResult` → discriminated record dispatcher | 三種舊題 `createDecisionRecord` v3；經驗證 `scenario` 才能 `createAcademyDecisionRecord` V1；不合條件須 unscorable |
+| Grading → persistence | `persistScoredRecord(record): RecordRef` | 分家族驗證與儲存：v3 只進原 archive，V1 只進 sidecar；之後才能做 adaptive reducer |
+| RecordRef → Adaptive | `applyEvidence(profile,recordRef,validatedRecord,registry):AbilityProfile` | 檢查家族對應 validator + scorer；證據去重且版本化；純 reducer，同輸入同結果 |
 | Adaptive → UI | `getTodayRecommendation(profile,reviewPlan,asOf):RecommendationPublic` | 限可實際產生的題目，標示估計；不能洩漏 answerKey |
 | Persist → UI startup | `load archive:v3`（原實作） + `loadAcademyState`（新命名空間） | 舊 key/bytes 原樣保留，未知 schema 拒絕或隔離，不清空 |
 
