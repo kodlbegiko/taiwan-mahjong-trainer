@@ -32,8 +32,8 @@ def run(out):
             page.goto(url, wait_until='networkidle')
             require(page.locator('#academy-navigation button').count()==6,
                     'original Academy navigation was replaced')
-            require(page.locator('#full-table-navigation button').count()==3,
-                    'table and replay navigation missing')
+            require(page.locator('#full-table-navigation button').count()==4,
+                    'table, replay and Daily navigation missing')
             table_open(page)
             require('實驗' in page.locator('#full-table-root').inner_text(),
                     'experimental scope not disclosed')
@@ -85,7 +85,7 @@ def run(out):
                         'canonical discard not reflected in public river')
                 require(page.locator('.table-hand button').count()==16,
                         'canonical discard did not reduce concealed count')
-                require('尚未整合正式 Bot API' in page.locator('.table-actions').inner_text(),
+                require('Bot API 尚未連接' in page.locator('.table-actions').inner_text(),
                         'missing bots must fail closed, not auto-play fake decisions')
                 require(page.locator('.table-action-buttons button').count()==0,
                         'unverified declarations rendered after discard')
