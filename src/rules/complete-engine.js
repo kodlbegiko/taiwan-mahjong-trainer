@@ -98,12 +98,20 @@ function exhaustIfNeeded(state,triggerActionId){
 }
 export function completeCreateGame({
   gameId='game-complete-1',seed,profileId='tw16-configurable-table',
-  ruleVersion='experimental-full-v1',dealerSeat=0,
+  ruleVersion='experimental-full-v1',dealerSeat=0,fixtureDeck=null,
 }={}){
   if(typeof gameId!=='string'||!/^[A-Za-z0-9_-]+$/.test(gameId))throw new TypeError('Invalid gameId');
   assertSeat(dealerSeat);
   const profile=profileFor({profileId,ruleVersion});
-  const {tiles,rng}=shuffleDeck(createDeck(profile),seed);
+  const shuffled=shuffleDeck(createDeck(profile),seed),rng=shuffled.rng;
+  if(fixtureDeck!==null){
+    const inventory=new Set(createDeck(profile));
+    if(!Array.isArray(fixtureDeck)||fixtureDeck.length!==inventory.size||
+      new Set(fixtureDeck).size!==inventory.size||
+      fixtureDeck.some(id=>!inventory.has(id)))
+      throw new RangeError('Invalid private scripted physical deck fixture');
+  }
+  const tiles=fixtureDeck===null?shuffled.tiles:[...fixtureDeck];
   const players=Array.from({length:4},(_,seat)=>({
     seat,concealed:[],melds:[],river:[],flowers:[],
   }));
@@ -118,7 +126,8 @@ export function completeCreateGame({
       window:null,passLocks:[false,false,false,false],
       lastDraw:null,result:null}}},
     counts=players.map(p=>p.concealed.length);
-  event(state,'deal','system-private',undefined,{dealerSeat,countsBySeat:counts});
+  event(state,'deal','system-private',undefined,{dealerSeat,countsBySeat:counts,
+    ...(fixtureDeck===null?{}:{fixtureDeck:clone(tiles)})});
   endInitialFlowers(state);
   completeValidateGameState(state,{replay:false});
   return state;
@@ -362,6 +371,7 @@ export function completeReplayGame(config){
     gameId:config.gameId,seed:config.seed??config.rng?.seed,
     profileId:ref.profileId,ruleVersion:ref.ruleVersion,
     dealerSeat:config.dealerSeat??config.round?.dealerSeat,
+    fixtureDeck:config.events[0]?.payload?.fixtureDeck??null,
   });
   if(!same(config.events[0],state.events[0]))
     throw new RangeError('Replay mismatch: deal event');
