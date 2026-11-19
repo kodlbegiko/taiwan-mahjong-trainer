@@ -90,6 +90,96 @@ test('Flower codes remain independent of 0..33; profile controls count and enabl
   assert.equal(getRuleProfile(...Object.values(REF)).tileSet.flowers.enabled, false);
 });
 
+
+/** Simulates persistent JSON round-trip with every object key recursively reversed. */
+function reverseObjectKeyOrder(value) {
+  if (Array.isArray(value)) return value.map(reverseObjectKeyOrder);
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).reverse()
+      .map(([key, nested]) => [key, reverseObjectKeyOrder(nested)]));
+  }
+  return value;
+}
+
+test('P0-1: recursively reordered persisted JSON and every TurnEvent replay identically', () => {
+  let original = fresh('p0-key-order-fixture');
+  for (let i = 0; i < 9; i++) {
+    original = next(original, original.round.currentSeat).state;
+  }
+  const serialized = JSON.stringify(reverseObjectKeyOrder(original));
+  assert.notEqual(serialized, JSON.stringify(original), 'fixture must reorder properties');
+  const restored = JSON.parse(serialized);
+  assert.deepEqual(restored, original, 'only object property insertion order may change');
+  assert.equal(validateGameState(restored), true);
+  assert.deepEqual(replayGame(restored), original);
+  assert.deepEqual(createPlayerView(restored, 0), createPlayerView(original, 0));
+  assert.deepEqual(restored.events.map(e => e.seq), original.events.map(e => e.seq));
+});
+
+test('P0-1: replay rejects changed fields, missing/extra fields, types, arrays, seq and revision', () => {
+  let original = fresh('p0-tamper-fixture');
+  original = next(original, 0, 'discard').state;
+  original = next(original, 1, 'draw').state;
+  function invalid(mutator) {
+    const altered = JSON.parse(JSON.stringify(reverseObjectKeyOrder(original)));
+    mutator(altered);
+    assert.throws(() => validateGameState(altered), 'tampered GameState must fail validation');
+  }
+  invalid(s => { s.events[0].payload.countsBySeat[0] = 0; });
+  invalid(s => { s.events[1].payload.tileId = 't:0:0'; });
+  invalid(s => { s.events[2].payload.tileId = 't:0:0'; });
+  invalid(s => { s.events[1].seq = 99; });
+  invalid(s => { s.events[2].seq = '3'; });
+  invalid(s => { delete s.events[1].payload.tileId; });
+  invalid(s => { s.events[1].payload.unapproved = true; });
+  invalid(s => { s.events[0].unexpected = false; });
+  invalid(s => { delete s.events[0].type; });
+  invalid(s => { s.events[0].payload.countsBySeat.reverse(); });
+  invalid(s => { s.revision++; });
+  invalid(s => { s.unexpectedPrivateField = 'not-in-contract'; });
+  invalid(s => { s.round.unrecognized = 'not-in-contract'; });
+  invalid(s => { s.players[1].unexpected = true; });
+  const modifiedLedger = JSON.parse(JSON.stringify(reverseObjectKeyOrder(original)));
+  modifiedLedger.events[1].payload.tileId = 't:0:0';
+  assert.throws(() => replayGame(modifiedLedger), /Replay event mismatch/);
+  const modifiedInitial = JSON.parse(JSON.stringify(reverseObjectKeyOrder(original)));
+  modifiedInitial.events[0].payload.unapproved = 1;
+  assert.throws(() => replayGame(modifiedInitial), /Replay mismatch: deal event/);
+});
+
+test('P0-2: flower codes must be typed nonempty normalized unique strings', () => {
+  const base = getRuleProfile(...Object.values(REF));
+  base.tileSet.flowers = { enabled: true, codes: [{ code: 'season-spring', copies: 1 }] };
+  for (const badCode of [undefined, null, 0, 1, true, false, [], ['season-spring'],
+    {}, '', 'undefined', 'Season-Spring', 'season_spring', ' season-spring']) {
+    const profile = structuredClone(base);
+    profile.tileSet.flowers.codes = [{ copies: 1 }];
+    if (badCode !== undefined) profile.tileSet.flowers.codes[0].code = badCode;
+    assert.throws(() => validateRuleProfile(profile), /flower code\/copies/, String(badCode));
+    assert.throws(() => createDeck(profile), /flower code\/copies/, String(badCode));
+  }
+  for (const badCopies of [undefined, null, -1, 0, 5, 1.5, '1', true]) {
+    const profile = structuredClone(base);
+    profile.tileSet.flowers.codes = [{ code: 'season-spring' }];
+    if (badCopies !== undefined) profile.tileSet.flowers.codes[0].copies = badCopies;
+    assert.throws(() => validateRuleProfile(profile), /flower code\/copies/, String(badCopies));
+  }
+  const duplicate = structuredClone(base);
+  duplicate.tileSet.flowers.codes.push({ code: 'season-spring', copies: 2 });
+  assert.throws(() => validateRuleProfile(duplicate), /flower code\/copies/);
+
+  const supported = structuredClone(base);
+  supported.tileSet.flowers.codes.push({ code: 'plant-plum', copies: 4 });
+  assert.equal(validateRuleProfile(supported), true);
+  const physicalIds = createDeck(supported);
+  assert.equal(physicalIds.length, 141);
+  assert.equal(physicalIds.filter(id => id.startsWith('f:')).length, 5);
+  assert.equal(physicalIds.some(id => id.startsWith('f:undefined:')), false);
+  for (const id of physicalIds.filter(id => id.startsWith('f:'))) {
+    assert.equal(validateTileIdentity(makeTileIdentity(id, supported), supported), true);
+  }
+});
+
 test('Pinned Golden Seed: physical wall order and initial dealer count', () => {
   const s = fresh();
   assert.deepEqual(s.players[0].concealed.slice(0, 8),

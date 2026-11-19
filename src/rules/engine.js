@@ -9,6 +9,24 @@ import { getRuleProfile } from './profiles.js';
 
 const V1 = { schemaVersion: SCHEMA_VERSION, contractVersion: CONTRACT_VERSION };
 const clone = x => JSON.parse(JSON.stringify(x));
+
+/**
+ * Strict structural equality for JSON DTOs. Property insertion order is
+ * irrelevant; object key sets, primitive types/values and array order are not.
+ * Keeping this browser-compatible avoids a Node-only assert dependency.
+ */
+function sameJson(a, b) {
+  if (a === b) return true;
+  if (a === null || b === null || typeof a !== 'object' || typeof b !== 'object') return false;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  if (Array.isArray(a)) {
+    return a.length === b.length && a.every((value, index) => sameJson(value, b[index]));
+  }
+  const keys = Object.keys(a);
+  return keys.length === Object.keys(b).length
+    && keys.every(key => Object.hasOwn(b, key) && sameJson(a[key], b[key]));
+}
+
 const seatOK = s => Number.isInteger(s) && s >= 0 && s < 4;
 function assertSeat(seat) { if (!seatOK(seat)) throw new RangeError('Invalid seat (expected 0..3)'); }
 function assertRoundProfile(profile) {
@@ -119,7 +137,7 @@ export function applyAction(state, submission) {
   if (typeof actionId !== 'string') throw new TypeError('actionId is required');
   const action = listLegalActions(state, actorSeat).find(a => a.actionId === actionId);
   if (!action) throw new RangeError('Unavailable or illegal actionId');
-  if (submission.tileIds !== undefined && JSON.stringify(submission.tileIds) !== JSON.stringify(action.tileIds)) {
+  if (submission.tileIds !== undefined && !sameJson(submission.tileIds, action.tileIds)) {
     throw new RangeError('Forged tileIds');
   }
   const next = clone(state);
@@ -220,7 +238,7 @@ export function replayGame(config) {
     ruleVersion: ruleRef.ruleVersion, dealerSeat: config.dealerSeat ?? config.round?.dealerSeat,
   });
   if (!config.events.length) throw new RangeError('Missing deal event');
-  if (JSON.stringify(config.events[0]) !== JSON.stringify(state.events[0])) {
+  if (!sameJson(config.events[0], state.events[0])) {
     throw new RangeError('Replay mismatch: deal event');
   }
   for (const recorded of config.events.slice(1)) {
@@ -232,7 +250,7 @@ export function replayGame(config) {
       actorSeat: recorded.actorSeat,
       actionId: recorded.causedByActionId, expectedRevision: state.revision,
     });
-    if (JSON.stringify(applied.event) !== JSON.stringify(recorded)) {
+    if (!sameJson(applied.event, recorded)) {
       throw new RangeError('Replay event mismatch at seq ' + recorded.seq);
     }
     state = applied.state;
@@ -289,7 +307,7 @@ export function validateGameState(state, { replay = true } = {}) {
     const e = state.events[i];
     if (!e || e.schemaVersion !== 1 || e.contractVersion !== CONTRACT_VERSION
         || e.seq !== i + 1 || e.eventId !== 'evt:' + state.gameId + ':' + (i + 1)
-        || e.gameId !== state.gameId || JSON.stringify(e.ruleRef) !== JSON.stringify(state.ruleRef)
+        || e.gameId !== state.gameId || !sameJson(e.ruleRef, state.ruleRef)
         || (i > 0 && e.previousEventId !== state.events[i - 1].eventId)
         || (i === 0 && (e.type !== 'deal' || e.visibility !== 'system-private'))
         || (i > 0 && !['discard', 'draw'].includes(e.type))) {
@@ -308,7 +326,7 @@ export function validateGameState(state, { replay = true } = {}) {
         last.type === 'deal' ? state.round.dealerSeat
           : last.type === 'discard' ? (last.actorSeat + 1) % 4 : last.actorSeat
       )) throw new RangeError('Invalid phase/seat/public sequence');
-  if (replay && JSON.stringify(replayGame(state)) !== JSON.stringify(state)) {
+  if (replay && !sameJson(replayGame(state), state)) {
     throw new RangeError('State does not match deterministic replay');
   }
   return true;

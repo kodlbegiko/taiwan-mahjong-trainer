@@ -47,7 +47,9 @@ export function validateRuleProfile(p) {
   if (!f.enabled && f.codes.length) fail('disabled flower codes');
   const codes = new Set();
   for (const item of f.codes) {
-    if (!isObj(item) || !/^[a-z]+(?:-[a-z]+)*$/.test(item.code)
+    if (!isObj(item) || typeof item.code !== 'string'
+        || item.code === 'undefined'
+        || !/^[a-z]+(?:-[a-z]+)*$/.test(item.code)
         || !Number.isInteger(item.copies) || item.copies < 1 || item.copies > 4
         || codes.has(item.code)) fail('flower code/copies');
     codes.add(item.code);
