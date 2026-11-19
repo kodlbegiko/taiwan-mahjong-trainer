@@ -201,10 +201,11 @@ export function planDailyTraining({
   const recapPool = mistakes.slice(0, Math.max(1, Math.ceil(minutes * 0.2 / 3)));
   const recapIds = new Set(recapPool.map(q => q.questionId + '@' + q.questionVersion));
   const candidates = shuffled.filter(q => !recapIds.has(q.questionId + '@' + q.questionVersion));
-  const weakDue = due.filter(q => q.skillTagIds.some(tag => weakTags.includes(tag)))
-    .map(q => available.get(q.questionId + '@' + q.questionVersion))
-    .filter(q => !recapIds.has(q.questionId + '@' + q.questionVersion));
-  pick(weakDue, SECTIONS[0], targets[SECTIONS[0]]);
+  // Review urgency precedes weak-tag drilling. A due question that is not
+  // currently in the weakest three skill tags must still enter the first pool.
+  const duePool = due.map(q => available.get(q.questionId + '@' + q.questionVersion))
+    .filter(q => q && !recapIds.has(q.questionId + '@' + q.questionVersion));
+  pick(duePool, SECTIONS[0], targets[SECTIONS[0]]);
   pick(candidates.filter(q => q.skillTagIds.some(tag => weakTags.includes(tag))),
     SECTIONS[1], targets[SECTIONS[1]]);
   pick(candidates, SECTIONS[2], targets[SECTIONS[2]]);
