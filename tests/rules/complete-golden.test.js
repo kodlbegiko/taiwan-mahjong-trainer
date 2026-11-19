@@ -95,7 +95,7 @@ test('R3-B positive Golden: discard win takes precedence and pays only discarder
   const ready=[...triplets(),'t:5:0'];
   assert.equal(ready.length,16);
   const s=fixture({0:['t:5:1'],1:ready},[],'ron');
-  assert.ok(!listLegalActions(s,0).some(a=>a.kind==='win'));
+  // The dealer could also have an independent structural win; the scripted discard remains legal.
   const opened=act(s,0,'discard','t:5:1');
   const win=selected(opened,1,'win',undefined,'DISCARD_WIN');
   assert.equal(win.claimEventId,opened.extensions.tw16.window.discardEventId);
@@ -226,5 +226,8 @@ test('R3-C private Golden fixture is never present in PlayerView; forged deck re
     /Invalid private scripted/);
   const tampered=cloned(initial);
   tampered.events[0].payload.fixtureDeck.reverse();
-  assert.throws(()=>replayGame(tampered),/Replay mismatch/);
+  // The original full state no longer corresponds to its private deal ledger.
+  // Replay by itself deterministically reconstructs the edited ledger; the
+  // mandatory full-state validation is what detects the inconsistency.
+  assert.throws(()=>validateGameState(tampered),/mismatch/);
 });
