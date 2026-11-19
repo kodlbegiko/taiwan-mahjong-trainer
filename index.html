@@ -10,7 +10,9 @@
   <link rel="apple-touch-icon" href="./public/icons/icon-180.png" />
   <link rel="manifest" href="./public/manifest.webmanifest" />
   <link rel="stylesheet" href="./style.css" />
+  <link rel="stylesheet" href="./src/academy-ui/academy.css" />
   <script type="module" src="./src/app.js"></script>
+  <script type="module" src="./src/academy-ui/main.js"></script>
   <title>台麻練習所 · Taiwan Mahjong Trainer</title>
 </head>
 <body>
@@ -23,6 +25,7 @@
       </a>
       <div class="header-meta"><span class="version">OPEN SOURCE · V0.2 訓練測試版</span><a class="repo-link" href="https://github.com/kodlbegiko/taiwan-mahjong-trainer" target="_blank" rel="noopener noreferrer">GitHub <span aria-hidden="true">↗</span></a></div>
     </header>
+    <nav id="academy-navigation" class="academy-nav" aria-label="台麻大師學院主要頁面"></nav>
     <nav class="mode-nav" aria-label="訓練模式">
       <button type="button" class="mode-tab is-active" data-mode="discard" aria-pressed="true"><span class="tab-index">01</span> 何切訓練</button>
       <button type="button" class="mode-tab" data-mode="tenpai" aria-pressed="false"><span class="tab-index">02</span> 聽牌判斷</button>
@@ -31,6 +34,7 @@
     </nav>
     <div class="pwa-bar"><p id="offline-status" role="status" aria-live="polite">離線功能初始化中；首次安裝需先連線。</p><div><button id="update-app" type="button" hidden>更新至最新版本</button><button id="install-app" type="button" hidden>安裝應用程式</button></div></div>
     <main id="main">
+      <section id="academy-root" class="academy-page" aria-label="台麻大師學院"></section>
       <section class="intro" aria-labelledby="intro-heading">
         <div class="intro-copy"><span class="eyebrow">16 張台麻 · 結構性牌效率</span><h1 id="intro-heading">每一張捨牌，<em>都應該有理由。</em></h1><p>練習何切、聽牌判斷與多面聽，作答後檢查官方評分、牌型拆解及錯誤原因；所有計算均在裝置內進行。</p></div>
         <div class="intro-note"><span class="note-label">本版的判斷範圍</span><p>只衡量一般牌型的結構性效率，不包含攻防、台數或對手資訊。</p></div>
