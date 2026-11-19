@@ -181,7 +181,7 @@ function ReplayPublicTable(view) {
     flowersSection(view.self.flowers ?? []) + '</section>';
 }
 export function ReplayControls(timeline, index) {
-  if (!timeline?.verified || !Array.isArray(timeline.frames)) {
+  if (!timeline?.verified || !Array.isArray(timeline.frames) || timeline.frames.length === 0) {
     return '<section class="table-empty" aria-label="複盤不可用"><h2>牌局複盤尚未開放</h2>' +
       '<p>目前沒有經正式 Replay API 驗證的事件快照與 CoachingFinding。' +
       '不會使用當前手牌偽裝歷史牌局，也不產生策略評分。</p>' +
