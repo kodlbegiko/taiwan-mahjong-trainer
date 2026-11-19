@@ -165,7 +165,7 @@ export function createAcademyStore(storage, {
       })),
     ];
   }
-  function derive(state, asOf, assessmentRefs = [], questionCatalog = []) {
+  function derive(state, asOf, assessmentRefs = [], questionCatalog = [], reservedQuestionRefs = []) {
     const legacy = readLegacy();
     const records = verifiedEntries(state, legacy);
     const profile = buildAbilityProfile({
@@ -173,20 +173,20 @@ export function createAcademyStore(storage, {
       assessmentRefs, validateAcademyDecisionRecord,
     });
     const reviewPlan = buildReviewPlan({
-      profile, records, asOf, timezone, questionCatalog, validateAcademyDecisionRecord,
-      validateAcademyQuestion,
+      profile, records, asOf, timezone, questionCatalog, reservedQuestionRefs,
+      validateAcademyDecisionRecord, validateAcademyQuestion,
     });
     return { profile, reviewPlan, records };
   }
-  function rebuild({ asOf, assessmentRefs = [], questionCatalog = [] } = {}) {
+  function rebuild({ asOf, assessmentRefs = [], questionCatalog = [], reservedQuestionRefs = [] } = {}) {
     requireUtc(asOf);
     const before = load();
-    const { profile, reviewPlan } = derive(before, asOf, assessmentRefs, questionCatalog);
+    const { profile, reviewPlan } = derive(before, asOf, assessmentRefs, questionCatalog, reservedQuestionRefs);
     return save({
       ...before, revision: before.revision + 1, abilityProfile: profile, reviewPlan,
     });
   }
-  function persistScoredRecord(entry, { asOf, assessmentRefs = [], questionCatalog = [] } = {}) {
+  function persistScoredRecord(entry, { asOf, assessmentRefs = [], questionCatalog = [], reservedQuestionRefs = [] } = {}) {
     requireUtc(asOf);
     const [validated] = normalizeRecordEntries([entry], { validateAcademyDecisionRecord });
     const ref = makeRecordRef(validated.kind, validated.record);
@@ -225,7 +225,7 @@ export function createAcademyStore(storage, {
     // At this point the raw canonical record is durably committed and read back.
     // A later failure leaves it intact and recoverable by rebuild().
     try {
-      const { profile, reviewPlan } = derive(state, asOf, assessmentRefs, questionCatalog);
+      const { profile, reviewPlan } = derive(state, asOf, assessmentRefs, questionCatalog, reservedQuestionRefs);
       const result = save({
         ...state, revision: state.revision + 1,
         abilityProfile: profile, reviewPlan,
