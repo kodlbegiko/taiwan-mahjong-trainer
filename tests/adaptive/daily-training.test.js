@@ -238,3 +238,34 @@ test('unverified scenario and unpublished lessons never enter a DailySession',()
     assert.ok(!Object.hasOwn(q,'answerKey'));
   }
 });
+
+test('crash window after canonical v3 append recovers pending provenance and session on resume',()=>{
+  const storage=new MemoryStorage(),c=ctrl(storage);
+  const session=c.ensureToday({asOf:A,minutes:10});
+  const ref=session.questionRefs[0],choice=choose(c.getQuestion(ref,{asOf:A}));
+  const set=storage.setItem.bind(storage);
+  let simulatedFailure=false;
+  storage.setItem=(key,value)=>{
+    if(!simulatedFailure && key===ACADEMY_STORAGE_KEY &&
+      JSON.parse(value).provenanceLinks.length>0) {
+      simulatedFailure=true;
+      throw new Error('Injected crash immediately after canonical v3 append');
+    }
+    return set(key,value);
+  };
+  const interrupted=c.submit(ref,choice,{asOf:A,durationMs:1000,
+    attemptId:'daily-interrupted-after-v3'});
+  assert.equal(interrupted.status,'recovery-required');
+  assert.ok(simulatedFailure);
+  assert.ok(storage.getItem(ARCHIVE_STORAGE_KEY));
+  assert.equal(JSON.parse(storage.getItem(ACADEMY_STORAGE_KEY)).pendingProvenance.length,1);
+  storage.setItem=set;
+  const healed=c.resumeSession({asOf:B,sessionId:session.sessionId});
+  assert.equal(healed.status,'active');
+  assert.equal(healed.completed,1);
+  assert.equal(healed.pendingRecovery,0);
+  assert.equal(healed.recordRefs.length,1);
+  const duplicate=c.submit(ref,choice,{asOf:B,durationMs:1000,
+    attemptId:'daily-after-healing-different'});
+  assert.equal(duplicate.status,'already-answered');
+});
