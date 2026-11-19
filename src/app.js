@@ -1,4 +1,5 @@
 import { TILE_LABELS, tileClass } from './tiles.js';
+import { tileFaceMarkup, tileAccessibleName, installTileFaceFallback } from './tile-visuals.js';
 import { gradeAnswer } from './practice.js';
 import { explainDiscard, analyzeStructure } from './analysis/explain.js';
 import { createExercise, EXERCISE_SCHEMA_VERSION, SCORING_VERSION } from './training/exercises.js';
@@ -137,9 +138,8 @@ function renderHistory() {
 }
 
 function tileMarkup(tile, index, { interactive = true, picked = false } = {}) {
-  const label = tileName(tile);
-  const suit = tile < 9 ? '萬' : tile < 18 ? '筒' : tile < 27 ? '索' : '字';
-  const contents = `<span aria-hidden="true">${tile < 27 ? label.slice(0, 1) : label}</span><small aria-hidden="true">${suit}</small>`;
+  const label = tileAccessibleName(tile);
+  const contents = tileFaceMarkup(tile);
   if (!interactive) return `<span class="tile ${tileClass(tile)}${picked ? ' picked' : ''}" role="img" aria-label="第 ${index + 1} 張：${label}">${contents}</span>`;
   return `<button type="button" class="tile ${tileClass(tile)}" data-tile="${tile}" data-index="${index}" aria-label="第 ${index + 1} 張：${label}；按下即捨牌並評分">${contents}</button>`;
 }
@@ -159,7 +159,7 @@ function renderWaitPicker() {
   for (const tile of [...exercise.hand, ...exercise.visibleTiles]) counts[tile]++;
   $('#wait-options').innerHTML = TILE_LABELS.map((_, tile) => {
     const unavailable = counts[tile] === 4;
-    return `<button type="button" class="wait-tile tile ${tileClass(tile)}" data-wait="${tile}" aria-pressed="false" aria-label="${tileName(tile)}${unavailable ? '；手牌及明牌已經四張，不可摸' : '；切換選取'}" ${unavailable ? 'disabled' : ''}><span aria-hidden="true">${tile < 27 ? tileName(tile).slice(0, 1) : tileName(tile)}</span><small aria-hidden="true">${tile < 9 ? '萬' : tile < 18 ? '筒' : tile < 27 ? '索' : '字'}</small></button>`;
+    return `<button type="button" class="wait-tile tile ${tileClass(tile)}" data-wait="${tile}" aria-pressed="false" aria-label="${tileAccessibleName(tile)}${unavailable ? '；手牌及明牌已經四張，不可摸' : '；切換選取'}" ${unavailable ? 'disabled' : ''}>${tileFaceMarkup(tile)}</button>`;
   }).join('');
   $('#wait-selected').textContent = '已選 0 種';
   $('#submit-waits').disabled = false;
@@ -384,6 +384,9 @@ function switchMode(nextMode) {
 }
 
 function registerEvents() {
+  // Capture image load failures before dynamically inserting any hand/wait SVGs.
+  installTileFaceFallback($('#hand'));
+  installTileFaceFallback($('#wait-options'));
   document.querySelectorAll('[data-mode]').forEach(button => button.addEventListener('click', () => switchMode(button.dataset.mode)));
   $('#difficulty').addEventListener('change', event => { difficulty = event.target.value; generateQuestion(); });
   $('#hand').addEventListener('click', event => {
