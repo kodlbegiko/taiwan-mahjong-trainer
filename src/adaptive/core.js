@@ -115,15 +115,21 @@ export function addLocalCalendarDays(iso, days, timezone = DEFAULT_TIMEZONE) {
   const target = Date.UTC(newDay.getUTCFullYear(), newDay.getUTCMonth(), newDay.getUTCDate(),
     p.hour, p.minute, p.second, p.millisecond);
   let guess = target;
-  for (let i = 0; i < 6; i++) {
+  const candidates = [];
+  for (let i = 0; i < 8; i++) {
     const actual = localParts(new Date(guess).toISOString(), timezone);
-    const apparent = Date.UTC(actual.year, actual.month - 1, actual.day, actual.hour, actual.minute, actual.second, actual.millisecond);
-    const delta = target - apparent;
-    if (delta === 0) break;
-    guess += delta;
+    const apparent = Date.UTC(actual.year, actual.month - 1, actual.day,
+      actual.hour, actual.minute, actual.second, actual.millisecond);
+    if (apparent === target) return new Date(guess).toISOString();
+    candidates.push({ instant: guess, apparent });
+    guess += target - apparent;
   }
-  // Spring-forward gaps are rare: deterministically use the first legal instant after the gap.
-  return new Date(guess).toISOString();
+  // If the desired wall time is missing across a spring-forward DST gap,
+  // preserve minute/second and select the nearest later representable wall time.
+  const later = candidates.filter(x => x.apparent >= target)
+    .sort((a, b) => a.apparent - b.apparent || a.instant - b.instant);
+  if (!later.length) throw new RangeError('Unable to resolve local calendar time');
+  return new Date(later[0].instant).toISOString();
 }
 export function localDayKey(iso, timezone = DEFAULT_TIMEZONE) {
   const p = localParts(iso, timezone);
