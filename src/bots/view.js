@@ -6,6 +6,15 @@
  */
 import { readPlayerView } from '../strategy/view.js';
 
+// Exact, versioned table profiles only. Never infer policy from a profile name
+// prefix or accept an unreviewed future version.
+export function isSupportedBotTableProfile(ref) {
+  return (ref?.profileId === 'tw16-configurable-table' &&
+    ref?.ruleVersion === 'experimental-full-v1') ||
+    (ref?.profileId === 'tw16-single-winner-interception' &&
+    ref?.ruleVersion === 'experimental-v1');
+}
+
 const rootKeys = ['schemaVersion','contractVersion','viewId','gameId','ruleRef',
   'audienceSeat','asOfEventSeq','round','self','opponents','publicEvents',
   'legalActions','knownUnavailableTypes','capabilities'];
@@ -98,8 +107,7 @@ function replacementView(input) {
   allow(v,rootKeys,'root');allow(v.round,roundKeys,'round');
   allow(v.ruleRef,['profileId','ruleVersion'],'ruleRef');
   required(v.schemaVersion===1 && v.contractVersion==='master-academy/1.0.0' &&
-    v.ruleRef.profileId==='tw16-configurable-table' &&
-    v.ruleRef.ruleVersion==='experimental-full-v1' &&
+    isSupportedBotTableProfile(v.ruleRef) &&
     v.round.phase==='replacement', 'R3 profile/phase');
   required(typeof v.gameId==='string' && v.gameId.length>0 &&
     typeof v.viewId==='string' && Number.isInteger(v.asOfEventSeq) &&
@@ -174,9 +182,46 @@ function replacementView(input) {
 /** Always use strict Strategy validation, except a *current actor's* R3
  * initial flower replacement; never send special-case views to Strategy. */
 export function readBotView(input) {
-  const flower = input?.ruleRef?.profileId==='tw16-configurable-table' &&
+  const flower = isSupportedBotTableProfile(input?.ruleRef) &&
     input?.round?.phase==='replacement' &&
     Array.isArray(input?.self?.concealed) &&
     input.self.concealed.some(t=>t?.kind==='flower');
   return flower ? replacementView(input) : readPlayerView(input);
+}
+
+/**
+ * Controller-only terminal check: no strategy call or BotDecision is made.
+ * R5 publishes claimResolution in final public WIN/SETTLE payloads, which the
+ * earlier Strategy pre-settlement schema intentionally does not recognize.
+ * Accept only a detached, redacted Rules PlayerView; no GameState fallback.
+ */
+export function readSettledBotView(input) {
+  const v = detached(input);
+  allow(v, rootKeys, 'settled root');
+  allow(v.ruleRef, ['profileId','ruleVersion'], 'settled ruleRef');
+  allow(v.round, roundKeys, 'settled round');
+  required(isSupportedBotTableProfile(v.ruleRef) && v.round.phase === 'settled' &&
+    Number.isInteger(v.audienceSeat) && v.audienceSeat >= 0 &&
+    v.audienceSeat <= 3 && v.self?.seat === v.audienceSeat &&
+    Array.isArray(v.legalActions) && v.legalActions.length === 0 &&
+    Array.isArray(v.publicEvents) && Array.isArray(v.opponents) &&
+    v.opponents.length === 3, 'settled Rules projection');
+  allow(v.self, ['seat','concealed','melds','river','flowers'], 'settled self');
+  const seats = new Set([v.audienceSeat]);
+  for (const opp of v.opponents) {
+    allow(opp, ['seat','concealedCount','melds','river','flowers'],
+      'settled opponent');
+    required(Number.isInteger(opp.seat) && opp.seat >= 0 && opp.seat <= 3 &&
+      !seats.has(opp.seat) && Number.isInteger(opp.concealedCount),
+      'settled opponent redaction');
+    seats.add(opp.seat);
+  }
+  for (const event of v.publicEvents) {
+    allow(event, publicEventKeys, 'settled event');
+    required(event.visibility === 'public' &&
+      event.ruleRef?.profileId === v.ruleRef.profileId &&
+      event.ruleRef?.ruleVersion === v.ruleRef.ruleVersion,
+      'settled public event');
+  }
+  return {view:v};
 }
