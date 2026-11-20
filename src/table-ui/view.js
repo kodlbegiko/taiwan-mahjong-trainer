@@ -132,7 +132,13 @@ export function TableView(snapshot,{selection=null,busy=false,error='',botStatus
     '</span><span>階段：'+escapeHtml(view.round.phase)+
     '</span><span>莊家：'+SEATS[view.round.dealerSeat]+
     '</span><span>行動席：'+(ended?'結束':SEATS[view.round.currentSeat])+
-    '</span><span>牌山剩餘：'+wallRemaining+' 張</span></div>'+
+    '</span><span>牌山剩餘：'+wallRemaining+' 張</span>'+
+    '<span data-table-physical-count="'+view.self.concealed.length+'">實體手牌：'+
+      view.self.concealed.length+' 張</span>'+
+    '<span data-table-discard-count="'+actions.filter(a=>a.kind==='discard').length+
+      '">合法捨牌：'+actions.filter(a=>a.kind==='discard').length+' 種</span>'+
+    '<span data-table-legal-count="'+actions.length+'">可執行動作：'+
+      actions.length+' 種</span></div>'+
     (storageWarning?'<p role="status" class="table-warning">'+escapeHtml(storageWarning)+'</p>':'')+
     (replayWarning?'<p role="status" class="table-warning">'+escapeHtml(replayWarning)+'</p>':'')+
     (error?'<p role="alert" class="table-warning">'+escapeHtml(error)+'</p>':'')+
