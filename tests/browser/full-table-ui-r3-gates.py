@@ -4,6 +4,7 @@ No fixtures or fabricated Bot decisions are permitted.
 """
 from pathlib import Path
 import json
+import os
 from playwright.sync_api import sync_playwright
 from _release_site import served_site
 
@@ -19,6 +20,13 @@ def open_game(page):
     profiles=page.locator('#table-profile option').all_text_contents()
     require(any('tw16-configurable-table' in p for p in profiles),
             'BLOCKED: latest R3 Rules/Bot/Replay not actually integrated; no full E2E claim')
+    if os.environ.get('PHASE3_REQUIRE_SINGLE_WINNER')=='1':
+        r5='tw16-single-winner-interception@experimental-v1'
+        require(any('一炮一響' in p and '攔胡' in p for p in profiles),
+                'R5 single-winner experimental profile label missing')
+        page.locator('#table-profile').select_option(r5)
+        require(page.locator('#table-profile').input_value()==r5,
+                'R5 Profile selection failed')
     page.locator('#full-table-root [data-start-new]').click()
     page.wait_for_selector('.table-hand', timeout=25000)
 
