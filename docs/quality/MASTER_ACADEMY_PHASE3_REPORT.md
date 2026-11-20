@@ -118,3 +118,40 @@
 
 ### 7.5 Release matrix
 **V1 baseline:** PASS and preserved. **Phase 3 integration branch/source management:** ESTABLISHED. **Experimental Rules and source-level Bot/Replay/Table UI:** bounded/partial PASS. **Daily canonical session API:** NODE PASS, UI incomplete. **Verified Taiwanese full four-player rules:** NO-GO. **Three-Bot settled full match:** NO-GO. **Postgame Replay/Coach:** NO-GO. **Full-match browser/PWA:** NOT_RUN. **Phase3 preview:** BLOCKED. **Formal Release:** NO-GO. All open PRs remain Draft; no protected main writes.
+
+
+---
+
+## 8. 2026-11-20 latest five-source integration candidate (supersedes older source pins)
+
+**Latest source-staged commit:** [dc8e7af215f5131e07622e482588d8aa7c6f5ffd](https://github.com/kodlbegiko/taiwan-mahjong-trainer/commit/dc8e7af215f5131e07622e482588d8aa7c6f5ffd); parent `98af3a721f0100f725c6f26d44ffe5ff1e27585d`. No protected `main` change, no PR merge or preview publication. Candidate is experimental; this section records pending and blocked gates, not false passes.
+
+| Source | Latest inspected HEAD | Exact owned files staged |
+| --- | --- | --- |
+| Rules #43 | `1f7badfefa50d97e4db4a9a689ea563eb3289232` | 12 |
+| Bots #40 | `273ccd9819fad4069540cdbd85021df1ad065ba3` | 7 |
+| Replay #41 | `147d99fd5dabe23a6c5d774b960a459f19767310` | 5 |
+| Table #42 | `701081ab893316dd8ed70ef27b4d487d722eb818` | 12 (source `sw.js` deliberately excluded) |
+| Daily #45 | `c4180ee595b72ae8801b3fb987e0036a15abbda8` | 6 |
+
+The 42 source-owned files are copied by their exact Git blob identities, not a cherry-pick of divergent ancestry. Their changed-file scopes and merge bases were audited. Rules #43, UI #42, and Daily #45 diverge from integration HEAD; avoid blind merges. All seven PRs remain Draft; zero formal review submissions were found at this audit. Being free of unresolved threads is not approval. Changes to `sw.js` are integrator-owned: preserve the prior Phase3 transitive precache and explicitly add `src/table-ui/full-round.js`, `src/table-ui/daily.js` and `src/bots/view.js`, with a cache version bump.
+
+**CI evidence before this candidate:** Bots #40 exact-source Verify [#44638412070](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44638412070) reported 281 tests / 279 PASS / 1 FAIL / 1 SKIP. It printed a real source-local `BOT_FULL_ROUND_SUMMARY` for seeds 0..99: 100 executed, 100 completed (89 wins, 11 exhaustive draws), 4,449 Claim Windows, zero illegal actions/stalls and 100 replay matches; **these counts are source-branch-only, not combined-source passing CI**. The failing old integrator test expected `claim-adjudication-unavailable`, but the new controller returned `acted`. In the candidate, `tests/integration/phase3-source-boundaries.test.js` now checks three actual authoritative Rules claim submissions, revision progression, automatic arbitration and deterministic state replay. Replay #41 source Verify [#44637928438](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44637928438) passed. #43/#42/#45 had no exact-source PR workflow runs returned by the queried commit-run endpoint.
+
+**New exact-head acceptance workflow:** `.github/workflows/phase3-full-match.yml` runs real R3 Rules, three Bot fixture/100 seeds, Replay and cross-module state tests; separately runs `tests/browser/full-table-ui-r3-gates.py` in Chromium including human controls, settlement, saved Replay, Daily UI, 34 SVG and offline PWA. Uploads screenshot/action evidence even if the browser gate fails. The existing `tw16-table-ui.yml` remains specifically a sandbox gate; its green result cannot be misreported as full-match acceptance.
+
+| Required status | Assessment at source staging | Pass rule |
+| --- | --- | --- |
+| V1_BASELINE_PASS | PASS on separately pinned #33 | Existing 12-step E2E/Oracle evidence; retest latest candidate pending |
+| EXPERIMENTAL_RULES_PASS | SOURCE_EVIDENCE; COMBINED_PENDING | Latest Rules golden + source pinned |
+| CLAIM_ARBITRATION_PASS | COMBINED_PENDING | Three responders, Rules adjudication, no private intent leak |
+| THREE_BOT_MATCH_PASS | SOURCE_100_SEEDS; COMBINED_PENDING | Same SHA, 100 seeded terminal games and replay equality |
+| REPLAY_PASS | SOURCE_CI_PASS; COMBINED_PENDING | Same SHA settled R3 Replay and privacy |
+| DAILY_UI_PASS | COMBINED_PENDING | Official v3/provenance and browser refresh |
+| TABLE_UI_PASS | COMBINED_PENDING | Actual human+three Bots completed browser game |
+| PWA_PASS | COMBINED_PENDING | Offline R3 new tab and full dependency graph |
+| PREVIEW_DEPLOYED | NO | Isolated verified HTTPS deployment not yet available |
+| FULL_RULES_VERIFIED | NO | Experimental simplified scoring, unsupported venue variants |
+| RELEASE_GO | NO | Full match/preview/device/complete-rules gates not met |
+
+**Do not promote any PENDING gate by inference.** Full Game Preview: NO-GO until same-HEAD terminal browser+replay evidence exists. Formal release: NO-GO. Physical iPhone, Android, VoiceOver, TalkBack: NOT_RUN by request.

@@ -1,0 +1,84 @@
+name: Phase 3 Real Full-Match Acceptance — experimental R3
+on:
+  pull_request:
+    paths:
+      - 'src/rules/**'
+      - 'src/bots/**'
+      - 'src/replay/**'
+      - 'src/table-ui/**'
+      - 'src/adaptive/**'
+      - 'src/integration/**'
+      - 'tests/rules/**'
+      - 'tests/bots/**'
+      - 'tests/replay/**'
+      - 'tests/integration/**'
+      - 'tests/browser/full-table-ui-r3-gates.py'
+      - 'sw.js'
+      - 'index.html'
+      - '.github/workflows/phase3-full-match.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  r3-node:
+    name: Rules, three Bots, 100 fixed seeds, Replay and integrity
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Record exact tested SHA
+        run: echo "TESTED_SOURCE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
+      - name: Real experimental R3 end-to-end Node gates
+        run: |
+          node --check src/table-ui/full-round.js
+          node --check src/table-ui/daily.js
+          node --test tests/rules/claim-arbitration.test.js tests/bots/r3-full-round.test.js tests/bots/r3-host-contract.test.js tests/replay/r3-full-round.test.js tests/integration/phase3-source-boundaries.test.js
+  r3-chromium:
+    name: Full human + 3 bots / settlement / Replay / Daily / PWA
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install 'playwright==1.56.0'
+      - run: google-chrome --version
+      - name: Verify exact tested source
+        run: |
+          git rev-parse HEAD
+          echo "TESTED_SOURCE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
+      - name: Chromium 320 / 390 / 1440, real full match, daily, service worker, offline
+        run: python tests/browser/full-table-ui-r3-gates.py --screenshots tw16-r3-full-match-evidence
+      - name: Evidence manifest (only after complete browser gate)
+        if: success()
+        run: |
+          python - <<'PY'
+          import json, os, pathlib
+          d=pathlib.Path('tw16-r3-full-match-evidence')
+          d.mkdir(exist_ok=True)
+          (d/'acceptance.json').write_text(json.dumps({
+            'testedSourceSHA':os.environ.get('GITHUB_SHA'),
+            'headSourceSHA':'${{ github.event.pull_request.head.sha || github.sha }}',
+            'gate':'chromium-full-match-r3',
+            'ruleStatus':'experimental',
+            'release':False,
+            'physicalDevice':'NOT_RUN',
+            'screenshots':sorted(p.name for p in d.glob('*.png'))
+          },indent=2),encoding='utf-8')
+          PY
+      - name: Preserve screenshots and action evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase3-real-r3-match-evidence
+          path: tw16-r3-full-match-evidence
+          if-no-files-found: warn
+          retention-days: 14
