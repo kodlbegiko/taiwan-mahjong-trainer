@@ -66,8 +66,11 @@ export function OpponentSeat(person, currentSeat, dealerSeat) {
 export function PlayerHand(self, legalActions, selectedId) {
   const byPhysicalId = new Map(legalActions.filter(a => a.kind === 'discard' && a.tileIds?.length === 1)
     .map(a => [a.tileIds[0], a]));
+  const replacing=legalActions.some(a=>a.kind==='replace_flower');
   return '<div class="table-self"><div class="table-seat-heading"><strong>你的手牌 · ' +
-    self.concealed.length + ' 張</strong><span>點牌選擇，二次確認</span></div>' +
+    self.concealed.length + ' 張</strong><span>' +
+    (replacing?'補花階段：先選擇合法補花操作':'點牌選擇，二次確認')+
+    '</span></div>' +
     '<div class="table-hand" role="group" aria-label="自己的手牌">' +
     self.concealed.map(tile => tileButton(tile, byPhysicalId.get(tile.id), selectedId === byPhysicalId.get(tile.id)?.actionId)).join('') +
     '</div>' + meldSection(self.melds ?? []) + flowersSection(self.flowers ?? []) + riverSection(self.river ?? []) +
