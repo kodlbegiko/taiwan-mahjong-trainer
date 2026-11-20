@@ -37,6 +37,11 @@ export async function createDailyPanel(storage) {
   function setProgress(next) {
     if(!next||next.status==='error')throw new Error(
       'Daily 狀態驗證失敗：'+(next?.error?.code??'INVALID_PROGRESS'));
+    if(next.sessionId&&(
+       !Array.isArray(next.completedQuestions)||!Array.isArray(next.recordRefs)||
+       !Number.isInteger(next.completed)||next.completed!==next.completedQuestions.length||
+       next.completed!==next.recordRefs.length))
+      throw new Error('Daily 正式進度與 RecordRef 數量不一致');
     const prev=progress?.nextQuestionRef;
     const nextQuestion=next.nextQuestionRef?
       ctrl.getQuestion(next.nextQuestionRef,{asOf:now()}):null;
@@ -169,17 +174,17 @@ export async function createDailyPanel(storage) {
         saved:'正式 RecordRef 已讀回', 'recovery-required':'需要恢復驗證',
         failed:'操作失敗'}[state]??state)+'</p>';
     if (!p) return header+'<section class="table-empty"><p>尚未讀取今日課表。</p>'+
-      '<button type="button" data-daily-resume>讀取今日課表</button></section>';
+      '<button type="button" data-daily-resume>讀取今日課表</button></section></section>';
     const progressText='<p role="status">日期 '+esc(p.dayKey)+' · '+esc(p.timezone)+
       ' · 狀態 '+esc(p.status)+' · '+esc(p.completed)+' / '+esc(p.total)+' 題</p>';
     if (p.status==='error')return header+progressText+'<p class="table-warning" role="alert">'+
       esc(p.error?.code)+'：'+esc(p.error?.message)+'</p>'+
-      '<button type="button" data-daily-resume>重新驗證／恢復</button>';
+      '<button type="button" data-daily-resume>重新驗證／恢復</button></section>';
     if (p.status==='not-started')return header+'<section class="table-empty"><h2>開始今日課表</h2>'+
       '<label for="daily-minutes">訓練長度</label><select id="daily-minutes">'+
       [10,20,30,60].map(n=>'<option value="'+n+'"'+(n===30?' selected':'')+'>'+n+' 分鐘</option>').join('')+
       '</select><button type="button" class="primary" data-daily-start>正式建立 Session</button>'+
-      '</section>';
+      '</section></section>';
     let html=header+progressText+
       '<div class="table-footer-controls"><button type="button" data-daily-resume>恢復／刷新 Session</button>';
     if (p.nextStep==='complete'&&p.status==='active')
