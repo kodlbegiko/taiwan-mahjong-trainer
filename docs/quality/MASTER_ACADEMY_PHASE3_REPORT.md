@@ -1,6 +1,6 @@
 # Taiwan Mahjong Master Academy — Phase 3 Integration & Quality Report
 
-> **As of 2026-11-20 Asia/Taipei. Phase 3 is NOT release-ready. Latest information: §7; §§1–6 are prior baseline audit.** This report records actually observed GitHub states; later HEADs require independent revalidation.
+> **Latest verified acceptance is §12 (R5), tested application SHA `7c4b08a4fce6d7ad2458f23397489ea7f6e2c042`: experimental one-winner preview READY; formal rules and RELEASE still NO-GO.** Sections §1–11 are historical R3/R4 audit snapshots, not assertions about R5. Every CI claim below binds to the actual tested application SHA.
 
 ## 1. V1 baseline (preserved)
 - main `25870862b6499f7e699967aa76429ae5dcfc5db4` (protected).
@@ -412,3 +412,120 @@ At exact `b53a998f21ffe17e43f1b81175551a51378a6623`:
 - [Independent Academy mobile/desktop/offline screenshot artifact #14597607170](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44665180740/artifacts/14597607170).
 
 **Final gate semantics:** `V1_BASELINE_PASS` historically true at #33's separate pinned SHA, Academy R4 browser regression PASS; `EXPERIMENTAL_RULES_PASS` bounded Golden/Oracle subtests PASS; `THREE_BOT_MATCH_PASS=false` (100-seed NO-GO); settled `REPLAY_PASS`, `DAILY_UI_PASS`, `TABLE_UI_PASS` and Chromium offline `PWA_PASS` have positive exact-code browser-job evidence, but their encompassing workflows remain RED because of the shared Seed87 check. Complete `FULL_GAME_PREVIEW_READY=false`, `FULL_RULES_VERIFIED=false`, `RELEASE_GO=false`. Physical iPhone Safari, Android, VoiceOver, TalkBack and installed-device PWA upgrades **NOT_RUN**. No Phase3 preview, main mutation, tag, PR merge or official release.
+
+## 12. R5 Final Acceptance — Single-Winner / 100 Seeds / Public Experimental Preview (2026-11-20)
+
+**Acceptance policy:** This section supersedes previous R3/R4 NO-GO observations for the R5 *experimental single-winner profile only*. The old capability policy remains intentionally unsupported. All runtime and Node/Chromium results below are pinned to the **same application source HEAD `7c4b08a4fce6d7ad2458f23397489ea7f6e2c042`**. Subsequent changes to this report and companion acceptance JSON are **documentation-only commits**, not retested application changes.
+
+### 12.1 Exact source pins, ownership, review and integration
+
+| Source | GitHub PR | Latest audited SHA | Integration and status |
+| --- | --- | --- | --- |
+| V1 base | [#33](https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/33) | `68fb50bc43746a0e6ff9f2f90712904d06a2ccda` | existing Draft baseline, unchanged |
+| Rules | [#43](https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/43) | `684df00afac540c082713c152d06e80e72eea3de` | exact path-owned R5 engine/profile/Golden integrated |
+| Bots | [#40](https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/40) | `2dc05b381211b7ccdbe84c3fe2fd1f4f6f353aba` | version-aware controller; legacy/R5 strict seeds integrated |
+| Replay | [#41](https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/41) | `aff59e61042389eea3a7b11f012aeb25031dc68c` | R5 private claims, group-atomic replay and postgame allowlist integrated |
+| UI | [#42](https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/42) | `f4814bcce387fb94b7f9266d981845ff0cda70b0` | visible Chinese R5 profile and legacy ID; real Chromium selector integrated |
+| Daily | [#45](https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/45) | `f7bca678c010377aaf187b4291f8d5b49d4b0aea` | source-owned blobs already identical in integration; no unnecessary overwrite |
+| Integration | [#44](https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/44) | **`7c4b08a4fce6d7ad2458f23397489ea7f6e2c042` tested application** | Draft, OPEN, not merged |
+| Protected main | main | `25870862b6499f7e699967aa76429ae5dcfc5db4` | unchanged; no force push, merge, tag, formal release |
+
+First source overlay was [`563fbd3812d7e4e718e91eb028ecff5eeba3f424`](https://github.com/kodlbegiko/taiwan-mahjong-trainer/commit/563fbd3812d7e4e718e91eb028ecff5eeba3f424). Latest tested application [`7c4b08a4fce6d7ad2458f23397489ea7f6e2c042`](https://github.com/kodlbegiko/taiwan-mahjong-trainer/commit/7c4b08a4fce6d7ad2458f23397489ea7f6e2c042) additionally restores the profile-ID selector and bumps the offline SW cache to `tmt-v02-realistic-tiles-master-academy-phase3-r5-interception-20261120-r8`. CI on `563fbd3` is **not** substituted for exact-head `7c4b08a` evidence. Six source/integration PRs had zero unresolved GitHub inline review threads when checked; **zero unresolved threads is not reviewer approval**. Source branch standalone checks are not accepted as combined tests.
+
+### 12.2 Distinct RuleProfile policy, Golden and Seed 87
+
+| | Legacy fail-closed Gate | R5 single-winner full-match Gate |
+| --- | --- | --- |
+| RuleRef | `tw16-configurable-table@experimental-full-v1` | `tw16-single-winner-interception@experimental-v1` |
+| Discard WIN policy | multiple winners **unsupported**, typed fail-closed | **single winner** closest clockwise from discarder, experimental |
+| Seed87 source WIN intents | seat 3 WIN, seat 0 WIN, both unchanged | same two private WIN intents preserved; never transformed into PASS |
+| Third responder | PASS is the legal rejected submission | seat 1 PASS is legal, completes the claim window |
+| Adjudication | `UNSUPPORTED_RULE_CAPABILITY: multiple_winners`, revision 162, state unchanged | seat 3 wins; seat 0 intercepted; discarder seat 2; revision 165 |
+| Settlement | **none**, cannot count as settled | `WIN`, `[0,0,-100,100]`, sum **0** |
+| Replay | valid 162-event **prefix**, not a terminal replay | deterministic canonical final-state replay; 162→165 atomic action boundary |
+| Privacy | private pre-resolution WIN declarations withheld from other PlayerViews | same information boundary; selected/intercepted seats released only via allowlisted postgame disclosure |
+
+Rules Golden and versioned capability tests: **PASS** on the exact tested HEAD. R5 `getRuleCapabilities` respects the experimental single-win policy, while unsupported additions, including rob-added-kong, remain fail-closed. Experimental `tw16-minimal-tai-v1` is **not** a certified Taiwanese regional payout standard. No assumption that 一炮一響 is the sole standard across Taiwan.
+
+### 12.3 All 100 fixed Seeds (true denominator, deterministic)
+
+Source: exact-HEAD [Phase3 Node #44706640239](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44706640239) and [Verify #44706640204](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44706640204); both were independently completed **SUCCESS** at `7c4b08a4fce6d7ad2458f23397489ea7f6e2c042`.
+
+| Measure | Legacy profile (expected fail-closed) | R5 single-winner (strict acceptance) |
+| --- | ---: | ---: |
+| Requested / executed | 100 / 100 | **100 / 100** |
+| Legally settled | 99 | **100** |
+| WIN | 88 | **89** |
+| DRAW | 11 | **11** |
+| UNSUPPORTED | 1 (Seed 87, correctly rejected) | **0** |
+| INVALID | 0 | **0** |
+| STALLED | 0 | **0** |
+| Illegal Bot actions | 0 | **0** |
+| Replay mismatches | 0 on legitimate terminals; unsupported prefix matches | **0** |
+| Complete Replay match | 99 settled; 100 prefixes | **100** |
+| Failed Seeds | 87 is an expected typed refusal, not success | **none** |
+| Full-match accepted | **NO** (not an acceptance denominator) | **YES — 100/100** |
+
+Strict Bot result on `7c4b08a` explicitly prints `BOT_R5_100_SUMMARY`: `requested:100,executed:100,completed:100,wins:89,draws:11,unsupported:0,invalid:0,stalled:0,replayMismatch:0,invalidActions:0,replayMatches:100,failedSeeds:[],fullMatchGo:true`. No seed removed, denominator redefined, or unsupported converted into DRAW/settled.
+
+### 12.4 Node, Golden, Oracles, Replay, Daily and backwards compatibility
+
+- **`npm run check` on `7c4b08a4fce6d7ad2458f23397489ea7f6e2c042`: 358 tests / 357 PASS / 0 FAIL / 1 SKIP**, [Verify #44706640204](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44706640204). The sole SKIP is the optional `MAHJONG_STRESS=1` extra numerical cross-check, **not** the R5 100-Seed acceptance; strict R5 tests are executed and PASS.
+- Standalone Phase3 Node scopes on the same HEAD: legacy R3 26/26 PASS, legacy/R5 Rules–Replay 33/33 PASS, independent strict R5 100 seeds 5/5 PASS. The two 10,000-case mandatory Oracle families and additional independent 10k win/shanten comparisons are **PASS** on [combined #44706640119](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44706640119); opt-in extra stress remains SKIP.
+- **Replay PASS:** exact Rules action-group boundaries; Seed 87 private multi-WIN declarations; completed window; single chosen winner; experimental zero-sum SettlementResult; canonical deterministic event reconstruction; historical owner-only PlayerView; public postgame disclosure separate from coaching and historical decisions.
+- **Daily PASS:** official QuestionPublic, canonical v3 grading, durable RecordRef and provenance, Session Progress, AbilityProfile, ReviewPlan and reload readback; [combined #44706640119](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44706640119) real Chromium and [Academy UI #44706640254](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44706640254). No reintroduction of historical asynchronous selector regression.
+- **V1/V0.2 PASS:** old Academy, both required 10k Oracles, V0.2 training flows, independent UI/PWA and existing SVG contract; no original archive overwrite; source contract remains `master-academy/1.0.0`.
+- **34 SVG and SW PASS:** Chromium 320/390/1440 real table; 1440/768/390/320 tile-face regression, offline new tab and atomic cache upgrade; see independent CI links below.
+
+### 12.5 All eight GitHub Actions workflows on the same application source SHA
+
+Each run below had **whole-workflow conclusion SUCCESS**, not merely a green browser subjob.
+
+| Required workflow | Run ID / link | Final result |
+| --- | --- | --- |
+| Phase 3 real full-match + strict 100 Seeds + browser/PWA | [44706640239](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44706640239) | **SUCCESS** (both jobs) |
+| `Verify` full Node `npm run check` | [44706640204](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44706640204) | **SUCCESS** |
+| V1 combined R/S/L/A Golden, 10k Oracles, real Daily | [44706640119](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44706640119) | **SUCCESS** |
+| Academy UI / canonical v3 / Chromium | [44706640254](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44706640254) | **SUCCESS** |
+| Table UI / Sandbox / Chromium and offline | [44706640142](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44706640142) | **SUCCESS** |
+| V0.2 Independent UI Release Gates | [44706640348](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44706640348) | **SUCCESS** |
+| V0.2 Browser UI & PWA | [44706640148](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44706640148) | **SUCCESS** |
+| V0.2 Realistic Tile Faces Integration QA | [44706640306](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44706640306) | **SUCCESS** |
+
+**Chrome browser evidence:** [artifact #14614609533](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44706640239/artifacts/14614609533), `phase3-real-r3-match-evidence`, 7,307,606 bytes: screenshots, durable Daily readback and `acceptance.json` with checkout SHA `7c4b08a4fce6d7ad2458f23397489ea7f6e2c042`. Real Chromium ran `PHASE3_REQUIRE_SINGLE_WINNER=1`: 320px, 390px, 1440px, actual one-human/three-Bot game, experimental settlement, atomic Replay, Daily saved/reloaded, cold offline new tab and 34 SVG. No fixtures or fabricated actions were used in the browser acceptance. **This Chromium evidence is not physical iPhone/Android accessibility evidence**.
+
+**Consolidated machine-readable acceptance:** [`docs/quality/MASTER_ACADEMY_PHASE3_R5_ACCEPTANCE.json`](https://github.com/kodlbegiko/taiwan-mahjong-trainer/blob/integration/mahjong-full-game/docs/quality/MASTER_ACADEMY_PHASE3_R5_ACCEPTANCE.json), `release:false`, 8 exact-SHA CI URLs, source pins, dual-profile results, preview ID and explicit NOT_RUN fields.
+
+### 12.6 Separate publicly reachable HTTPS experimental preview
+
+| Deployment property | R5 verified staging preview |
+| --- | --- |
+| URL | **https://taiwan-mahjong-phase3-r5-experimental-q4g6cft27-sign2.vercel.app/** |
+| Vercel project | `taiwan-mahjong-phase3-r5-experimental`, ID `prj_8vpKCNHxLKWMUyw02ZU6DaWRPLYp` |
+| Accepted deployment ID | `dpl_EGeDz9KozJVR51PMii4QTMEd3jmR` |
+| Vercel target | **staging**, NOT formal release |
+| Source | pinned `7c4b08a4fce6d7ad2458f23397489ea7f6e2c042`; identical application code to all eight CI runs |
+| Vercel state | **READY**, HTTPS |
+| Access | public; Vercel Authentication and password protection disabled **on this isolated project only** |
+| Public HTTP | homepage and `/sw.js` externally retrieved; SW confirms R5 r8 cache |
+| Real live deployed browser smoke | [run `ab845369-537f-49a2-98db-f7f2e051da0c`](https://agent.tinyfish.ai/runs/ab845369-537f-49a2-98db-f7f2e051da0c) **PASS** for homepage, no auth/404, navigation, exact R5 selector, correct profile start, 17 real tiles and all three Bot seats |
+| Live-deployment **full settled hand / offline** | **NOT_RUN on public URL**; those complete gates were executed on local-served exact-SHA Chromium CI |
+| Release metadata | **`release:false`** in this acceptance policy/JSON; not a tag, GitHub Release, or verified formal rules |
+
+An earlier independent-project default deployment `dpl_DtuGoN39Nc6j62rE68sCQruBUhEr` targeted Vercel production implicitly and an initial staging deployment `dpl_EsVqkTnt4EDd5afjySCCDoN9XcQ1` were **unacceptable** despite READY: public URL and `sw.js` returned 404 due missing static build output. Those deployments **are not claimed as accepted previews**. The isolated project was corrected to build a static `dist/` with `index.html`, `style.css`, `sw.js`, `src/`, `public/` and `data/` files. The new staging deployment above was externally read and browser-smoked successfully. **No existing V1 Vercel Preview or V0.2 GitHub Pages site was changed.**
+
+### 12.7 Experimental gates vs. formal release gates
+
+| Gate | R5 result and evidence scope |
+| --- | --- |
+| `EXPERIMENTAL_RULES_PASS` | **true** — new policy Golden, capability, Legacy refusal, Seed87 R5 settlement |
+| `THREE_BOT_MATCH_PASS` | **true** — 100/100 strict settled, 89 WIN + 11 DRAW, 0 illegal/stall |
+| `REPLAY_PASS` | **true** — 100/100 matches, atomic Seed87, privacy/postgame separation |
+| `DAILY_UI_PASS` | **true** — canonical v3 durable grading/reload Chromium |
+| `TABLE_UI_PASS` | **true** — 17 tiles, flowers, Bot claims and settlement on exact-SHA Chromium |
+| `PWA_PASS` | **true** — Chromium SW r8/34 SVG/offline cold new tab; physical-device NOT_RUN |
+| `FULL_GAME_PREVIEW_READY` | **true, EXPERIMENTAL ONLY** — same-SHA 8/8 CI SUCCESS, public staging READY + live smoke |
+| `FULL_RULES_VERIFIED` | **false** — Taiwanese venue rules, rob-added-kong, house tai/scoring/penalties not certified |
+| `RELEASE_GO` | **false** — keep #44 DRAFT; outstanding source review/formal device QA and rules certification |
+
+**NOT_RUN / explicit remaining limitations:** physical iPhone 17 Pro Safari, physical Android, VoiceOver, TalkBack, installed-device PWA update and a complete live-public-URL settlement/offline replay remain NOT_RUN. Legacy unsupported Seed87 remains an expected hard refusal and is never counted in new profile's 100/100. The preview is a bounded, experimental table policy—not a certified complete Taiwanese Mahjong rule standard. No protected main write/force push, no PR #33/#44 merge, no Release Tag, no formal publication.
