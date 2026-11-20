@@ -62,6 +62,29 @@ const ext=state=>state.extensions.tw16;
 const afterSeat=s=>(s+1)%4;
 
 /**
+ * R4 capability negotiation is STATIC by RuleProfile, not live claim intents.
+ * Safe to pass to a Bot or UI without exposing which seats declared WIN.
+ * No new table rule is implicitly enabled by this metadata.
+ */
+export function completeGetRuleCapabilities(ruleRef) {
+  const profile=profileFor(ruleRef);
+  return {
+    ...V1,ruleRef:{profileId:profile.profileId,ruleVersion:profile.ruleVersion},
+    status:'experimental',
+    claimArbitration:{
+      responders:3,
+      supportedActions:['pass','chi','pong','kong','win'],
+      priority:['win','kong','pong','chi'],
+      singleDiscardWin:'experimental-supported',
+      multipleDiscardWins:{status:'unsupported',capability:'multiple_winners'},
+      robAddedKong:{status:'unsupported',capability:'rob_added_kong'},
+      unsupportedDisposition:'fail-closed-without-settlement',
+    },
+    scoring:{status:'experimental',policy:'tw16-minimal-tai-v1'},
+  };
+}
+
+/**
  * Rules-host scheduling API. Never pass GameState or this function to a Bot.
  * Responders are stable clockwise; intents and action identities stay private.
  */
