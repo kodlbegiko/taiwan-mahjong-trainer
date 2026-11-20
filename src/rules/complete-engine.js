@@ -37,7 +37,9 @@ const same=(a,b)=>{
 };
 function profileFor(ref){
   const p=getRuleProfile(ref?.profileId,ref?.ruleVersion);
-  if(p.profileId!=='tw16-configurable-table'||p.ruleVersion!=='experimental-full-v1'
+  const interception=p.profileId==='tw16-single-winner-interception';
+  if(!['tw16-configurable-table','tw16-single-winner-interception'].includes(p.profileId)
+    ||p.ruleVersion!==(interception?'experimental-v1':'experimental-full-v1')
     ||p.status!=='experimental'||p.scope!=='four-player'
     ||p.turnPolicy.claimPriority!=='configured'
     ||p.turnPolicy.replacementDraw!=='configured'
@@ -53,7 +55,13 @@ function profileFor(ref){
     c.reserveTail<0||c.reserveTail>32||
     !Array.isArray(c.specialHands)||c.specialHands.length>0||
     c.dealerRetentionOnDraw!==true||
-    c.startingPrevailingWind!=='east'||c.windAdvancePolicy!=='explicit')
+    c.startingPrevailingWind!=='east'||c.windAdvancePolicy!=='explicit'||
+    c.multipleDiscardWins!==(interception?'single-winner':'unsupported')||
+    (interception&&(c.winPriority!=='nearest-clockwise-from-discarder'||
+      c.claimPriority!=='win > open-kong > pong > chi'||
+      c.settlementPolicy!=='single-discard-winner'||
+      c.scoringPolicy!=='tw16-minimal-tai-v1'||
+      c.verificationStatus!=='experimental')))
     throw new RangeError('Unsupported or contradictory experimental table policy');
   return p;
 }
@@ -68,6 +76,7 @@ const afterSeat=s=>(s+1)%4;
  */
 export function completeGetRuleCapabilities(ruleRef) {
   const profile=profileFor(ruleRef);
+  const interception=profile.extensions.tw16.multipleDiscardWins==='single-winner';
   return {
     ...V1,ruleRef:{profileId:profile.profileId,ruleVersion:profile.ruleVersion},
     status:'experimental',
@@ -76,7 +85,14 @@ export function completeGetRuleCapabilities(ruleRef) {
       supportedActions:['pass','chi','pong','kong','win'],
       priority:['win','kong','pong','chi'],
       singleDiscardWin:'experimental-supported',
-      multipleDiscardWins:{status:'unsupported',capability:'multiple_winners'},
+      multipleDiscardWins:interception
+        ?{status:'experimental-supported',mode:'single-winner',
+          priority:'nearest-clockwise-from-discarder'}
+        :{status:'unsupported',capability:'multiple_winners'},
+      singleWinner:interception,
+      winPriority:interception?'nearest-clockwise-from-discarder':null,
+      settlementPolicy:interception?'single-discard-winner':null,
+      multipleWinnerSettlement:{status:'unsupported',capability:'multiple_winner_settlement'},
       robAddedKong:{status:'unsupported',capability:'rob_added_kong'},
       unsupportedDisposition:'fail-closed-without-settlement',
     },
@@ -284,7 +300,7 @@ export function completeListLegalActions(state,seat){
   }
   return actions;
 }
-function registerWin(state,winnerSeat,sourceSeat,via,tileId,actionId){
+function registerWin(state,winnerSeat,sourceSeat,via,tileId,actionId,claimResolution=null){
   const player=state.players[winnerSeat];
   const scoring=scoreWinningHand(profileFor(state.ruleRef),player,{winnerSeat,sourceSeat,via,
     dealerSeat:state.round.dealerSeat});
@@ -295,18 +311,23 @@ function registerWin(state,winnerSeat,sourceSeat,via,tileId,actionId){
   ext(state).window=null;
   ext(state).result={reason:'win',winnerSeat,sourceSeat,via,
     winningTileId:tileId||null,tai:scoring.tai,breakdown:scoring.breakdown,
-    delta:settlement.delta};
-  event(state,'win','public',winnerSeat,{via,sourceSeat,winnerSeat},actionId);
+    delta:settlement.delta,
+    ...(claimResolution?{claimResolution:clone(claimResolution)}:{})};
+  event(state,'win','public',winnerSeat,
+    {via,sourceSeat,winnerSeat,
+      ...(claimResolution?{claimResolution:clone(claimResolution)}:{})},actionId);
   event(state,'settle','public',winnerSeat,
-    {reason:'win',winnerSeat,tai:scoring.tai,delta:settlement.delta},actionId);
+    {reason:'win',winnerSeat,tai:scoring.tai,delta:settlement.delta,
+      ...(claimResolution?{claimResolution:clone(claimResolution)}:{})},actionId);
 }
 function resolveClaim(state,triggerActionId){
   const w=ext(state).window;
   if(w.decisions.length!==3)return;
   const priority={...Object.fromEntries(policyOf(state).claimOrder.map((kind,index)=>[kind,index])),pass:9};
-  // This experimental profile has no multi-winner settlement. Never pick an
-  // arbitrary winner if two legal win intents are submitted concurrently.
-  if(w.decisions.filter(d=>d.kind==='win').length>1)
+  // The legacy profile remains fail-closed. The *new* profile explicitly
+  // intercepts multiple legal WIN intents by nearest clockwise claimant.
+  const legalWins=w.decisions.filter(d=>d.kind==='win');
+  if(legalWins.length>1&&policyOf(state).multipleDiscardWins!=='single-winner')
     throw new RuleCapabilityError('multiple_winners');
   const choices=w.decisions.filter(d=>d.kind!=='pass').sort((a,b)=>
     priority[a.kind]-priority[b.kind]||
@@ -319,7 +340,23 @@ function resolveClaim(state,triggerActionId){
   }
   const winner=choices[0],p=state.players[winner.seat],discarder=state.players[w.fromSeat];
   if(winner.kind==='win'){
-    registerWin(state,winner.seat,w.fromSeat,'discard',w.tileId,triggerActionId);
+    // This disclosure is emitted only after all three private responses.
+    // Keep each original private WIN intent immutable; do not rewrite to PASS.
+    const claimResolution=policyOf(state).multipleDiscardWins==='single-winner'
+      ?{schemaVersion:1,
+        policyVersion:policyOf(state).housePolicyVersion,
+        winPriority:'nearest-clockwise-from-discarder',
+        discardEventId:w.discardEventId,
+        fromSeat:w.fromSeat,selectedSeat:winner.seat,
+        selectedClaimActionId:winner.actionId,
+        declaredWinSeats:legalWins.map(d=>d.seat).sort((a,b)=>
+          ((a-w.fromSeat+4)%4)-((b-w.fromSeat+4)%4)),
+        interceptedWinSeats:legalWins.filter(d=>d.seat!==winner.seat)
+          .map(d=>d.seat).sort((a,b)=>
+            ((a-w.fromSeat+4)%4)-((b-w.fromSeat+4)%4))}
+      :null;
+    registerWin(state,winner.seat,w.fromSeat,'discard',w.tileId,
+      triggerActionId,claimResolution);
     return;
   }
   const target=discarder.river.find(d=>d.seq===w.discardSeq&&d.tileId===w.tileId);
@@ -426,7 +463,9 @@ function publicEvent(evt){
     ...(evt.payload.sourceSeat!==undefined?{sourceSeat:evt.payload.sourceSeat}:{}),
     ...(evt.payload.claimEventId?{claimEventId:evt.payload.claimEventId}:{})};
   else if(evt.type==='win')payload={seat:evt.payload.winnerSeat,
-    sourceSeat:evt.payload.sourceSeat};
+    sourceSeat:evt.payload.sourceSeat,
+    ...(evt.payload.claimResolution
+      ?{claimResolution:clone(evt.payload.claimResolution)}:{})};
   return {...V1,eventId:evt.eventId,gameId:evt.gameId,seq:evt.seq,
     ruleRef:clone(evt.ruleRef),type:hiddenClaim?'claim':evt.type,visibility:'public',
     ...(hiddenClaim||evt.actorSeat===undefined?{}:{actorSeat:evt.actorSeat}),
@@ -600,6 +639,26 @@ export function completeValidateGameState(state,{replay=true}={}){
       !['self-draw','discard'].includes(r.via)||
       !state.events.some(x=>x.type==='win')))
       throw new RangeError('Invalid winning settlement');
+    if(r.claimResolution){
+      const cr=r.claimResolution;
+      const winEvents=state.events.filter(x=>x.type==='win');
+      const settlementEvent=state.events.at(-1);
+      if(profile.profileId!=='tw16-single-winner-interception'||
+        r.reason!=='win'||r.via!=='discard'||
+        !cr||cr.schemaVersion!==1||
+        cr.policyVersion!==profile.extensions.tw16.housePolicyVersion||
+        cr.winPriority!=='nearest-clockwise-from-discarder'||
+        !seatOK(cr.selectedSeat)||cr.selectedSeat!==r.winnerSeat||
+        cr.fromSeat!==r.sourceSeat||
+        !Array.isArray(cr.declaredWinSeats)||!Array.isArray(cr.interceptedWinSeats)||
+        new Set(cr.declaredWinSeats).size!==cr.declaredWinSeats.length||
+        !cr.declaredWinSeats.includes(cr.selectedSeat)||
+        cr.declaredWinSeats.some(x=>!seatOK(x)||x===cr.fromSeat)||
+        !same(cr.interceptedWinSeats,cr.declaredWinSeats.filter(x=>x!==cr.selectedSeat))||
+        !same(winEvents.at(-1)?.payload.claimResolution,cr)||
+        !same(settlementEvent?.payload.claimResolution,cr))
+        throw new RangeError('Invalid versioned single-winner settlement');
+    }
     if(r.reason==='exhaustive-draw'&&(r.winnerSeat!==null||
       r.delta.some(x=>x!==0)))
       throw new RangeError('Invalid exhaustive draw settlement');
