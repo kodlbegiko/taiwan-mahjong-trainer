@@ -639,24 +639,38 @@ export function completeValidateGameState(state,{replay=true}={}){
       !['self-draw','discard'].includes(r.via)||
       !state.events.some(x=>x.type==='win')))
       throw new RangeError('Invalid winning settlement');
+    if(profile.profileId==='tw16-single-winner-interception' &&
+      r.reason==='win'&&r.via==='discard'&&!r.claimResolution)
+      throw new RangeError('Missing single-winner claim resolution');
     if(r.claimResolution){
       const cr=r.claimResolution;
       const winEvents=state.events.filter(x=>x.type==='win');
-      const settlementEvent=state.events.at(-1);
+      const settleEvents=state.events.filter(x=>x.type==='settle');
+      const source=state.events.find(x=>x.eventId===cr.discardEventId);
+      const declared=state.events.filter(x=>
+        x.visibility==='seat-private'&&x.type==='claim'&&
+        x.payload?.kind==='win'&&x.payload.claimEventId===cr.discardEventId);
+      const clockwise=(a,b)=>((a-cr.fromSeat+4)%4)-((b-cr.fromSeat+4)%4);
+      const ranked=declared.map(x=>x.actorSeat).sort(clockwise);
       if(profile.profileId!=='tw16-single-winner-interception'||
         r.reason!=='win'||r.via!=='discard'||
-        !cr||cr.schemaVersion!==1||
+        cr.schemaVersion!==1||
         cr.policyVersion!==profile.extensions.tw16.housePolicyVersion||
         cr.winPriority!=='nearest-clockwise-from-discarder'||
         !seatOK(cr.selectedSeat)||cr.selectedSeat!==r.winnerSeat||
         cr.fromSeat!==r.sourceSeat||
+        source?.type!=='discard'||source?.actorSeat!==cr.fromSeat||
         !Array.isArray(cr.declaredWinSeats)||!Array.isArray(cr.interceptedWinSeats)||
-        new Set(cr.declaredWinSeats).size!==cr.declaredWinSeats.length||
-        !cr.declaredWinSeats.includes(cr.selectedSeat)||
-        cr.declaredWinSeats.some(x=>!seatOK(x)||x===cr.fromSeat)||
-        !same(cr.interceptedWinSeats,cr.declaredWinSeats.filter(x=>x!==cr.selectedSeat))||
-        !same(winEvents.at(-1)?.payload.claimResolution,cr)||
-        !same(settlementEvent?.payload.claimResolution,cr))
+        ranked.length<1||ranked.length>3||
+        new Set(ranked).size!==ranked.length||
+        !same(cr.declaredWinSeats,ranked)||
+        cr.selectedSeat!==ranked[0]||
+        !same(cr.interceptedWinSeats,ranked.slice(1))||
+        !declared.some(x=>x.actorSeat===cr.selectedSeat&&
+          x.causedByActionId===cr.selectedClaimActionId)||
+        winEvents.length!==1||settleEvents.length!==1||
+        !same(winEvents[0]?.payload.claimResolution,cr)||
+        !same(settleEvents[0]?.payload.claimResolution,cr))
         throw new RangeError('Invalid versioned single-winner settlement');
     }
     if(r.reason==='exhaustive-draw'&&(r.winnerSeat!==null||
