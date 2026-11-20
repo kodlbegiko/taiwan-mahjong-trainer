@@ -271,3 +271,120 @@ test('crash window after canonical v3 append recovers pending provenance and ses
     attemptId:'daily-after-healing-different'});
   assert.equal(duplicate.status,'already-answered');
 });
+
+test('saved status requires persisted v3, linked provenance, Session, ability and review proof across restart',()=>{
+  const s=new MemoryStorage(),c=ctrl(s);
+  const legacy='[{"grade":"perfect","seconds":3.5,"difficulty":"beginner","date":"2026-11-19T00:00:00.000Z"}]';
+  s.setItem(LEGACY_SESSION_KEY,legacy);
+  const day=c.ensureToday({asOf:A,minutes:10});
+  const ref=day.questionRefs[0];
+  const result=c.submitSessionAnswer({questionRef:ref,
+    choice:choose(c.getQuestion(ref,{asOf:A})),
+    asOf:A,durationMs:1200,attemptId:'r4-durable-proof-01'});
+  assert.equal(result.status,'saved',result.errorCode??result.message);
+  assert.equal(result.durabilityProof.status,'verified');
+  assert.equal(result.durabilityProof.recordRef.id,result.recordRef.id);
+  const rawV3=s.getItem(ARCHIVE_STORAGE_KEY);
+  const rawSidecar=s.getItem(ACADEMY_STORAGE_KEY);
+  assert.ok(rawV3&&rawSidecar);
+  const persisted=JSON.parse(rawSidecar);
+  assert.ok(JSON.parse(rawV3).records.some(r=>r.schemaVersion===3&&r.id===result.recordRef.id));
+  assert.ok(persisted.provenanceLinks.some(x=>x.recordRef.id===result.recordRef.id));
+  assert.ok(persisted.trainingSessions.some(x=>x.sessionId===day.sessionId&&
+    x.recordRefs.some(r=>r.id===result.recordRef.id)));
+  assert.ok(persisted.abilityProfile.sourceRecordRefs.some(x=>x.id===result.recordRef.id));
+  assert.equal(result.durabilityProof.reviewPlanId,persisted.reviewPlan.planId);
+  assert.ok(Number.isSafeInteger(result.durabilityProof.sidecarRevision));
+  const restored=ctrl(s).resumeSession({asOf:B,sessionId:day.sessionId});
+  assert.equal(restored.completed,1);
+  assert.equal(restored.completedQuestions[0].recordRef.id,result.recordRef.id);
+  const duplicate=ctrl(s).submit(ref,choose(c.getQuestion(ref,{asOf:B})),
+    {asOf:B,durationMs:1200,attemptId:'r4-duplicate-after-reload'});
+  assert.equal(duplicate.status,'already-answered');
+  assert.equal(duplicate.durabilityProof.status,'verified');
+  assert.equal(s.getItem(ARCHIVE_STORAGE_KEY),rawV3,'duplicate must not rewrite archive');
+  assert.equal(s.getItem(LEGACY_SESSION_KEY),legacy,'v1 remains byte-identical');
+});
+test('existing v3 cannot be called saved when derived sidecar evidence vanished',()=>{
+  const s=new MemoryStorage(),c=ctrl(s);
+  const day=c.ensureToday({asOf:A,minutes:10}),ref=day.questionRefs[0];
+  const choice=choose(c.getQuestion(ref,{asOf:A}));
+  const result=c.submit(ref,choice,{asOf:A,durationMs:1000,attemptId:'r4-missing-ability'});
+  assert.equal(result.status,'saved');
+  const v3=s.getItem(ARCHIVE_STORAGE_KEY);
+  const broken=JSON.parse(s.getItem(ACADEMY_STORAGE_KEY));
+  broken.abilityProfile=null;
+  broken.reviewPlan=null;
+  s.setItem(ACADEMY_STORAGE_KEY,JSON.stringify(broken));
+  assert.throws(()=>ctrl(s).submit(ref,choice,{asOf:B,durationMs:1000,
+    attemptId:'r4-would-fake-proof'}),error=>error.code==='DURABLE_PROOF_FAILED');
+  assert.equal(s.getItem(ARCHIVE_STORAGE_KEY),v3);
+});
+test('corrupt finalized provenance is refused without rewriting canonical archive',()=>{
+  const s=new MemoryStorage(),c=ctrl(s);
+  const day=c.ensureToday({asOf:A,minutes:10}),ref=day.questionRefs[0];
+  const result=c.submit(ref,choose(c.getQuestion(ref,{asOf:A})),{
+    asOf:A,durationMs:1000,attemptId:'r4-corrupt-link'});
+  assert.equal(result.status,'saved');
+  const originalV3=s.getItem(ARCHIVE_STORAGE_KEY);
+  const sidecar=JSON.parse(s.getItem(ACADEMY_STORAGE_KEY));
+  sidecar.provenanceLinks[0].recordRef.id='missing-original-canonical-v3';
+  const corrupt=JSON.stringify(sidecar);
+  s.setItem(ACADEMY_STORAGE_KEY,corrupt);
+  const error=ctrl(s).getDailyProgress({asOf:B});
+  assert.equal(error.status,'error');
+  assert.equal(error.nextStep,'recover');
+  assert.ok(error.error?.message);
+  assert.equal(s.getItem(ARCHIVE_STORAGE_KEY),originalV3);
+  assert.equal(s.getItem(ACADEMY_STORAGE_KEY),corrupt);
+});
+test('after official completion, replayed submit is terminal and no old record is rewritten',()=>{
+  const s=new MemoryStorage(),c=ctrl(s);
+  const day=c.ensureToday({asOf:A,minutes:10});
+  for(let i=0;i<day.questionRefs.length;i++){
+    const ref=day.questionRefs[i];
+    const out=c.submit(ref,choose(c.getQuestion(ref,{asOf:A})),{
+      asOf:A,durationMs:1500,attemptId:'r4-complete-'+i});
+    assert.equal(out.status,'saved',out.errorCode??out.message);
+    assert.equal(out.durabilityProof.status,'verified');
+  }
+  const state=ctrl(s).getDailyProgress({asOf:B});
+  assert.equal(state.status,'completed');
+  assert.equal(state.completed,state.total);
+  const v3=s.getItem(ARCHIVE_STORAGE_KEY);
+  const first=day.questionRefs[0];
+  assert.throws(()=>ctrl(s).submit(first,choose(c.getQuestion(first,{asOf:B})),{
+    asOf:B,durationMs:1500,attemptId:'r4-should-be-terminal'}),/terminal/);
+  assert.equal(s.getItem(ARCHIVE_STORAGE_KEY),v3);
+});
+test('abortable Web Lock acquisition returns LOCK_TIMEOUT rather than hanging',async()=>{
+  const s=new MemoryStorage();
+  const blocking={request(_name,options) {
+    return new Promise((resolve,reject)=>{
+      options.signal.addEventListener('abort',()=>{
+        const error=new Error('cancelled');error.name='AbortError';reject(error);
+      },{once:true});
+    });
+  }};
+  const c=createDailyTrainingController(s,{
+    learning:academy,registry:APPROVED_LEGACY_REGISTRY,
+    validateAcademyDecisionRecord:academy.validateAcademyDecisionRecord,
+    locks:blocking,lockTimeoutMs:20
+  });
+  await assert.rejects(c.ensureTodayLocked({asOf:A}),e=>e.code==='LOCK_TIMEOUT');
+  assert.equal(s.getItem(ACADEMY_STORAGE_KEY),null);
+});
+test('same instant but different IANA-local days must not share a Daily Session',()=>{
+  const s=new MemoryStorage();
+  const make=timezone=>createDailyTrainingController(s,{
+    learning:academy,registry:APPROVED_LEGACY_REGISTRY,
+    validateAcademyDecisionRecord:academy.validateAcademyDecisionRecord,timezone
+  });
+  const taiwan=make('Asia/Taipei').ensureToday({asOf:A,minutes:10});
+  const pacific=make('America/Los_Angeles').ensureToday({asOf:A,minutes:10});
+  assert.equal(taiwan.extensions['adaptive.daily'].dayKey,'2026-11-20');
+  assert.equal(pacific.extensions['adaptive.daily'].dayKey,'2026-11-19');
+  assert.notEqual(taiwan.sessionId,pacific.sessionId);
+  assert.equal(make('Asia/Taipei').getTodaySession({asOf:A}).sessionId,taiwan.sessionId);
+  assert.equal(make('America/Los_Angeles').getTodaySession({asOf:A}).sessionId,pacific.sessionId);
+});

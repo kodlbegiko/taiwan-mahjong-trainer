@@ -12,6 +12,9 @@ const safe=v=>String(v??'').replace(/[&<>"']/g,c=>({
 let session=null, daily=null, fullMode=false, selection=null;
 let busy=false,lastError='',activePage='academy',timeline=null,replayIndex=0;
 let replayFrame=null,replayBusy=false,botStatus='',storage=null;
+let dailyBoot='idle';
+const forceSandbox=new URLSearchParams(window.location.search).get('table')==='sandbox';
+
 
 function profilesList() {
   return fullMode ? session.availableProfiles() :
@@ -51,11 +54,13 @@ function activate(page,{focus=true}={}) {
 function draw() {
   if(!root)return;
   if(activePage==='daily') {
-    root.innerHTML=(daily?daily.render():
+    root.innerHTML=daily?daily.render():
       '<header class="table-heading"><h1 id="table-heading" tabindex="-1">今日訓練</h1></header>'+
-      '<section class="table-empty"><p>正式 Daily Controller 尚未就緒。'+
-      safe(lastError)+'</p><button type="button" data-daily-retry>重試連線</button></section>')+
-      (daily&&lastError?'<p class="table-warning" role="alert">'+safe(lastError)+'</p>':'');
+      '<section class="table-empty" data-daily-state="'+safe(dailyBoot==='loading'?'loading':'failed')+
+      '"><p role="status">'+(dailyBoot==='loading'?'正式 Daily Module 載入中…':
+      '正式 Daily Controller 尚未就緒。'+safe(lastError))+'</p>'+
+      (dailyBoot==='loading'?'':'<button type="button" data-daily-retry>重試連線</button>')+
+      '</section>';
     return;
   }
   if(activePage==='replay'){
@@ -151,27 +156,47 @@ async function openReplay() {
   draw();
 }
 async function ensureDaily() {
-  lastError='';
-  try{
+  if(dailyBoot==='loading')return;
+  dailyBoot='loading';lastError='';
+  activate('daily',{focus:false});
+  try {
     if(!daily)daily=await createDailyPanel(storage);
     await daily.refresh();
-  }catch(error){lastError='Daily 正式服務不可用：'+error.message;}
-  activate('daily',{focus:false});draw();
+    dailyBoot='ready';
+  }catch(error) {
+    dailyBoot='failed';
+    lastError='Daily 正式服務不可用：'+error.message;
+  }
+  draw();
 }
 async function dailyAction(kind) {
   if(busy)return;
+  // Read values before the progress indicator rerenders the form.
+  const selectedMinutes=kind==='start'?
+    Number(root.querySelector('#daily-minutes')?.value??30):null;
+  if(kind==='abort'&&!window.confirm(
+    '結束今天的訓練？已保存的正式成績不會刪除。'))return;
   busy=true;lastError='';
   try{
-    if(kind==='retry'){daily=null;await ensureDaily();return;}
-    if(!daily)throw new Error('Daily Controller 不可用');
-    if(kind==='start')await daily.start(Number(root.querySelector('#daily-minutes')?.value??30));
-    if(kind==='resume')await daily.resume();
-    if(kind==='submit')await daily.submit(root);
-    if(kind==='complete')await daily.finish();
-    if(kind==='abort'){
-      if(!window.confirm('結束今天的訓練？已保存的正式成績不會刪除。'))return;
-      await daily.abort();
+    if(kind==='retry'){
+      daily=null;
+      await ensureDaily();
+      return;
     }
+    if(!daily)throw new Error('Daily Controller 不可用');
+    // Invoke the panel method first: it sets loading/submitting synchronously.
+    // Then paint that explicit state, while the official locked API is pending.
+    let operation;
+    if(kind==='start')operation=daily.start(selectedMinutes);
+    else if(kind==='resume')operation=daily.resume();
+    else if(kind==='submit')operation=daily.submit(root);
+    else if(kind==='complete')operation=daily.finish();
+    else if(kind==='abort')operation=daily.abort();
+    else throw new Error('不支援的 Daily UI 操作');
+    draw();
+    const result=await operation;
+    if(result?.status==='recovery-required'||result?.status==='pending-recovery')
+      lastError='正式提交需要恢復與讀回，未標示為成功儲存。';
   }catch(error){lastError='Daily 操作未完成：'+error.message;}
   finally{busy=false;draw();}
 }
@@ -226,7 +251,7 @@ async function init() {
   if(!root||!controls)return;
   try{storage=window.localStorage;}catch{storage=null;}
   session=createSandboxSession({storage});
-  if(fullRoundCapability()){
+  if(!forceSandbox&&fullRoundCapability()){
     try{session=await createFullRoundSession({storage});fullMode=true;}
     catch(error){lastError='R3 功能版本尚未完全整合：'+error.message;}
   }

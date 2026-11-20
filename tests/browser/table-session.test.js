@@ -43,6 +43,31 @@ test('actual Rules sandbox supplies a private 17-tile hand and 3 redacted seats'
   assert.ok(!html.includes('data-action="win"'));
   assert.ok(!html.includes('CoachingFinding') || !html.includes('100/100'));
 });
+test('fixture-only replacement PlayerView separates 17 physical tiles from zero legal discards', () => {
+  // This is a pure UI contract fixture, not a real Rules/Bot completed game.
+  const session=createSandboxSession({storage:memoryStorage()});
+  const p=firstProfile();
+  const snapshot=session.start({profileId:p.profileId,ruleVersion:p.ruleVersion});
+  const copy=JSON.parse(JSON.stringify(snapshot));
+  copy.view.self.concealed[0]={
+    id:'f:season-spring:0',kind:'flower',flowerCode:'season-spring',
+    schemaVersion:1,contractVersion:'master-academy/1.0.0',
+    copyIndex:0
+  };
+  copy.view.round.phase='replacement';
+  copy.view.legalActions=[{
+    actorSeat:0,kind:'replace_flower',tileIds:['f:season-spring:0'],
+    actionId:'fixture-issued-by-rules-only',expectedRevision:copy.view.asOfEventSeq
+  }];
+  const html=TableView(copy);
+  assert.ok(html.includes('data-table-physical-count="17"'));
+  assert.ok(html.includes('data-table-discard-count="0"'));
+  assert.ok(html.includes('data-table-legal-count="1"'));
+  assert.equal((html.match(/data-pick-action=/g)??[]).length,0);
+  assert.equal((html.match(/data-submit-action=/g)??[]).length,1);
+  assert.ok(html.includes('補花'));
+});
+
 test('the first discard must be confirmed; stale/repeated/forged actions are rejected', () => {
   const session = createSandboxSession({ storage: memoryStorage() });
   const p = firstProfile();

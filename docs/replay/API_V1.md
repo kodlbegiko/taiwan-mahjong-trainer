@@ -93,6 +93,16 @@ A frame with `asOfEventSeq=N` replays exactly events 1..N, where N must be an **
 
 For future integration, the Academy must first publish versioned, independently validated scenario fixtures and a scorer; an integrator must authenticate the gameplay source, persist the official Academy V1 record in its own sidecar, and apply `evidenceId` as a **unique transactional idempotency key**. Replaying the same match, refreshing or rescoring the same `recordRef` must never increase AbilityProfile evidence counts. Formally validated findings should be separate from advisory structural-disadvantage findings.
 
+## R4 atomic boundaries and unsupported hand archiving
+
+`listReplayFrameBoundaries(replayId,{viewerSeat})` is owner-only and returns the legal, Rules-reconstructed initial deal/action-end event sequences in ascending order. Multi-event action interiors (e.g., final PASS + resolved claim, WIN + SETTLE) are excluded. Requesting one of those interior `eventSeq` values through `getReplayFrame` returns `NON_ATOMIC_EVENT_SEQ`; clients must not assume consecutive TurnEvent numbers imply legal frames.
+
+`saveReplay(lastValidGameState,{ownerSeat,disclosurePolicy:'none',unsupportedSubmission})` optionally records a **verified** Rules failure after the last successful LegalAction. `unsupportedSubmission` must be the exact `{actorSeat,actionId,expectedRevision}` that was legal at that revision and then rejected by the formal Rules `applyAction` with a typed `RuleCapabilityError`, without mutating the state. Both archival write and readback independently reproduce this failed action. Incomplete, unsupported games **never** receive a SettlementResult or postgame disclosure.
+
+The public manifest exposes `lastLegalRevision`, `interruptionStatus:'unsupported-rule-capability'` and a generic `unsupportedCapability.code='UNSUPPORTED_RULE_CAPABILITY'`; the private capability name and rejected LegalAction identity are **redacted** to avoid revealing still-private multi-seat WIN declarations. The canonical Seed87 `bot-r3-87 / fixed-round-87` intentionally ends at revision 162 after 157 accepted actions; the next legal PASS is rejected with the Rules-private `multiple_winners` capability and must never append an event or be labeled settled.
+
+Full R4 fixture/test and consumer contract: `docs/replay/R4_ATOMICITY_AND_SEED87.md`, `tests/replay/r4-seed87-atomic.test.js`. A distinct counterfactual single-WIN test branch can settle and start the next hand, but never substitutes for the real failed Seed87 history.
+
 ## Quality tests and outstanding gates
 
 Run `node --test tests/replay/*.test.js` and `npm run check` on **the exact latest PR head**. Original V1 Sandbox fixtures remain in `tests/replay/replay.test.js`. New `tests/replay/r3-full-round.test.js` covers R3 self-win and discard-win settlement, private concurrent claims and priority, chi/pong, concealed kong and tail replacement, initial flowers, deterministic exhaustion, atomic boundary rejection, player-scoped decisions, public-only postgame outcome, tampered ledger with recomputed checksums, and unchanged v3 persistence.

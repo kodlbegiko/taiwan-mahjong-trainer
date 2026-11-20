@@ -109,8 +109,8 @@ function findingsFor(analysis) {
  */
 export function createReplayService({storage=null}={}) {
   const store=createStorage(storage);
-  function saveReplay(gameState,{ownerSeat=0,disclosurePolicy='none'}={}) {
-    const archive=createReplayArchive(gameState,{ownerSeat,disclosurePolicy});
+  function saveReplay(gameState,{ownerSeat=0,disclosurePolicy='none',unsupportedSubmission=null}={}) {
+    const archive=createReplayArchive(gameState,{ownerSeat,disclosurePolicy,unsupportedSubmission});
     const id=archive.manifest.replayId;
     if(store.read(DATA_PREFIX+id)!==null && store.read(DATA_PREFIX+id)!==undefined) {
       const previous=readArchive(store,id);

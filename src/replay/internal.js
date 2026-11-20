@@ -2,7 +2,8 @@
  * Internal-only replay archive format. Never import this module from public UI.
  * A seeded event ledger is sensitive: it can reconstruct the future wall.
  */
-import { createGame, replayGame, validateGameState, getRuleProfile, ENGINE_VERSION, COMPLETE_ENGINE_VERSION } from '../rules/index.js';
+import { replayGame, validateGameState, getRuleProfile, listLegalActions, applyAction,
+  RuleCapabilityError, ENGINE_VERSION, COMPLETE_ENGINE_VERSION } from '../rules/index.js';
 
 export const CONTRACT_VERSION = 'master-academy/1.0.0';
 export const REPLAY_VERSION = 'tw16-replay/1.0.0';
@@ -78,7 +79,52 @@ function decisionsOf(events,m) {
   }
   return result;
 }
-export function createReplayArchive(state,{ownerSeat=0,disclosurePolicy='none'}={}) {
+/**
+ * Verify a claimed unsupported terminal action against the actual current
+ * Rules LegalAction and Rules applyAction. This remains internal-only because
+ * exact action IDs / multi-WIN outcomes can disclose private claim intents.
+ * A mere caller-provided error string is not accepted as evidence.
+ */
+function verifiedUnsupportedSubmission(state,submitted) {
+  if(submitted===undefined || submitted===null)return null;
+  if(!isR3(state?.ruleRef)||state.round.phase==='settled')
+    throw new ReplayError('INVALID_INTERRUPTION','Only an unfinished R3 round may report unsupported rule capability');
+  if(!submitted || typeof submitted!=='object' || Array.isArray(submitted) ||
+     Object.keys(submitted).sort().join(',')!=='actionId,actorSeat,expectedRevision' ||
+     !Number.isInteger(submitted.actorSeat)||submitted.actorSeat<0||submitted.actorSeat>3 ||
+     !Number.isInteger(submitted.expectedRevision)||
+     submitted.expectedRevision!==state.revision||
+     typeof submitted.actionId!=='string'||!submitted.actionId)
+    throw new ReplayError('INVALID_INTERRUPTION','Rejected action must be an exact Rules-issued submission');
+  let legal;
+  try {legal=listLegalActions(state,submitted.actorSeat).find(a=>
+    a.actionId===submitted.actionId && a.expectedRevision===submitted.expectedRevision);}
+  catch(error) {
+    throw new ReplayError('INVALID_INTERRUPTION','Cannot validate the rejected Rules action',error);
+  }
+  if(!legal)throw new ReplayError('INVALID_INTERRUPTION','Rejected submission is not a current legal Rules action');
+  const priorChecksum=checksum(state);
+  let capabilityError=null;
+  try {
+    // Authority is Rules. Do not invent an alternative arbitration/reducer.
+    applyAction(state,{actorSeat:legal.actorSeat,actionId:legal.actionId,
+      expectedRevision:legal.expectedRevision});
+  } catch(error) {
+    if(!(error instanceof RuleCapabilityError)||
+       error.code!=='UNSUPPORTED_RULE_CAPABILITY'||
+       typeof error.capability!=='string'||!error.capability)
+      throw new ReplayError('INVALID_INTERRUPTION','Rules did not produce an unsupported capability',error);
+    capabilityError=error;
+  }
+  if(!capabilityError || checksum(state)!==priorChecksum)
+    throw new ReplayError('INVALID_INTERRUPTION','Rejected Rules action must fail atomically and leave state unchanged');
+  return {kind:'unsupported-rule-capability',code:capabilityError.code,
+    capability:capabilityError.capability,
+    lastLegalRevision:state.revision,
+    submittedAction:{actorSeat:legal.actorSeat,actionId:legal.actionId,
+      expectedRevision:legal.expectedRevision}};
+}
+export function createReplayArchive(state,{ownerSeat=0,disclosurePolicy='none',unsupportedSubmission=null}={}) {
   if(!Number.isInteger(ownerSeat)||ownerSeat<0||ownerSeat>3)
     throw new ReplayError('INVALID_SEAT','ownerSeat must be 0..3');
   const profile=assertProfile(state?.ruleRef),r3=isR3(state.ruleRef);
@@ -89,6 +135,7 @@ export function createReplayArchive(state,{ownerSeat=0,disclosurePolicy='none'}=
   if(!['none','settled-public-only'].includes(disclosurePolicy) ||
       (disclosurePolicy!=='none' && (!r3||state.round.phase!=='settled')))
     throw new ReplayError('INVALID_DISCLOSURE_POLICY','Only an explicitly settled R3 game permits public-only postgame disclosure');
+  const unsupported=verifiedUnsupportedSubmission(state,unsupportedSubmission);
   const events=state.events.map(turnEvent=>({...V1,replayEventVersion:REPLAY_VERSION,
     seq:turnEvent.seq,turnEvent:clone(turnEvent)}));
   const completionStatus=r3&&state.round.phase==='settled'?'settled-experimental':'incomplete';
@@ -113,6 +160,7 @@ export function createReplayArchive(state,{ownerSeat=0,disclosurePolicy='none'}=
     settlementResultRef:settlement?{eventSeq:state.events.at(-1).seq,
       type:'SettlementResult',access:'private-storage'}:null,
     settlementResultChecksum:settlement?checksum(settlement):null,
+    ...(unsupported?{unsupportedInterruption:unsupported}:{}),
     disclosurePolicy,
   });
   const decisions=decisionsOf(state.events,m);
@@ -174,10 +222,17 @@ export function validateReplayArchive(archive) {
     if(checksum(state)!==m.integrity?.finalStateChecksum)
       throw new Error('canonical final state mismatch');
     if(r3){
+      if(m.unsupportedInterruption!==undefined){
+        const interruption=m.unsupportedInterruption;
+        if(interruption?.kind!=='unsupported-rule-capability' ||
+           !same(interruption,verifiedUnsupportedSubmission(state,interruption.submittedAction)))
+          throw new Error('unsupported action evidence no longer matches Rules');
+      }
       const settled=state.round.phase==='settled',result=state.extensions?.tw16?.result;
       const expected=settled?'settled-experimental':'incomplete';
       if(m.completionStatus!==expected||m.actionCount!==archive.decisions.length||
          (m.disclosurePolicy==='settled-public-only'&&!settled)||
+         (settled&&m.unsupportedInterruption!==undefined)||
          (settled&&(!result||state.events.at(-1)?.type!=='settle'))||
          !same(m.settlementResultRef,settled?{eventSeq:state.revision,type:'SettlementResult',access:'private-storage'}:null)||
          m.settlementResultChecksum!==(settled?checksum(result):null))
@@ -212,6 +267,14 @@ export function publicManifest(archive) {
     ...(r3?{
       gameRef:clone(m.gameRef),ruleProfileVersion:m.ruleProfileVersion,
       actionCount:m.actionCount,settlementResultRef:clone(m.settlementResultRef),
+      lastLegalRevision:m.eventCount,
+      interruptionStatus:m.unsupportedInterruption?'unsupported-rule-capability':null,
+      // The precise capability can disclose that multiple seats secretly
+      // declared WIN. Never expose it to the archived player or to UI.
+      unsupportedCapability:m.unsupportedInterruption?{
+        code:'UNSUPPORTED_RULE_CAPABILITY',capability:'redacted-private-claim',
+        visibility:'private-error-details-withheld',
+      }:null,
       disclosurePolicy:m.disclosurePolicy,
     }:{}),
     postgameAvailable:r3&&m.completionStatus==='settled-experimental'&&

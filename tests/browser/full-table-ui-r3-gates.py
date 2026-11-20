@@ -132,9 +132,21 @@ def daily_roundtrip(page,folder):
       return {links:(v.provenanceLinks||[]).length,
               records:(v.trainingSessions||[]).reduce((n,s)=>n+(s.recordRefs||[]).length,0)};
     }""")
+    original_ref=page.locator('[data-daily-question-ref]').get_attribute('data-daily-question-ref')
     page.locator('[name="daily-answer"]').first.check()
-    page.locator('[data-daily-submit]').click()
-    page.wait_for_timeout(1400)
+    # Two direct clicks in the same browser turn exercise the real UI re-entry guard.
+    # Exactly one canonical v3 RecordRef is permitted.
+    page.evaluate("""() => {
+      const button=document.querySelector('[data-daily-submit]');
+      if(!button)throw Error('Missing official submit button');
+      button.click();button.click();
+    }""")
+    page.locator('[data-daily-state="saved"][data-daily-record-id]').wait_for(timeout=25000)
+    require(page.locator('[data-daily-save-confirmed="true"]').count()==1,
+            'Daily UI claims saved without an explicit verified RecordRef readback')
+    ui_record_id=page.locator('[data-daily-state="saved"]').get_attribute('data-daily-record-id')
+    require(ui_record_id is not None and len(ui_record_id)>0,
+            'Daily UI did not expose validated public RecordRef')
     after_state=page.evaluate("""() => {
       const sidecar=JSON.parse(localStorage.getItem('tw-mahjong-master-academy:state:v1')||'{}');
       const archive=JSON.parse(localStorage.getItem('tw-mahjong-trainer:archive:v3')||'{}');
@@ -150,8 +162,12 @@ def daily_roundtrip(page,folder):
         abilityPresent:!!sidecar.abilityProfile,reviewPresent:!!sidecar.reviewPlan};
     }""")
     view=page.locator('#full-table-root').inner_text()
-    require(after_state['links']>before_state['links'] and
-            len(after_state['recordRefs'])>before_state['records'] and
+    require(ui_record_id in after_state['linkedRecordIds'] and
+            ui_record_id in after_state['canonicalRecordIds'] and
+            ui_record_id in [r['id'] for r in after_state['recordRefs']],
+            'Saved UI RecordRef is absent from canonical archive/sidecar/session')
+    require(after_state['links']==before_state['links']+1 and
+            len(after_state['recordRefs'])==before_state['records']+1 and
             all(ref.get('id') in after_state['canonicalRecordIds'] and
                 ref.get('id') in after_state['linkedRecordIds']
                 for ref in after_state['recordRefs']) and
@@ -159,6 +175,10 @@ def daily_roundtrip(page,folder):
             after_state['abilityPresent'] and after_state['reviewPresent'],
             'Daily canonical durability failed: '+str(after_state)+
             '; UI='+view[-900:])
+    next_question=page.locator('[data-daily-question-ref]')
+    require(next_question.count()==0 or
+            next_question.get_attribute('data-daily-question-ref')!=original_ref,
+            'Daily form did not advance from the officially saved QuestionRef')
     page.screenshot(path=str(folder/'table-390-daily-durable.png'),full_page=True)
     page.reload(wait_until='networkidle')
     page.locator('[data-table-nav="daily"]').click()
@@ -189,6 +209,7 @@ def daily_roundtrip(page,folder):
     page.screenshot(path=str(folder/'table-390-daily-reloaded.png'),full_page=True)
     (folder/'daily-durable-evidence.json').write_text(
         json.dumps({'status':'verified-browser-readback',
+                    'uiSavedRecordId':ui_record_id,
                     'recordRefs':after_state['recordRefs'],
                     'canonicalRecordIds':reread['recordIds'],
                     'provenanceRecordIds':reread['linkedRecordIds'],
