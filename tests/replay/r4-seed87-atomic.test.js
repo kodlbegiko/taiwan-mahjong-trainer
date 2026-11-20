@@ -141,7 +141,15 @@ test('Seed87: private WIN intent is noninterfering for third-party frame and can
   const lastTwo=seq162.playerView.publicEvents.slice(-2);
   assert.deepEqual(lastTwo.map(x=>x.type),['claim','claim']);
   assert.ok(lastTwo.every(x=>!('actorSeat' in x)&&!('causedByActionId' in x)));
-  assert.equal(errorSafeJSON(seq162).includes(GOLDEN.rejectedSubmission.actionId),false);
+  // The owner's current legal PASS action ID is legitimately visible to that
+  // owner; privacy applies to OTHER seats' private WIN declarations.
+  assert.ok(seq162.playerView.legalActions.some(a=>
+    a.actionId===GOLDEN.rejectedSubmission.actionId));
+  assert.equal(errorSafeJSON(seq162.playerView.publicEvents).includes(
+    GOLDEN.rejectedSubmission.actionId),false);
+  for(const hiddenWin of state.events.slice(-2))
+    assert.equal(errorSafeJSON(seq162.playerView.publicEvents)
+      .includes(hiddenWin.causedByActionId),false);
   assert.equal(errorSafeJSON(seq162).includes(GOLDEN.seed),false);
   assert.equal(errorSafeJSON(seq160).includes('t:26:0'),true,'public discard is visible');
 
