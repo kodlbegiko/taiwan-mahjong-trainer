@@ -52,7 +52,7 @@ and requires a new versioned RuleProfile plus verified multiwinner payout.
 | Completed Replay match | **99** |
 | Failed seed | `87` |
 | Claim windows | **4,449** |
-| Seed 87 events / successful steps | **162 / 156** (157th submission rejected) |
+| Seed 87 events / successful steps | **162 / 157** (158th submission rejected) |
 | Seed 87 Claim windows / successful responses | **32 / 95** |
 
 The sampled GitHub-runner metrics on that SHA were: mean of per-hand
