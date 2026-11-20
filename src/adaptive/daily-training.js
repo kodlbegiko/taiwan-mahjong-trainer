@@ -25,7 +25,7 @@ function validateLearningCallbacks(learning) {
 }
 export function createDailyTrainingController(storage, {
   learning, registry, validateAcademyDecisionRecord,
-  profileId='local-academy-profile', timezone='Asia/Taipei', locks,
+  profileId='local-academy-profile', timezone='Asia/Taipei', locks, lockTimeoutMs=15000,
 }={}) {
   validateLearningCallbacks(learning);
   if(typeof timezone!=='string' || !timezone.trim() ||
@@ -38,13 +38,26 @@ export function createDailyTrainingController(storage, {
   // Web Locks serializes the entire legacy-v3 -> sidecar -> derived-profile
   // critical section across same-origin tabs. localStorage alone has no CAS.
   const lockManager = locks ?? globalThis.navigator?.locks;
+  if(!Number.isSafeInteger(lockTimeoutMs)||lockTimeoutMs<10||lockTimeoutMs>60000)
+    throw new RangeError('Invalid Daily Web Lock timeout');
   const lockName = 'tw-mahjong-master-academy:daily:' + profileId;
   async function exclusive(op) {
-    if (!lockManager || typeof lockManager.request !== 'function') {
+    if (!lockManager || typeof lockManager.request !== 'function' ||
+      typeof AbortController !== 'function') {
       throw new AcademyStorageError('LOCK_UNAVAILABLE',
-        'Safe concurrent Daily writes require the same-origin Web Locks API');
+        'Safe concurrent Daily writes require same-origin abortable Web Locks');
     }
-    return lockManager.request(lockName, { mode: 'exclusive' }, op);
+    const abort=new AbortController();
+    let entered=false;
+    const timer=setTimeout(()=>abort.abort(),lockTimeoutMs);
+    try {
+      return await lockManager.request(lockName, {mode:'exclusive',signal:abort.signal},
+        ()=>{entered=true;return op();});
+    } catch(error) {
+      if(abort.signal.aborted&&!entered)
+        throw new AcademyStorageError('LOCK_TIMEOUT','Daily Web Lock acquisition timed out',error);
+      throw error;
+    } finally {clearTimeout(timer);}
   }
 
   function sourceVerified(q) {
