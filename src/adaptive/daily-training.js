@@ -256,9 +256,13 @@ export function createDailyTrainingController(storage, {
     try {
       durabilityProof=proveDurableAnswer(day.sessionId,ref,result.recordRef);
     } catch(error) {
+      // A corrupt sidecar can make readToday fail as well. Preserve the error
+      // result, never throw away evidence or accidentally label it 'saved'.
+      let lastKnownSession=day;
+      try { lastKnownSession=readToday({asOf:at})??day; } catch {}
       return {...result,status:'recovery-required',
         durabilityProof:null,errorCode:error.code??'DURABLE_PROOF_FAILED',
-        message:error.message,session:readToday({asOf:at})};
+        message:error.message,session:lastKnownSession};
     }
     return {...result,status:'saved',durabilityProof,
       session:readToday({asOf:at})};
