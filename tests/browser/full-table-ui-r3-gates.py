@@ -78,6 +78,8 @@ def full_round(page, folder):
     require('四家分數變化' in result,'authoritative zero-sum result missing')
     require('牌局事件數' in result,'round event count missing')
     require(any('discard'==h for h in history),'no real human discard exercised')
+    require(any('放棄宣告' in h for h in history),
+            'no real human PASS exercised; use an additional seeded round')
     page.screenshot(path=str(folder/'table-390-real-settled.png'),full_page=True)
     page.reload(wait_until='networkidle')
     page.locator('[data-table-nav="play"]').click()
@@ -90,6 +92,9 @@ def full_round(page, folder):
             'fake skill grading shown')
     page.locator('[data-replay-next]').click()
     require(page.locator('.table-replay').count()==1,'Replay next failed')
+    page.locator('[data-replay-jump]').select_option('0')
+    require('事件 1 /' in page.locator('.table-replay').inner_text(),
+            'Replay jump to historical event failed')
     page.screenshot(path=str(folder/'table-390-real-replay.png'),full_page=True)
     return history
 
@@ -158,6 +163,9 @@ def run(folder):
                     ctx.set_offline(False)
                 else:
                     open_game(page)
+                    first=page.locator('.table-hand button[data-pick-action]').first.bounding_box()
+                    require(first and first['width']>=44,
+                            str(width)+'px touch target below 44px')
                     require(page.evaluate('document.documentElement.scrollWidth<=innerWidth+1'),
                             str(width)+'px overflow')
                 require(not errors,str(width)+'px JS errors: '+str(errors))
