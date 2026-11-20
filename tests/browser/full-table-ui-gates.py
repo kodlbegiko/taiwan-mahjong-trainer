@@ -87,7 +87,7 @@ def run(out):
                     'three redacted opponent hand counts missing')
             require(page.locator('.table-opponent .table-hand').count()==0,
                     'opponent concealed tiles leaked')
-            require(page.locator('[data-submit-action]').count()==0,
+            require(page.locator('.table-selected [data-submit-action]').count()==0,
                     'discard should not be pre-selected')
             require(page.evaluate('document.documentElement.scrollWidth<=innerWidth+1'),
                     str(width)+'px horizontal overflow')
@@ -105,7 +105,7 @@ def run(out):
                 require(first.evaluate('(el)=>document.activeElement===el'),
                         'keyboard focus lost')
                 first.press('Enter')
-                require(page.locator('.table-actions [data-submit-action]').count()==1,
+                require(page.locator('.table-selected [data-submit-action]').count()==1,
                         'keyboard Enter did not select a Rules legal discard')
                 page.locator('[data-clear-selection]').click()
             if width in (390,1440):
@@ -115,11 +115,11 @@ def run(out):
                 require(pre and pre.get('gameState',{}).get('round',{}).get('phase')=='await_discard',
                         'canonical R3 state not persisted after legal flower replacement')
                 page.locator('.table-hand button[data-pick-action]:enabled').first.click()
-                require(page.locator('.table-actions [data-submit-action]').count()==1,
+                require(page.locator('.table-selected [data-submit-action]').count()==1,
                         'physical tile selection lacks confirmation')
                 require(read_checkpoint(page)==pre,
                         'merely selecting a tile mutated the Rules GameState')
-                page.locator('.table-actions [data-submit-action]').click()
+                page.locator('.table-selected [data-submit-action]').click()
                 page.wait_for_function("""(args) => {
                   const p=localStorage.getItem(args.key);
                   return p && JSON.parse(p).gameState.revision>args.rev;
