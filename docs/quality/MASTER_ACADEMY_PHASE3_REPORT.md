@@ -206,3 +206,10 @@ Source-owned corrections:
 | RELEASE_GO | **NO-GO** |
 
 **Do not conflate a single 310-event settled browser match with 100/100 completion or verified full Taiwanese rules.** The final integration commit must pass the exact-source Node/Chromium/PWA/legacy gates before any Full Game Preview designation. Physical iPhone, Android, VoiceOver and TalkBack remain NOT_RUN.
+
+
+### 2026-11-20 Seed 87 reproducibility instrumentation and runner reliability
+
+The deterministic unsupported path above was corroborated on another same-SHA R3 Node run [#44646674494](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44646674494): 24 targeted Node tests, 23 passed, 1 failed (the 100 fixed-seed completion assertion), and again 99/100 terminal, 88 wins, 11 draws, seed 87 `unsupported-rule-capability`, 4,449 Claim Windows. This is evidence of repeatability, not permission to relabel the unsupported hand as a draw.
+
+Bot source [#40 `47f63464d8de224ad7043b46c495ff62d1d0cbcb`](https://github.com/kodlbegiko/taiwan-mahjong-trainer/commit/47f63464d8de224ad7043b46c495ff62d1d0cbcb) now retains `unsupportedCapability`, failing Action ID and a replayable sequence of submitted public `{actorSeat,actionId,expectedRevision}` values for unsuccessful seeds; it does **not** put private wall or concealed state in logs. Its source-owned test blob was staged on integration for the next exact-SHA run. The Chromium workflow no longer depends on potentially stalled Linux package-mirror CJK font installation: functional acceptance and screenshots take precedence; text typography coverage is assessed separately. Newest combined CI is PENDING; no other release gate is promoted.

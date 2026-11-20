@@ -33,10 +33,11 @@ async function fullRound(seed,{difficulty='Beginner',maxEvents=1500}={}){
     maxRevision:maxEvents,
   });
   const before=performance.now();
-  let reason=null,steps=0,claims=0;
+  let reason=null,steps=0,claims=0,unsupportedCapability=null,failedSubmission=null;
+  const actionTrace=[];
   for(;steps<maxEvents && state.round.phase!=='settled';steps++){
     const oldRevision=state.revision,wasClaim=state.round.phase==='claim_window';
-    let result=await controller.tick();
+    let result=await controller.tick(),attempted=null;
     if(result.status==='human-turn'){
       const view=createPlayerView(state,0);
       const start=performance.now();
@@ -44,13 +45,26 @@ async function fullRound(seed,{difficulty='Beginner',maxEvents=1500}={}){
       decisionMs+=performance.now()-start;decisions++;
       validateBotDecision(humanPolicy,view,decision);
       if(decision.status!=='ready'){reason='human-'+decision.status;break;}
+      attempted={actorSeat:0,actionId:decision.actionId,
+        expectedRevision:decision.expectedRevision};
       result=await controller.submitHumanAction({
         actionId:decision.actionId,expectedRevision:decision.expectedRevision,
       });
     }else if(result.status==='acted'){
       decisionMs+=result.decisionMs;decisions++;
     }
-    if(result.status!=='acted'){reason=result.reason||result.status;break;}
+    if(!attempted&&result.decision)attempted={actorSeat:result.seat,
+      actionId:result.decision.actionId,expectedRevision:result.decision.expectedRevision};
+    if(result.status!=='acted'){
+      reason=result.reason||result.status;
+      unsupportedCapability=result.capability??null;
+      failedSubmission=attempted;
+      break;
+    }
+    actionTrace.push({revision:oldRevision,actorSeat:attempted?.actorSeat,
+      actionId:attempted?.actionId,expectedRevision:attempted?.expectedRevision,
+      fromPhase:wasClaim?'claim_window':null,
+      afterRevision:state.revision,afterPhase:state.round.phase});
     if(wasClaim)claims++;
     if(!wasClaim&&state.round.phase==='claim_window')claimWindows++;
     if(state.revision<=oldRevision) {
@@ -75,7 +89,11 @@ async function fullRound(seed,{difficulty='Beginner',maxEvents=1500}={}){
     replayMatch,decisionCount:decisions,
     decisionMs:Number(decisionMs.toFixed(3)),
     elapsedMs:Number((performance.now()-before).toFixed(3)),
-    reason,state,controller};
+    reason,unsupportedCapability,failedSubmission,
+    // Only unsuccessful seeds emit full reproducible public action submissions;
+    // private wall, opponent hands, and full GameState remain out of CI logs.
+    failureActionTrace:reason?actionTrace:null,
+    state,controller};
 }
 
 test('R3 Controller: initial flower replacement, three independent claims, then legal next turn',async()=>{
