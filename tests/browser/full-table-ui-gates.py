@@ -1,5 +1,8 @@
-"""Phase 3 table-only browser gates. Screenshots are browser emulation, NOT physical iOS proof.
-Full 4-player end-to-end must remain NOT_RUN until Rules + Bot + Replay official APIs exist.
+"""Legacy four-seat Sandbox compatibility gate, not a full R3 game certification.
+
+The sandbox Profile has no initial flowers. This suite intentionally selects
+?table=sandbox, then verifies 17 physical tiles AND 17 real Rules-issued discard
+actions. The independent R3 suite must handle flower replacement before discard.
 """
 import argparse
 from pathlib import Path
@@ -17,6 +20,7 @@ def table_open(page):
 def run(out):
     out.mkdir(parents=True, exist_ok=True)
     with served_site() as (url, _):
+      sandbox_url=url+('?' if '?' not in url else '&')+'table=sandbox'
       with sync_playwright() as pw:
         browser = pw.chromium.launch(channel='chrome', headless=True, args=['--no-sandbox'])
         for width in [320,375,390,430,768,1440]:
@@ -29,9 +33,10 @@ def run(out):
             page = ctx.new_page()
             errors=[]
             page.on('pageerror', lambda error: errors.append(str(error)))
-            page.goto(url, wait_until='networkidle')
+            page.goto(sandbox_url, wait_until='networkidle')
             require(page.locator('#academy-navigation button').count()==6,
                     'original Academy navigation was replaced')
+            page.locator('#full-table-navigation [data-table-nav="daily"]').wait_for()
             require(page.locator('#full-table-navigation button').count()==4,
                     'table, replay and Daily navigation missing')
             table_open(page)
@@ -40,6 +45,12 @@ def run(out):
             require(page.locator('#table-profile option').count()>=1,
                     'explicit RuleProfile selection missing')
             page.locator('#full-table-root [data-start-new]').click()
+            require(page.locator('[data-table-physical-count="17"]').count()==1,
+                    'sandbox initial physical inventory is not 17')
+            require(page.locator('[data-table-discard-count="17"]').count()==1,
+                    'sandbox official Rules did not issue 17 legal discard actions')
+            require(page.locator('[data-table-legal-count="17"]').count()==1,
+                    'sandbox legal action count differs from source Rules PlayerView')
             require(page.locator('.table-hand button[data-pick-action]').count()==17,
                     'initial real engine 17 legal physical tiles missing')
             require(page.locator('.table-hand .tile-face-image').count()==17,
@@ -109,13 +120,13 @@ def run(out):
                 require(page.locator('#wait-options button').count()==34,
                         'legacy multi-wait broken')
                 # Offline in a brand-new navigation after SW activation.
-                page.goto(url,wait_until='networkidle')
+                page.goto(sandbox_url,wait_until='networkidle')
                 page.evaluate('() => navigator.serviceWorker.ready.then(() => true)')
                 page.reload(wait_until='networkidle')
                 page.wait_for_function('navigator.serviceWorker.controller !== null',timeout=20000)
                 ctx.set_offline(True)
                 offline=ctx.new_page()
-                offline.goto(url,wait_until='domcontentloaded')
+                offline.goto(sandbox_url,wait_until='domcontentloaded')
                 table_open(offline)
                 require(offline.locator('.table-hand button').count()==16,
                         'offline restored game unavailable')
@@ -131,8 +142,9 @@ def run(out):
             ctx.close()
         browser.close()
     (out/'verification.txt').write_text(
-        'Widths: 320,375,390,430,768,1440. Touch, keyboard labels, reduced motion,\n'
-        'real sandbox discard, reload and 390 offline new tab. Full Rules/Bot/Replay E2E: NOT_RUN.\n',
+        'Explicit ?table=sandbox: 320,375,390,430,768,1440. Touch, keyboard, reduced motion,\n'
+        'legacy real Rules 17 legal discard actions, reload and offline new tab.\n'
+        'Full R3 with flowers/Bot/Replay is independently gated: NOT CERTIFIED by this suite.\n',
         encoding='utf-8')
 if __name__=='__main__':
     parser=argparse.ArgumentParser()
