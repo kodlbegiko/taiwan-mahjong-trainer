@@ -171,12 +171,15 @@ async function ensureDaily() {
 }
 async function dailyAction(kind) {
   if(busy)return;
+  // Preserve the user's selection before any loading rerender.
+  const selectedMinutes=kind==='start'?
+    Number(root.querySelector('#daily-minutes')?.value??30):null;
   busy=true;lastError='';
   if(kind!=='submit')draw();
   try{
     if(kind==='retry'){daily=null;await ensureDaily();return;}
     if(!daily)throw new Error('Daily Controller 不可用');
-    if(kind==='start')await daily.start(Number(root.querySelector('#daily-minutes')?.value??30));
+    if(kind==='start')await daily.start(selectedMinutes);
     if(kind==='resume')await daily.resume();
     if(kind==='submit'){
       // Capture the selected QuestionPublic answer before redrawing an in-flight state.
