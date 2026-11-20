@@ -298,3 +298,89 @@ New Bot code latches typed Rules rejection with game/revision/seat and persists 
 **Historical measured 100-seed classification at `232c9457350c69224f12b346f2a1e4b528dd0b65`:** 100 executed, 88 wins, 11 exhaustive draws, 1 `unsupported` (seed 87), 0 invalid legal actions, 0 stalled, 99 complete Replay matches, 4,449 claim windows. **Do not reuse as test results for `ede7dc94...` or a later report-only commit.**
 
 Both new source heads had no newer directly associated full integration Workflow result during the source audit. Their integration commit triggered new verification on PR #44; report only what actually completes at that exact SHA. **V1 baseline still SHA-scoped, experimental source safety improved, FULL_MATCH_GO=false, RELEASE_GO=false, PR #44 Draft.** Physical device, screen-reader and final Preview gates remain NOT_RUN / NO-GO.
+
+
+---
+
+## 11. R4 exact-source CI recovery audit (2026-11-20 Asia/Taipei; status is SHA-scoped)
+
+**Final tested code candidate at this audit:** \`b53a998f21ffe17e43f1b81175551a51378a6623\`. **Prior composed-source app HEAD:** \`7104ba9134794a44d9511472f6eae591d1281ab2\`. These are different commits; do **not** transfer a browser PASS or FAIL between them. The *report-writing commit itself is documentation only* and must not be silently treated as a fresh same-HEAD app/CI PASS.
+
+### 11.1 Live source provenance and ancestry
+
+| Component | PR | Latest source HEAD inspected / integrated | Last action |
+| --- | --- | --- | --- |
+| Rules | #43 | \`bedab27a8a39565cb62fdbcdc9abb868cf1dadac\` | All owned Git blobs already identical at \`ca7ce4d\` |
+| Bots | #40 | \`b872f3529fc76dc76dc7f4d01bfdb66f306f4c71\` | All owned Git blobs already identical at \`ca7ce4d\` |
+| Replay | #41 | \`20e3f72112cbeaa64843e290ff167c8e136eb3dc\` | 5 owned files copied byte-for-byte by \`7104ba9\` |
+| Table UI | #42 | \`ea655ff2100609fe923ec731c335fa1fd14e1c42\` | 7 owned R4 files copied by \`7104ba9\`; one E2E selector source fix synchronized by \`b53a998\` |
+| Daily | #45 | \`f7bca678c010377aaf187b4291f8d5b49d4b0aea\` | 3 owned source files copied byte-for-byte by \`7104ba9\` |
+| Master Academy V1 | #33 | \`68fb50bc43746a0e6ff9f2f90712904d06a2ccda\` | Untouched Draft, separate pinned baseline |
+| protected main | — | \`25870862b6499f7e699967aa76429ae5dcfc5db4\` | Untouched |
+
+GitHub commit-comparison at \`ca7ce4d\`: Rules and Bots diverged; UI and Daily diverged; Replay was ahead-only. All five source review-thread checks reported **zero unresolved threads** at audit. To avoid replaying entire unrelated branch histories, the integration used exact owner-file blob SHAs in a new Git tree and an **expected-HEAD, non-forced fast-forward**. Integrator-owned \`index.html\` matched the UI source blob exactly, so it was preserved. The full integrator \`sw.js\` transitive precache list was preserved; only the integrated cache version advanced from \`...-r6\` to \`...-r7\`. The UI source's shorter standalone \`sw.js\` was **not** copied over it. An independent installed-PWA update on physical iPhone is **NOT_RUN**.
+
+- [Integrate source blobs / SW invalidate \`7104ba9\`](https://github.com/kodlbegiko/taiwan-mahjong-trainer/commit/7104ba9134794a44d9511472f6eae591d1281ab2).
+- [Source UI E2E fix \`ea655ff\`](https://github.com/kodlbegiko/taiwan-mahjong-trainer/commit/ea655ff2100609fe923ec731c335fa1fd14e1c42).
+- [Integrate same UI fix \`b53a998\`](https://github.com/kodlbegiko/taiwan-mahjong-trainer/commit/b53a998f21ffe17e43f1b81175551a51378a6623).
+
+### 11.2 Failure Matrix — do not count fan-out as independent defects
+
+The eight rows below all refer to **GitHub checkout source HEAD \`ca7ce4dd0d855ade1827873623e9e7eaf5c2bfb1\`**. Synthetic PR merge-ref SHA is not the tested checkout. Jobs are distinguished from workflows. One workflow may have both a shared-check failure and a separate browser result.
+
+| Workflow / run | Job / first actual failure | Test or assertion / root owner | Shared \`npm run check\` failure? | R4 repair and same-SHA revalidation |
+| --- | --- | --- | --- | --- |
+| Verify [#44657599223](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44657599223) | \`test\` / \`not ok 113\` | \`tests/bots/r3-full-round.test.js:307\`; \`FULL_MATCH_GO=false: unsupported is not settled\`; Rules #43 multiwinner capability / Bots #40 strict 100-seed gate | **Original direct failing assertion** | **NOT FIXED**: 99/100 real settlements; new exact-HEAD CI required |
+| Master Academy combined [#44657599391](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44657599391) | \`R/S/L/A, Golden & both 10k Oracles\` | Shared full unit suite reaches same Bot Seed 87 | Yes | Browser Academy E2E separately SUCCESS at \`ca7ce4d\`; Node remained NO-GO |
+| Academy UI [#44657599256](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44657599256) | \`Academy public boundary / canonical Node\` | Same Bot Seed 87, inherited from \`npm run check\` | Yes | Academy mobile/desktop/offline Chromium separately SUCCESS at \`ca7ce4d\` |
+| V0.2 Browser [#44657599237](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44657599237) | \`chromium\`, step \`Run npm run check\` | Same Bot Seed 87, **before** independent browser stage | Yes | No separate V0.2 behavior regression established by this failure |
+| V0.2 Independent UI [#44657599240](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44657599240) | Node \`Run npm run check\` and Chrome \`Validate candidate P0\` | Same strict Bot failure in shared preflight | Yes | Independent V0.2 regression not established by a preflight-only FAIL |
+| V0.2 Tile Faces [#44657599284](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44657599284) | \`Full existing Node gates plus SVG contract tests\` | Same shared \`npm run check\` before full browser gate | Yes | Existing 34-SVG Node assertion individually passed; workflow remained failed |
+| Phase 3 Table UI [#44657599219](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44657599219) | Node \`Run npm run check\`; **separate browser** \`AssertionError: table / Replay / Daily / Academy navigation missing\` | Shared Seed 87 **plus** independent async navigation/sandbox test mismatch; UI #42 | Node yes; browser **no** | R4 UI source fixes navigation and explicit sandbox route; at \`7104ba9\` [Table UI Chromium job passed](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44664800689). Full workflow still depends on Node |
+| Phase 3 full match [#44657599345](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44657599345) | \`Rules, three Bots, 100 fixed seeds\`, \`FULL_MATCH_GO=false\` | Direct Bot Seed 87 test — same unsupported Rules capability | Direct separate Node invocation, **same underlying assertion**, not a second bug | **NO-GO**. Separate real R3 Browser job **SUCCESS at \`ca7ce4d\`** |
+
+**Independent R4 browser regression after latest source import:** At **\`7104ba9\`**, [Phase 3 run #44664800653](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44664800653) browser failed at \`tests/browser/full-table-ui-r3-gates.py:185\` after reload. The selector used \`querySelector('#full-table-root [role="status"]')\`, which returned the **submission-status** node; the **date/progress** status is a separate later node. It waited for '日期 ' on the wrong first node for 25 seconds. This is a genuine test-selector error, **not evidence that canonical grading failed**. Source UI PR #42 and integrated \`b53a998\` replace that single-node lookup with \`querySelectorAll(...).some(...)\`, preserving *all* archive, provenance, Session RecordRef and ability/review storage assertions, with no extended timeout or faked data.
+
+### 11.3 Seed 87 forensic classification (do not normalize unsupported)
+
+At exact source checkout \`ca7ce4d\`, [Verify logs](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44657599223) recorded **315 tests, 313 PASS, 1 FAIL, 1 optional SKIP**. The 100-seed benchmark recorded:
+
+| Category | Actual count |
+| --- | ---: |
+| Executed | 100 |
+| Legal win settlements | 88 |
+| Legal exhaustive draws | 11 |
+| Unsupported \`multiple_winners\` | **1 — fixed-round-87** |
+| Invalid actions | 0 |
+| Stalls | 0 |
+| Settled outcomes | **99** |
+| Complete replay matches | 99 |
+| Replayable valid prefixes (including Seed 87) | 100 |
+| Claim windows | 4,449 |
+
+Actual Seed 87: 157 successful legal submissions, 162 accepted Rules events. Seat 2 discarded \`t:26:0\`, Seat 3 and Seat 0 each issued an individually legal discard \`WIN\`, then Seat 1's legal final \`CLAIM_WINDOW_PASS\` attempted arbitration. **Only the multi-WIN settlement is unsupported:** \`RuleCapabilityError: UNSUPPORTED_RULE_CAPABILITY / multiple_winners\`; no state mutation, no settlement, no imaginary event 163. Rules #43 public \`getRuleCapabilities\` discloses this limitation. Bot #40 retains typed blocked checkpoint rather than retrying/forging PASS. Replay #41 stores an explicitly **incomplete** rejected-submission proof, not a complete match. Claim priority, multi-WIN payout, table policy and four-seat conservation need an explicit versioned Rules design plus new Golden tests before Seed87 can legitimately pass.
+
+### 11.4 Same application SHA browser, Daily, Replay and PWA evidence
+
+At exact \`b53a998f21ffe17e43f1b81175551a51378a6623\`:
+- [Phase 3 Full human + three Bots / settlement / Replay / Daily / PWA Chromium job **SUCCESS**](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44665180727), job \`136052621113\`. Actual checkout log confirms \`b53a998\`, real \`tests/browser/full-table-ui-r3-gates.py\` execution, the complete success path and uploaded artifact.
+- [Real Chromium screenshots + machine-readable Daily evidence artifact #14596933806](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44665180727/artifacts/14596933806). Browser test checks the official \`archive:v3\` RecordRef, Academy \`provenanceLinks\`, \`trainingSessions[].recordRefs\`, AbilityProfile, ReviewPlan, reload readback, session continuity, offline new tab and 34 SVG. Artifact upload confirmed; the ZIP contents were not separately opened by this audit.
+- Academy V1 original suite and legacy V0.2 UI/PWA are **separate jobs**, not implied by this single browser PASS. A Chromium 390px viewport is **not** an iPhone Safari hardware result.
+- At the time this section was authored, [full source Verify #44665180689](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44665180689), [Phase3 100-seed Node job #44665180727](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44665180727) and other [exact-SHA checks](https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/44/checks) were still in progress; **do not mark them PASS by extrapolation**. Two 10,000-case Oracle suites passed in older scoped logs, but a whole \`npm run check\` cannot be PASS while fixed-round-87 deliberately fails.
+
+### 11.5 Explicit gates and release boundary
+
+| Gate | At R4 audit |
+| --- | --- |
+| \`V1_BASELINE_PASS\` | Historical PINNED_PASS at #33 SHA only; current full Node suite pending/affected by Bot failure |
+| \`EXPERIMENTAL_RULES_PASS\` | Bounded Golden / safety tests on older SHA passed; entire experimental RuleProfile not full Taiwanese table rules |
+| \`THREE_BOT_MATCH_PASS\` | **FAIL / NO-GO:** 99/100 settled at last measured complete 100-seed run |
+| \`REPLAY_PASS\` | Real settled replay browser PASS at \`b53a998\`; unsupported prefix explicitly incomplete |
+| \`DAILY_UI_PASS\` | Real Chromium formal answer + durable reload PASS at \`b53a998\`; all parallel Node gates not complete |
+| \`TABLE_UI_PASS\` | Real R3 Chromium PASS at \`b53a998\`; source Sandbox Chromium PASS at \`7104ba9\`, other combined checks pending |
+| \`PWA_PASS\` | Real new-tab offline Chromium PASS at \`b53a998\`; installed device SW-update **NOT_RUN** |
+| \`FULL_GAME_PREVIEW_READY\` | **false** — strict full-match 100/100 is blocked |
+| \`FULL_RULES_VERIFIED\` | **false** — \`multiple_winners\`, robbery-of-added-kong and venue-dependent tai/penalties unverified |
+| \`RELEASE_GO\` | **false** — PR #44 remains Draft |
+
+**Deployment:** no new Phase 3 immutable HTTPS preview authorized; existing separate V1 Vercel preview and V0.2 remain untouched. **Physical devices / accessibility:** iPhone Safari, Android, VoiceOver and TalkBack **NOT_RUN**. No protected main push, force push, PR #33/#44 merge, formal tag/release or fake certified settlement.
