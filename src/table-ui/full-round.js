@@ -197,12 +197,18 @@ export async function createFullRoundSession({storage} = {}) {
     if (!manifest || manifest.integrityStatus!=='canonical-replay-verified' ||
         !Number.isInteger(manifest.eventCount) || manifest.eventCount<1)
       throw new Error('Replay 內容尚未通過正式驗證');
+    // Group-atomic Replay frames are supplied by the owner-only Replay service.
+    const boundaries=replays.listReplayFrameBoundaries(replayId,{viewerSeat:HUMAN});
+    if(!Array.isArray(boundaries)||!boundaries.length||
+       boundaries[0]!==1||boundaries.at(-1)!==manifest.eventCount)
+      throw new Error('Replay 缺少完整合法動作事件邊界');
     return {
-      verified:true,replayId,total:manifest.eventCount,manifest:copy(manifest),
+      verified:true,replayId,total:boundaries.length,boundaries:copy(boundaries),
+      manifest:copy(manifest),
       getFrame(index) {
-        if (!Number.isInteger(index)||index<0||index>=manifest.eventCount)
+        if (!Number.isInteger(index)||index<0||index>=boundaries.length)
           throw new RangeError('Invalid replay index');
-        const seq=index+1;
+        const seq=boundaries[index];
         const frame=replays.getReplayFrame(replayId,seq,{viewerSeat:HUMAN,
           perspective:'player-at-time'});
         if (frame?.playerView?.audienceSeat!==HUMAN ||

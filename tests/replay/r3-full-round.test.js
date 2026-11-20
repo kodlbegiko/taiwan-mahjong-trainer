@@ -72,6 +72,8 @@ test('R3 self-win+settlement is one atomic decision; owner historical and opted-
   assert.equal(manifest.ruleStatus,'experimental');
   assert.equal(manifest.postgameAvailable,true);
   assert.equal(manifest.actionCount,1);
+  assert.deepEqual(api.listReplayFrameBoundaries(manifest.replayId,{viewerSeat:0}),[1,3]);
+  code(()=>api.listReplayFrameBoundaries(manifest.replayId,{viewerSeat:1}),'VIEW_FORBIDDEN');
   assert.equal(manifest.settlementResultRef.eventSeq,end.revision);
   assert.equal(JSON.stringify(manifest).includes(end.rng.seed),false);
   assert.equal(JSON.stringify(manifest).includes('fixtureDeck'),false);
