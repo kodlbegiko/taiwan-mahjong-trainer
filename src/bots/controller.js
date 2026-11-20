@@ -33,7 +33,8 @@ export async function runBotTurn({ bot, playerView, submitAction }) {
     if (error?.code === 'UNSUPPORTED_RULE_CAPABILITY' &&
         typeof error.capability === 'string')
       return {status:'unsupported',reason:'unsupported-rule-capability',
-        capability:error.capability,decision,decisionMs};
+        code:'UNSUPPORTED_RULE_CAPABILITY',capability:error.capability,
+        decision,decisionMs};
     // Fail closed; no fallback, no retry using the same revision.
     return { status: 'submission-rejected', decision, decisionMs };
   }
@@ -65,11 +66,12 @@ export function createBotController({
   const isBlocked = value => value && typeof value==='object' &&
     !Array.isArray(value) && value.status==='unsupported' &&
     value.reason==='unsupported-rule-capability' &&
+    value.code==='UNSUPPORTED_RULE_CAPABILITY' &&
     typeof value.capability==='string' && /^[a-z][a-z0-9_-]{0,100}$/.test(value.capability) &&
     typeof value.gameId==='string' && value.gameId.length>0 &&
     Number.isInteger(value.expectedRevision) && value.expectedRevision>=1 &&
     Number.isInteger(value.seat) && value.seat>=0 && value.seat<=3 &&
-    Object.keys(value).every(k=>['status','reason','capability','gameId','expectedRevision','seat'].includes(k));
+    Object.keys(value).every(k=>['status','reason','code','capability','gameId','expectedRevision','seat'].includes(k));
   if (checkpoint !== null && (!checkpoint || typeof checkpoint!=='object' ||
       Array.isArray(checkpoint) ||
       Object.keys(checkpoint).some(k => !['paused','blocked'].includes(k)) ||
@@ -175,13 +177,15 @@ export function createBotController({
       if (result.status==='unsupported' &&
           result.reason==='unsupported-rule-capability') {
         blocked={status:'unsupported',reason:result.reason,
-          capability:result.capability,gameId:view.gameId,
+          code:'UNSUPPORTED_RULE_CAPABILITY',capability:result.capability,
+          gameId:view.gameId,
           expectedRevision:view.asOfEventSeq,seat};
       }
       return {status:result.status,seat,decision:result.decision,
         decisionMs:result.decisionMs,
         ...(result.reason?{reason:result.reason}:{}),
-        ...(result.capability?{capability:result.capability}:{})};
+        ...(result.capability?{capability:result.capability}:{}),
+        ...(result.code?{code:result.code}:{})};
     } finally {
       busy=false;
     }
@@ -231,7 +235,8 @@ export function createBotController({
       if (error?.code==='UNSUPPORTED_RULE_CAPABILITY' &&
           typeof error.capability==='string') {
         blocked={status:'unsupported',reason:'unsupported-rule-capability',
-          capability:error.capability,gameId:view.gameId,
+          code:'UNSUPPORTED_RULE_CAPABILITY',capability:error.capability,
+          gameId:view.gameId,
           expectedRevision:view.asOfEventSeq,seat:humanSeat};
         return copy(blocked);
       }
