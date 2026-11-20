@@ -281,3 +281,20 @@ The eight failed Workflows are **not eight independent bugs**. The first proven 
 7. The last three commits are only CI/test evidence improvements, not engine behavior changes. Every final integration Gate still requires all Workflow/Job results on **the same final HEAD**. On the latest audit, final same-SHA runs were queued or in progress. **Seed 87 remains blocked, so release status remains NO-GO.**
 
 Reviewer coordination posted in source PR #43 (Rules, issue comment `7027901182`) and #40 (Bots, comment `7027901776`) requiring versioned policy resolution and no fictitious settlement. PR #44 stays Draft. All iPhone Safari, Android, VoiceOver and TalkBack remain NOT_RUN; no official Phase 3 immutable-SHA preview, tag, or release authorized.
+
+## 10. R4 newest Rules/Bots source integration (supersedes earlier source pins)
+
+**Newer source PR heads were discovered by a second live GitHub check after §9 was written.** Rules #43 advanced to `bedab27a8a39565cb62fdbcdc9abb868cf1dadac`; Bots #40 advanced to `b872f3529fc76dc76dc7f4d01bfdb66f306f4c71`. Both remain Draft. Replay #41 remains `b5f64675b51ac5515329bb4d758dbff6df707ab1`, UI #42 remains `9a0b35ad4ee5b18cca7a0861bbf8fcc5d77cc76c`, Daily #45 remains `4d91a537156dd25e22569f6025acc2b63ec0e251`.
+
+**Safe exact-blob integration commit:** `ede7dc94ad516e751001921f7d1a91cf1f5c7be9` (parent `beaf84d07466924c791fdfd65ee6b9ba39a3660f`). Cherry-picked by matching Git blob IDs via a single tree+commit and checked fast-forward ref, **not by blind merging diverged branch histories**. The following 12 source-owned files were copied byte-identically:
+
+- Rules (7): `docs/rules/CLAIM_ARBITRATION_API.md`, `docs/rules/TW16_TABLE_POLICY.md`, `src/rules/complete-engine.js`, `src/rules/engine.js`, `src/rules/index.js`, `tests/rules/fixtures/seed-87-r4-trace.js`, `tests/rules/r4-seed-87.test.js`.
+- Bots (5): `docs/bots/R4_SEED87_RELIABILITY.md`, `docs/bots/README.md`, `src/bots/controller.js`, `tests/bots/r3-full-round.test.js`, `tests/bots/r4-capability.test.js`.
+
+New Rules tests preserve a fixed 157 legal-action trace ending revision 162 with two separately valid private WIN intents and unchanged source state on an unsupported final PASS. The revised documented RuleProfile explicitly distinguishes **single-winner experimental settlement** from **multiple legal discard WINs: `UNSUPPORTED_RULE_CAPABILITY/multiple_winners`**. The prior documentation's misleading nearest-seat tie-break language has been constrained to supported claim types. No new multiwinner payout/settlement was created.
+
+New Bot code latches typed Rules rejection with game/revision/seat and persists a minimal redacted checkpoint; subsequent ticks and retries fail closed. The source-owned 100-seed test still requires `summary.fullMatchGo===true`, intentionally failing with 99/100 settled until policy is implemented. It does not normalize unsupported to settlement. Additional `r4-capability.test.js` tests typed blocked state and no duplicate submissions.
+
+**Historical measured 100-seed classification at `232c9457350c69224f12b346f2a1e4b528dd0b65`:** 100 executed, 88 wins, 11 exhaustive draws, 1 `unsupported` (seed 87), 0 invalid legal actions, 0 stalled, 99 complete Replay matches, 4,449 claim windows. **Do not reuse as test results for `ede7dc94...` or a later report-only commit.**
+
+Both new source heads had no newer directly associated full integration Workflow result during the source audit. Their integration commit triggered new verification on PR #44; report only what actually completes at that exact SHA. **V1 baseline still SHA-scoped, experimental source safety improved, FULL_MATCH_GO=false, RELEASE_GO=false, PR #44 Draft.** Physical device, screen-reader and final Preview gates remain NOT_RUN / NO-GO.
