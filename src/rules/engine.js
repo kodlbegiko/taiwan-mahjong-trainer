@@ -10,7 +10,7 @@ import {
   completeCreateGame, completeListLegalActions, completeApplyAction,
   completeReplayGame, completeValidateGameState, completeCreatePlayerView,
   completeStartNextRound, completeListPendingClaimResponders,
-  completeGetClaimWindowPublic,
+  completeGetClaimWindowPublic, completeGetRuleCapabilities,
 } from './complete-engine.js';
 const isCompleteRef=ref=>ref?.profileId==='tw16-configurable-table';
 
@@ -122,6 +122,24 @@ export function createGame({
  * Lists only executable bounded-subset moves. No chi/pong/kong/win/pass/
  * replace_flower candidates are ever emitted.
  */
+/**
+ * Static, detached RuleProfile capability contract. Never inspects GameState
+ * or pending private claim intents; not an assertion of certified house rules.
+ */
+export function getRuleCapabilities(ruleRef) {
+  if(isCompleteRef(ruleRef))return completeGetRuleCapabilities(ruleRef);
+  const profile=getRuleProfile(ruleRef?.profileId,ruleRef?.ruleVersion);
+  assertRoundProfile(profile);
+  return {...V1,ruleRef:{profileId:profile.profileId,ruleVersion:profile.ruleVersion},
+    status:'experimental',
+    claimArbitration:{responders:0,supportedActions:[],
+      priority:[],singleDiscardWin:'unsupported',
+      multipleDiscardWins:{status:'unsupported',capability:'multiple_winners'},
+      robAddedKong:{status:'unsupported',capability:'rob_added_kong'},
+      unsupportedDisposition:'fail-closed-without-settlement'},
+    scoring:{status:'unsupported',policy:null}};
+}
+
 /**
  * Authority-side scheduler; never provide the private state to a Bot.
  * Legacy experimental sandbox has no claim windows.

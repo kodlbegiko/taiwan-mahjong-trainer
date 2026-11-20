@@ -84,14 +84,25 @@ during other phases the human must be Rules' current actor.
   has bounded `maxActions=32` (allowed 1–128) and yields between steps.
 - `maxRevision=2048` by default (allowed 1–100000) bounds cumulative
   event growth. `duplicate-revision-blocked` blocks re-submission.
-- A newer Rules host may pass `getPendingClaimResponders` backed by\n  `listPendingClaimResponders(authoritative)` (Rules #43). The callback returns\n  *only a seat array* and is checked against that seat's current PlayerView.\n  Older pinned R3 versions remain compatible through PlayerView-only scanning.\n- A Rules `RuleCapabilityError` (e.g. multiple legitimate WIN intents) is\n  returned as `{status:'unsupported',reason:'unsupported-rule-capability',\n  capability:'multiple_winners'}`; no invented priority, settlement, or PASS.\n- Mixed PlayerView revisions, no active responder, impossible action set,
+- A newer Rules host may pass `getPendingClaimResponders` backed by
+  `listPendingClaimResponders(authoritative)` (Rules #43). The callback returns
+  *only a seat array* and is checked against that seat's current PlayerView.
+  Older pinned R3 versions remain compatible through PlayerView-only scanning.
+- A Rules `RuleCapabilityError` (e.g. multiple legitimate WIN intents) is
+  returned as `{status:'unsupported',reason:'unsupported-rule-capability',
+  code:'UNSUPPORTED_RULE_CAPABILITY',capability:'multiple_winners'}`; no invented priority, settlement, or PASS.
+- Mixed PlayerView revisions, no active responder, impossible action set,
   or exceeding event budget return typed `{status:'unsupported',reason:'...'}`
   rather than false win/draw.
 - Missing R3 capabilities in old draw/discard sandbox still fail closed as
   `claim-adjudication-unavailable`; the experimental sandbox is not a full game.
-- `pause()`, `resume()`, `checkpoint()` preserve the controller's pause
-  bit only. The host must persist and restore its authoritative Rules state.
-  In-flight calls cannot be paused mid-submission.
+- `pause()`, `resume()`, `checkpoint()` preserve the pause bit.
+  After a typed Rules `UNSUPPORTED_RULE_CAPABILITY` refusal, checkpoint also
+  preserves only a small allowlisted blocked status (code, capability, seat,
+  revision and gameId). All subsequent controller calls fail closed without
+  retrying that action. The host alone persists authoritative Rules state
+  and must create a new controller for a new valid round. In-flight calls
+  cannot be paused mid-submission.
 
 ## Policies and limitations
 
@@ -134,3 +145,13 @@ be pinned by the integrator). The optional host callback and typed response are
 Bot-owned compatibility changes, **not** evidence that the latest combined
 source has passed the same 100 seed run. AI 6 must retest against one exact
 integrated SHA, replacing its now-stale negative claim-window gate.
+
+## R4 Seed 87 measured limitation
+
+The latest combined R4 RuleProfile explicitly refuses two simultaneous
+legitimate discard WIN intents. The measured integrated 100-seed result was
+**99 settled (88 wins, 11 draws) + 1 typed unsupported (Seed 87)**. These
+outcomes are counted separately; the **strict 100/100 FULL_MATCH_GO gate stays
+RED**. Source-only older 100/100 benchmarks cannot replace this evidence.
+See [R4_SEED87_RELIABILITY.md](./R4_SEED87_RELIABILITY.md) for revision 162,
+full public action trace, no-repeat controller tests, and Rules/AI6 handoff.

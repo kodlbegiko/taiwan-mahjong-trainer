@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {performance} from 'node:perf_hooks';
+import * as R3Authority from '../../src/rules/index.js';
 import {
   createGame,createPlayerView,listLegalActions,applyAction,replayGame,
   validateGameState,startNextRound,
@@ -22,26 +23,44 @@ async function fullRound(seed,{difficulty='Beginner',maxEvents=1500}={}){
   const gameId='bot-r3-'+seed;
   let state=createGame({gameId,seed:'fixed-round-'+seed,...ruleRef});
   let claimWindows=0,invalidActions=0,stalls=0,decisionMs=0,decisions=0;
+  let lastRulesError=null;
   const bots=[bot(1,difficulty),bot(2,difficulty),bot(3,difficulty)];
   const humanPolicy=bot(0,difficulty);
   const controller=createBotController({
     bots,humanSeat:0,
     getActingSeat:()=>state.round.currentSeat,
     getPlayerView:seat=>createPlayerView(state,seat),
-    submitAction:submission=>{state=applyAction(state,submission).state;},
+    ...(typeof R3Authority.listPendingClaimResponders==='function'
+      ? {getPendingClaimResponders:()=>R3Authority.listPendingClaimResponders(state)}
+      : {}),
+    submitAction:submission=>{
+      lastRulesError=null;
+      try { state=applyAction(state,submission).state; }
+      catch(error) {
+        lastRulesError={
+          name:String(error?.name||'Error'),
+          code:typeof error?.code==='string'?error.code:null,
+          capability:typeof error?.capability==='string'?error.capability:null,
+          message:String(error?.message||'unknown Rules error'),
+        };
+        throw error;
+      }
+    },
     yieldControl:async()=>{},
     maxRevision:maxEvents,
   });
   const before=performance.now();
-  let reason=null,steps=0,claims=0,unsupportedCapability=null,failedSubmission=null;
+  let reason=null,steps=0,claims=0,unsupportedCapability=null,failedSubmission=null,failedContext=null;
   const actionTrace=[];
   for(;steps<maxEvents && state.round.phase!=='settled';steps++){
-    const oldRevision=state.revision,wasClaim=state.round.phase==='claim_window';
-    let result=await controller.tick(),attempted=null;
+    const oldRevision=state.revision,beforePhase=state.round.phase,
+      wasClaim=beforePhase==='claim_window';
+    let result=await controller.tick(),attempted=null,humanDecision=null;
     if(result.status==='human-turn'){
       const view=createPlayerView(state,0);
       const start=performance.now();
       const decision=chooseBotAction(humanPolicy,view);
+      humanDecision=decision;
       decisionMs+=performance.now()-start;decisions++;
       validateBotDecision(humanPolicy,view,decision);
       if(decision.status!=='ready'){reason='human-'+decision.status;break;}
@@ -59,11 +78,36 @@ async function fullRound(seed,{difficulty='Beginner',maxEvents=1500}={}){
       reason=result.reason||result.status;
       unsupportedCapability=result.capability??null;
       failedSubmission=attempted;
+      const actor=attempted?.actorSeat;
+      // Forensics are reconstructed from THIS actor's own Rules PlayerView.
+      // Do not put GameState, the wall, private claim intents or any other
+      // seat's concealed tiles in logs or Bot's inputs.
+      const v=Number.isInteger(actor)?createPlayerView(state,actor):null;
+      failedContext=v?{
+        gameId:v.gameId,ruleRef:v.ruleRef,actorSeat:actor,
+        currentSeat:v.round.currentSeat,phase:v.round.phase,
+        asOfEventSeq:v.asOfEventSeq,expectedRevision:attempted.expectedRevision,
+        legalActions:v.legalActions.map(a=>({
+          kind:a.kind,actionId:a.actionId,actorSeat:a.actorSeat,
+          expectedRevision:a.expectedRevision,
+          claimEventId:a.claimEventId??null,
+          reasonCodes:a.legalityBasis?.reasonCodes??[],
+        })),
+        visibleEventCount:v.publicEvents.length,
+        ownConcealedCount:v.self.concealed.length,
+        opponentConcealedCounts:v.opponents.map(p=>({
+          seat:p.seat,count:p.concealedCount,
+        })),
+        decisionReasonCodes:(humanDecision||result.decision)?.reasonCodes??[],
+        rulesError:lastRulesError,
+        afterRevision:state.revision,afterPhase:state.round.phase,
+      }:null;
       break;
     }
     actionTrace.push({revision:oldRevision,actorSeat:attempted?.actorSeat,
       actionId:attempted?.actionId,expectedRevision:attempted?.expectedRevision,
-      fromPhase:wasClaim?'claim_window':null,
+      fromPhase:beforePhase,wasClaimWindow:wasClaim,
+      decisionReasonCodes:(humanDecision||result.decision)?.reasonCodes??[],
       afterRevision:state.revision,afterPhase:state.round.phase});
     if(wasClaim)claims++;
     if(!wasClaim&&state.round.phase==='claim_window')claimWindows++;
@@ -76,10 +120,12 @@ async function fullRound(seed,{difficulty='Beginner',maxEvents=1500}={}){
   }
   if(!reason&&state.round.phase!=='settled')reason='max-event-budget';
   const completed=state.round.phase==='settled'&&!reason;
-  let replayMatch=false;
+  let replayMatch=false,prefixReplayMatch=false;
   try{
     validateGameState(state,{replay:false});
-    if(completed)replayMatch=JSON.stringify(replayGame(state))===JSON.stringify(state);
+    prefixReplayMatch=JSON.stringify(replayGame(state))===JSON.stringify(state);
+    if(completed)replayMatch=prefixReplayMatch;
+    if(!prefixReplayMatch)reason=reason||'replay-prefix-mismatch';
   }catch(e){reason=reason||('state-or-replay:'+e.message);}
   return {seed,ruleProfile:ruleRef.profileId+'@'+ruleRef.ruleVersion,
     botPolicy:difficulty,events:state.events.length,steps,
@@ -89,7 +135,13 @@ async function fullRound(seed,{difficulty='Beginner',maxEvents=1500}={}){
     replayMatch,decisionCount:decisions,
     decisionMs:Number(decisionMs.toFixed(3)),
     elapsedMs:Number((performance.now()-before).toFixed(3)),
-    reason,unsupportedCapability,failedSubmission,
+    reason,unsupportedCapability,failedSubmission,failedContext,
+    prefixReplayMatch,
+    terminalCategory:completed&&!reason?'settled':
+      reason==='unsupported-rule-capability'?'unsupported':
+      reason==='unchanged-revision'?'stalled':
+      reason==='replay-prefix-mismatch'||reason?.startsWith('state-or-replay:')?
+        'replay-mismatch':'invalid',
     // Only unsuccessful seeds emit full reproducible public action submissions;
     // private wall, opponent hands, and full GameState remain out of CI logs.
     failureActionTrace:reason?actionTrace:null,
@@ -183,6 +235,75 @@ test('R3 stale and forged claim actions are rejected by authoritative Rules',()=
     actionId:legal.actionId,expectedRevision:legal.expectedRevision}),/Stale/);
 });
 
+test('R4 Seed 87: deterministic revision-162 arbitration evidence, no stale action and replayable prefix',async()=>{
+  const r=await fullRound('87');
+  const {state,controller,...publicResult}=r;
+  console.log('BOT_R4_SEED87 '+JSON.stringify({
+    seed:r.seed,ruleProfile:r.ruleProfile,policy:r.botPolicy,
+    status:r.terminalCategory,events:r.events,steps:r.steps,
+    unsupportedCapability:r.unsupportedCapability,
+    failedSubmission:r.failedSubmission,failedContext:r.failedContext,
+    finalPublicActions:r.failureActionTrace?.slice(-12)??null,
+    prefixReplayMatch:r.prefixReplayMatch,
+    decisionMs:r.decisionMs,elapsedMs:r.elapsedMs,
+  }));
+  assert.equal(r.invalidActions,0);
+  assert.equal(r.stalls,0);
+  assert.equal(r.prefixReplayMatch,true);
+  assert.deepEqual(replayGame(state),state);
+  if(r.terminalCategory==='unsupported'){
+    assert.equal(r.reason,'unsupported-rule-capability');
+    assert.equal(r.unsupportedCapability,'multiple_winners');
+    assert.equal(state.revision,162);
+    assert.equal(state.round.phase,'claim_window');
+    assert.equal(r.failedSubmission.actorSeat,1);
+    assert.equal(r.failedSubmission.expectedRevision,162);
+    assert.ok(r.failedSubmission.actionId.includes(':pass:CLAIM_WINDOW_PASS:'));
+    assert.equal(r.failedContext.rulesError.code,'UNSUPPORTED_RULE_CAPABILITY');
+    assert.equal(r.failedContext.rulesError.capability,'multiple_winners');
+    assert.ok(r.failedContext.legalActions.some(a=>
+      a.actionId===r.failedSubmission.actionId &&
+      a.expectedRevision===162 && a.actorSeat===1));
+    const preceding=r.failureActionTrace.slice(-2);
+    assert.deepEqual(preceding.map(x=>[x.revision,x.actorSeat,
+      x.actionId.includes(':win:'),x.expectedRevision]),
+      [[160,3,true,160],[161,0,true,161]]);
+    assert.equal(r.completed,false);
+    assert.equal(r.finish,null);
+    assert.equal((await controller.tick()).status,'unsupported');
+    assert.equal((await controller.runUntilHuman({maxActions:4})).capability,
+      'multiple_winners');
+    assert.equal(controller.checkpoint().blocked.expectedRevision,162);
+    assert.equal(state.revision,162,'must not retry the failed claim');
+  }else{
+    // The older R3 source tree did not enforce explicit multiwinner rejection.
+    // A settlement there is NOT evidence that the latest R4 Rules support it.
+    assert.equal(r.terminalCategory,'settled');
+    assert.equal(r.completed,true);
+    assert.equal(r.replayMatch,true);
+  }
+  assert.ok(!JSON.stringify(r.failedContext??{}).includes('"wall"'));
+  assert.ok(!JSON.stringify(r.failedContext??{}).includes('"concealed"'));
+});
+
+test('R4 10 representative fixed seeds: explicit terminal classifications',async()=>{
+  const seeds=['0','1','6','19','37','42','50','72','87','99'],results=[];
+  for(const seed of seeds){
+    const {state,controller, failureActionTrace,...r}=await fullRound(seed);
+    results.push({seed,status:r.terminalCategory,finish:r.finish,
+      capability:r.unsupportedCapability,events:r.events,
+      replayPrefix:r.prefixReplayMatch,invalidActions:r.invalidActions,
+      stalls:r.stalls,decisionMs:r.decisionMs,elapsedMs:r.elapsedMs});
+    assert.equal(r.prefixReplayMatch,true);
+    assert.equal(r.invalidActions,0);
+    assert.equal(r.stalls,0);
+    assert.ok(r.terminalCategory==='settled'||(
+      seed==='87' && r.terminalCategory==='unsupported' &&
+      r.unsupportedCapability==='multiple_winners'));
+  }
+  console.log('BOT_R4_TEN_SEED '+JSON.stringify(results));
+});
+
 test('R3 100 fixed-seed complete hands: observed coverage, settlements and replay',async()=>{
   const reports=[],failures=[];
   for(let n=0;n<100;n++){
@@ -206,21 +327,48 @@ test('R3 100 fixed-seed complete hands: observed coverage, settlements and repla
     wins:completed.filter(x=>x.finish==='win').length,
     draws:completed.filter(x=>x.finish==='exhaustive-draw').length,
     claims:reports.reduce((a,r)=>a+r.claimWindows,0),
+    claimResponses:reports.reduce((a,r)=>a+r.claimResponses,0),
+    settled:reports.filter(r=>r.terminalCategory==='settled').length,
+    unsupported:reports.filter(r=>r.terminalCategory==='unsupported').length,
+    invalid:reports.filter(r=>r.terminalCategory==='invalid').length,
+    stalled:reports.filter(r=>r.terminalCategory==='stalled').length,
+    replayMismatch:reports.filter(r=>r.terminalCategory==='replay-mismatch').length,
+    unsupportedCodes:[...new Set(reports.filter(r=>r.terminalCategory==='unsupported')
+      .map(r=>r.unsupportedCapability))],
     invalidActions:reports.reduce((a,r)=>a+r.invalidActions,0),
     stalls:reports.reduce((a,r)=>a+r.stalls,0),
     replayMatched:reports.filter(r=>r.replayMatch).length,
+    prefixReplayMatched:reports.filter(r=>r.prefixReplayMatch).length,
     avgDecisionMs:durations.length?Number((durations.reduce((a,b)=>a+b,0)/durations.length).toFixed(3)):null,
     p95DecisionMs:durations.length?Number(durations[Math.ceil(.95*durations.length)-1].toFixed(3)):null,
     failedSeeds:failures.map(x=>x.seed),
-    limitations:'Coverage only; no skill/win-rate certification. Minimal experimental scoring.',
+    fullMatchGo:completed.length===100 && failures.length===0,
+    limitations:'Coverage only. Unsupported is NOT settled. Full-match release gate requires 100/100 settled and verified policy.',
   };
   console.log('BOT_FULL_ROUND_SUMMARY '+JSON.stringify(summary));
   if(failures.length)console.log('BOT_FULL_ROUND_FAILURES '+JSON.stringify(failures));
   assert.equal(reports.length,100,'all 100 fixed seeds must execute');
-  assert.deepEqual(failures,[],'no false positive completions, replay mismatches or stalls');
-  assert.equal(summary.replayMatched,100);
-  assert.equal(summary.invalidActions,0);
-  assert.equal(summary.completed,100);
+  assert.equal(summary.invalidActions,0,'Bot must never submit forged or stale actions');
+  assert.equal(summary.invalid,0);
+  assert.equal(summary.stalled,0);
+  assert.equal(summary.replayMismatch,0);
+  assert.equal(summary.prefixReplayMatched,100,'unsupported prefix must also replay deterministically');
+  // A known R3 experimental capability gap remains a distinct unresolved
+  // FULL_MATCH_GO blocker, NOT a completed game and NOT a synthetic draw.
+  const knownUnsupported=reports.filter(r=>r.terminalCategory==='unsupported');
+  assert.ok(knownUnsupported.every(r=>r.seed==='87' &&
+    r.unsupportedCapability==='multiple_winners'),
+    'Any new or unexpected unsupported seed requires separate Rules adjudication');
+  assert.equal(summary.settled+summary.unsupported,100);
+  if(!summary.fullMatchGo)console.log('BOT_FULL_MATCH_GATE NO_GO '+JSON.stringify({
+    actualSettled:summary.settled,unsupported:summary.unsupported,
+    unsupportedCodes:summary.unsupportedCodes,failedSeeds:summary.failedSeeds,
+  }));
+  // Keep the STRICT full-match acceptance gate independent from the
+  // classification evidence above. With R4's unsupported multiple_winners,
+  // the test must stay RED: 99 settled + 1 unsupported is not 100 settled.
+  assert.equal(summary.fullMatchGo,true,
+    'FULL_MATCH_GO=false: unsupported is not settled; Rules must support the table policy');
   // Explicitly verify Rules-authoritative next-round creation after settlement.
   const sample=await fullRound('next-round');
   assert.equal(sample.completed,true);
