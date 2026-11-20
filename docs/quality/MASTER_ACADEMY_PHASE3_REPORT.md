@@ -213,3 +213,57 @@ Source-owned corrections:
 The deterministic unsupported path above was corroborated on another same-SHA R3 Node run [#44646674494](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44646674494): 24 targeted Node tests, 23 passed, 1 failed (the 100 fixed-seed completion assertion), and again 99/100 terminal, 88 wins, 11 draws, seed 87 `unsupported-rule-capability`, 4,449 Claim Windows. This is evidence of repeatability, not permission to relabel the unsupported hand as a draw.
 
 Bot source [#40 `47f63464d8de224ad7043b46c495ff62d1d0cbcb`](https://github.com/kodlbegiko/taiwan-mahjong-trainer/commit/47f63464d8de224ad7043b46c495ff62d1d0cbcb) now retains `unsupportedCapability`, failing Action ID and a replayable sequence of submitted public `{actorSeat,actionId,expectedRevision}` values for unsuccessful seeds; it does **not** put private wall or concealed state in logs. Its source-owned test blob was staged on integration for the next exact-SHA run. The Chromium workflow no longer depends on potentially stalled Linux package-mirror CJK font installation: functional acceptance and screenshots take precedence; text typography coverage is assessed separately. Newest combined CI is PENDING; no other release gate is promoted.
+
+---
+
+## 8. R4 CI recovery audit — 2026-11-20 Asia/Taipei (integration-only evidence; not release certification)
+
+### 8.1 Exact refs and blob provenance
+
+- Protected main: `25870862b6499f7e699967aa76429ae5dcfc5db4`.
+- V1 PR #33 Draft: `68fb50bc43746a0e6ff9f2f90712904d06a2ccda`.
+- Phase 3 PR #44 Draft, **first audited failing HEAD**: `232c9457350c69224f12b346f2a1e4b528dd0b65`.
+- Latest source HEADs checked on 2026-11-20: Rules #43 `1f7badfefa50d97e4db4a9a689ea563eb3289232`; Bots #40 `47f63464d8de224ad7043b46c495ff62d1d0cbcb`; Replay #41 `b5f64675b51ac5515329bb4d758dbff6df707ab1`; Table UI #42 `9a0b35ad4ee5b18cca7a0861bbf8fcc5d77cc76c`; Daily #45 `4d91a537156dd25e22569f6025acc2b63ec0e251`.
+- Full Git tree blob-identity comparison at integration test-fix HEAD `d4dd0533fa27514d8018f0ee8b6d35936d4dc2ad`: Rules 14/14 source-owned paths identical; Bots 10/10; Replay 7/7; Daily 18/18; UI 7/9. The **only two intentional deviations** from latest UI source are integrator browser tests `tests/browser/full-table-ui-gates.py` and `tests/browser/full-table-ui-r3-gates.py`. No source-owned Rules/Bots/Replay/Adaptive implementation blobs were overwritten; `src/table-ui/**`, `index.html` and `sw.js` are unchanged by this R4 recovery.
+- Historical source PR branch ancestry is **diverged** from integration; matching blobs is stronger evidence than commit ancestry here. No blind full-branch merge or cherry-pick was performed.
+
+### 8.2 Failure Matrix — first independently observed blocker, audited SHA `232c945...`
+
+| Workflow / run | Failed Job / first assertion | Root owner | Shared npm check propagation? | R4 disposition / exact validation |
+| --- | --- | --- | --- | --- |
+| [Verify #44647873450](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44647873450) | `test`: `tests/bots/r3-full-round.test.js:220` | Rules #43 + Bots #40 | Direct failure | 305 tests / 303 PASS / 1 FAIL / 1 optional SKIP at **232c945 only** |
+| [Full Match #44647873497](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44647873497) | Rules + Bots Node: `fixed-round-87`, assert `failures=[]` | Rules #43 + Bots #40 | Direct | 99/100 settled, 1 typed `multiple_winners` unsupported; separate Chromium Job: Daily assertion |
+| [Full Match #44647873497](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44647873497) | Full human+3bot Chromium: `Daily canonical grading was not durably recorded` | Daily #45 + Table UI #42 integration | No | R4 updated browser assertions to require canonical v3 RecordRef + sidecar provenance/session + derivations, pending same-HEAD CI |
+| [Table UI #44647875434](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44647875434) | Chromium: `initial real engine 17 legal physical tiles missing` | UI / obsolete sandbox acceptance contract | No | R4 replaced incorrect immediate-discard-only assumption with real R3 flower-phase transition + 17 legal discards, pending same-HEAD Chromium |
+| [Table UI #44647875434](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44647875434) | Table UI / legal action / persistence Job: `npm run check` | Seed 87 common fail | Yes | Not independent UI failure |
+| [Tile QA #44647874205](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44647874205) | Real Chromium 1440/768/390/320 + SVG/PWA Job: Node prerequisite | Seed 87 common fail | Yes | Browser itself not reached; no separate SVG verdict |
+| [V0.2 PWA #44647874247](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44647874247) | chromium Job: `npm run check` | Seed 87 common fail | Yes | Browser itself not reached |
+| [V0.2 independent #44647873483](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44647873483) | Both Node and Chrome Jobs: `npm run check` / candidate P0 prerequisite | Seed 87 common fail | Yes | No independent V0.2 defect established |
+| [Academy UI #44647873609](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44647873609) | Node Job: `npm run check` | Seed 87 common fail | Yes | Independent Academy mobile/desktop/offline Chromium Job **SUCCESS on 232c945**, not same as total workflow PASS |
+| [Academy combined #44647873473](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44647873473) | R/S/L/A Node Job prerequisite | Seed 87 common fail | Yes | Independent real Lesson/v3/Adaptive/Review/offline Chromium Job **SUCCESS on 232c945**; total workflow still failure |
+
+The eight failed Workflows are **not eight independent bugs**. The first proven independent blockers are: 100-seed RuleProfile capability; R3 Daily browser durability; outdated table sandbox browser assertion. Previous SW cache-prefix regression was repaired before 232c945; no new independent cache-prefix failure was observed in these logs.
+
+### 8.3 Seed 87 — mandatory preserved NO-GO
+
+- Deterministic game seed `fixed-round-87`; game `bot-r3-87`. Trace shows seat 2 discards physical tile `t:26:0` at revision 159; seat 3 submits a valid Rules `DISCARD_WIN` at revision 160; seat 0 submits a distinct valid `DISCARD_WIN` at revision 161; resolution at revision 162 returns typed `UNSUPPORTED_RULE_CAPABILITY / multiple_winners`. 162 events, 32 claim windows, 95 claim responses, **0 invalid actions, 0 stalls**, no forged Bot action ID. No valid settlement and no complete Replay for this seed.
+- Source `src/rules/complete-engine.js` and `getRuleCapabilities` explicitly reject multiple discard-win intents; `tests/rules/claim-arbitration.test.js` asserts typed fail-closed. Meanwhile `docs/rules/TW16_TABLE_POLICY.md` documents nearest-seat single-winner tie-break. This is a **policy/capability discrepancy requiring Rules-owner adjudication**. It is unsafe for the integrator to silently erase `unsupported` or select a winner without publishing a coherent, versioned policy and Golden settlement/replay/privacy tests.
+- Observed fixed-seed totals at **232c945**: 100 executed, 99 settled, 1 unsupported, 99 replay matches. Exact win/draw breakdown on the 99 successes must be read from the individual seed log; no absent data is inferred. **THREE_BOT_MATCH_PASS=false**.
+- Keep seed 87 unmodified and red. If Rules eventually implements a reviewed single-winner nearest-seat policy, new exact-head full 100 seeds + replay + independent Golden + settlement verification are mandatory. A genuine multi-winner settlement needs separate versioned RuleProfile/ScoringPolicy and tests.
+
+### 8.4 R4 browser test repairs, source ownership, and limits
+
+- `c554c253fcdf47f48fc919b9919e0d4075ad41d0`: R3 Daily Chromium test now explicitly checks durable canonical `archive:v3` records, Adaptive sidecar provenance, Session RecordRefs, no pending provenance and derived AbilityProfile/ReviewPlan. It includes safe metadata diagnostics if the submission still fails. This does **not** manufacture official records.
+- `185ffee7a509c41aacf732d849f61ca810dbc0b7`, `1a968d5c8c3b6e4df8ce642e1a7ea284680517c7`, `d4dd0533fa27514d8018f0ee8b6d35936d4dc2ad`: update the obsolete *sandbox-only* Browser gate to require real R3 profile, complete actual flower replacements via Rules-issued LegalActions, then 17 physical eligible dealer discards; preserve keyboard, touch, reduced motion, 320/375/390/430/768/1440 widths, two-step discard, authenticated Rules checkpoint readback, reload, redacted opponents, legacy Academy, 34 SVG and cold offline tab. No fake Bot decisions or fixture-only acceptance. The separately required real full-match R3 Chromium E2E remains unchanged except stricter Daily durability.
+- All four are **test/diagnostic commits**, not source Rules/Adaptive behavioral fixes. CI results must refer to the exact candidate HEAD; queued/in-progress are NOT PASS.
+- Independent historical public real Chromium R3 evidence exists at 232c945: one real terminal game, experimental settlement and verified Replay frames with [screenshots in run #44647873497 artifact](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44647873497). The **overall R3 job failed at Daily before offline**. The images are not proof of full R4 acceptance.
+
+### 8.5 Oracle, schema, security, and remaining release gates
+
+- At 232c945, required independent 10,000 mixed 16/17-tile physical oracle, 10,000 sampled 17-tile win oracle and 10,000 seeded shanten oracle are individually reported PASS inside the 303 passing Node tests. The separate opt-in `MAHJONG_STRESS=1` additional 10,000+ oracle remains **SKIP**, not silently passed.
+- V1 PR #33 baseline historically passed at its own exact SHA, and both standalone combined Academy/V1 Chromium jobs succeeded at 232c945. Neither certifies all R4 code changes after 232c945.
+- Rules remain `experimental`, with simplified `tw16-minimal-tai-v1` scoring, unverified full Taiwanese venue tai/penalty/rob-kong/multi-winner semantics. No official scenario scorer or Bot-derived Adaptive evidence is certified.
+- 320/390/1440 Chromium, Replay privacy, cold-tab PWA, new SW Update, 34 SVG, legacy archive bytes and Daily reload require final same-SHA CI evidence. Physical iPhone Safari, Android, VoiceOver and TalkBack: **NOT_RUN**.
+- No fresh Phase 3 immutable-SHA Vercel HTTPS acceptance preview was published by this audit. Existing V1 independent Preview and V0.2 must remain unchanged.
+- Gate state at audit: `V1_BASELINE_PASS`=historical only / new integration not certified; `EXPERIMENTAL_RULES_PASS`=bounded Rules Node PASS at 232c945; `THREE_BOT_MATCH_PASS`=FAIL; `REPLAY_PASS`=partial/old SHA only; `DAILY_UI_PASS`=FAIL; `TABLE_UI_PASS`=FAIL/repair awaiting run; `PWA_PASS`=NOT_VERIFIED for full R3; `FULL_GAME_PREVIEW_READY`=false; `FULL_RULES_VERIFIED`=false; `RELEASE_GO`=false.
+- PR #44 remains Draft; no protected main change, new PR, official release/tag or production deployment. **Release decision: NO-GO** until the same final SHA passes all mandatory gates.
