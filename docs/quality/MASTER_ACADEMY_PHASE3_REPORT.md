@@ -535,32 +535,32 @@ An earlier independent-project default deployment `dpl_DtuGoN39Nc6j62rE68sCQruBU
 
 ## 13. 2026-11-20 R6 public HTTPS live-preview acceptance — **NOT YET GO**
 
-**R6 machine-readable evidence:** [MASTER_ACADEMY_PHASE3_R6_ACCEPTANCE.json](./MASTER_ACADEMY_PHASE3_R6_ACCEPTANCE.json), written at 2026-11-20 22:11 Asia/Taipei. **This section adds public-origin audit evidence; it does not supersede the validated R5 application source SHA or convert an incomplete browser run into PASS.** R6 files are documentation-only changes. Keep \`release:false\` and \`fullyCertifiedTaiwaneseRules:false\`.
+**R6 machine-readable evidence:** [MASTER_ACADEMY_PHASE3_R6_ACCEPTANCE.json](./MASTER_ACADEMY_PHASE3_R6_ACCEPTANCE.json), written at 2026-11-20 22:11 Asia/Taipei. **This section adds public-origin audit evidence; it does not supersede the validated R5 application source SHA or convert an incomplete browser run into PASS.** R6 files are documentation-only changes. Keep `release:false` and `fullyCertifiedTaiwaneseRules:false`.
 
 ### 13.1 Re-fetched Source Pin Matrix, reviews and CI
 
 | Ref | Exact queried HEAD | Review / merge state |
 | --- | --- | --- |
-| main | \`25870862b6499f7e699967aa76429ae5dcfc5db4\` | unchanged |
-| Academy V1 [#33](https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/33) | \`68fb50bc43746a0e6ff9f2f90712904d06a2ccda\` | DRAFT |
-| Phase3 Integration [#44](https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/44) | \`80298a3c6b0564c84de3206c7223a36b0c95a9a5\` **before R6 docs** | DRAFT |
-| Rules [#43](https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/43) | \`684df00afac540c082713c152d06e80e72eea3de\` | DRAFT |
-| Bots [#40](https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/40) | \`2dc05b381211b7ccdbe84c3fe2fd1f4f6f353aba\` | DRAFT |
-| Replay [#41](https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/41) | \`aff59e61042389eea3a7b11f012aeb25031dc68c\` | DRAFT |
-| Table UI [#42](https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/42) | \`f4814bcce387fb94b7f9266d981845ff0cda70b0\` | DRAFT, GitHub \`mergeable=false\` |
-| Daily [#45](https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/45) | \`f7bca678c010377aaf187b4291f8d5b49d4b0aea\` | DRAFT |
+| main | `25870862b6499f7e699967aa76429ae5dcfc5db4` | unchanged |
+| Academy V1 [#33](https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/33) | `68fb50bc43746a0e6ff9f2f90712904d06a2ccda` | DRAFT |
+| Phase3 Integration [#44](https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/44) | `80298a3c6b0564c84de3206c7223a36b0c95a9a5` **before R6 docs** | DRAFT |
+| Rules [#43](https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/43) | `684df00afac540c082713c152d06e80e72eea3de` | DRAFT |
+| Bots [#40](https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/40) | `2dc05b381211b7ccdbe84c3fe2fd1f4f6f353aba` | DRAFT |
+| Replay [#41](https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/41) | `aff59e61042389eea3a7b11f012aeb25031dc68c` | DRAFT |
+| Table UI [#42](https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/42) | `f4814bcce387fb94b7f9266d981845ff0cda70b0` | DRAFT, GitHub `mergeable=false` |
+| Daily [#45](https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/45) | `f7bca678c010377aaf187b4291f8d5b49d4b0aea` | DRAFT |
 
 All seven PRs had **zero inline review threads and zero submitted reviewer approvals** at this query. Lack of unresolved comments is **not** formal approval. Full line-by-line review of every changed source file was **NOT_RUN**. Individual source PR workflow status is not a substitute for integration CI, and some lacked workflow results.
 
-**Verified application source: \`7c4b08a4fce6d7ad2458f23397489ea7f6e2c042\`.** Git compare against \`80298a3c6b0564c84de3206c7223a36b0c95a9a5\` showed *two documentation-only commits*, touching only this report and R5 acceptance JSON. The eight completed **SUCCESS** GitHub Actions on **application SHA 7c4b08a** are the exact links in §12.5. Previously recorded \`npm run check\`: 358 tests / 357 PASS / 0 FAIL / 1 optional SKIP. R5 strict 100/100 seed terminal result: 89 WIN, 11 DRAW, zero unsupported/invalid/stall/replay mismatch. These are **R5 exact-SHA CI results, not newly executed R6 CI or public-site terminal results**. As R6 does not modify executable code, new app-SHA gates are not automatically claimed.
+**Verified application source: `7c4b08a4fce6d7ad2458f23397489ea7f6e2c042`.** Git compare against `80298a3c6b0564c84de3206c7223a36b0c95a9a5` showed *two documentation-only commits*, touching only this report and R5 acceptance JSON. The eight completed **SUCCESS** GitHub Actions on **application SHA 7c4b08a** are the exact links in §12.5. Previously recorded `npm run check`: 358 tests / 357 PASS / 0 FAIL / 1 optional SKIP. R5 strict 100/100 seed terminal result: 89 WIN, 11 DRAW, zero unsupported/invalid/stall/replay mismatch. These are **R5 exact-SHA CI results, not newly executed R6 CI or public-site terminal results**. As R6 does not modify executable code, new app-SHA gates are not automatically claimed.
 
 ### 13.2 Vercel deployment and independent public HTTP
 
-- Pinned fixed deployment: \`dpl_EGeDz9KozJVR51PMii4QTMEd3jmR\`, project \`prj_8vpKCNHxLKWMUyw02ZU6DaWRPLYp\`, target **staging**, \`READY\`, Vercel commit \`7c4b08a4fce6d7ad2458f23397489ea7f6e2c042\`.
+- Pinned fixed deployment: `dpl_EGeDz9KozJVR51PMii4QTMEd3jmR`, project `prj_8vpKCNHxLKWMUyw02ZU6DaWRPLYp`, target **staging**, `READY`, Vercel commit `7c4b08a4fce6d7ad2458f23397489ea7f6e2c042`.
 - Fixed URL: https://taiwan-mahjong-phase3-r5-experimental-q4g6cft27-sign2.vercel.app/
 - **Pre-existing stable Alias** https://taiwan-mahjong-phase3-r5-experimental-sign2.vercel.app/ resolves to that same deployment; HTTP **200**. No new Alias assignment, deployment or production promotion was performed. Aliases/fixed hostnames are distinct localStorage Origins; data does not automatically sync.
-- Independently fetched fixed HTTPS homepage **200**, \`src/table-ui/main.js\` **200**, \`src/table-ui/table.css\` **200**, \`sw.js\` **200**, and \`public/manifest.webmanifest\` **200**.
-- Independently requested **all 34** \`/public/tiles/0.svg\` through \`33.svg\`: **34/34 HTTP 200 with SVG markup**. SW script declares all 34 and version \`tmt-v02-realistic-tiles-master-academy-phase3-r5-interception-20261120-r8\`.
+- Independently fetched fixed HTTPS homepage **200**, `src/table-ui/main.js` **200**, `src/table-ui/table.css` **200**, `sw.js` **200**, and `public/manifest.webmanifest` **200**.
+- Independently requested **all 34** `/public/tiles/0.svg` through `33.svg`: **34/34 HTTP 200 with SVG markup**. SW script declares all 34 and version `tmt-v02-realistic-tiles-master-academy-phase3-r5-interception-20261120-r8`.
 - **HTTP/SW script presence is not proof of Service Worker registration, Cache Storage coverage, or cold-origin offline boot.**
 
 ### 13.3 Actual public-origin browser actions, errors and limits
@@ -569,29 +569,29 @@ All seven PRs had **zero inline review threads and zero submitted reviewer appro
 | --- | --- | --- |
 | Load / navigate / R5 profile | **PASS** | Independent HTTP checks and [live full-match browser run](https://agent.tinyfish.ai/runs/77f5af62-2afb-4bfb-83dd-c45154f17b22) opened fixed Vercel URL, entered four-seat mode and selected one-winner experimental RuleProfile |
 | 17 real tiles, three Bot seats, flower display, legal discard | **PASS for those steps only** | Same run used ordinary UI and confirmed a legal discard; **not** a terminal match |
-| Complete online WIN/DRAW, settlement, zero-sum | **BLOCKED / NOT VERIFIED** | The run stalled at a claim window after clicking \`pass\`; no terminal or settlement data was obtained |
-| Native confirm / Claim Window diagnosis | **BLOCKED; root cause NOT ESTABLISHED** | [Diagnostic run](https://agent.tinyfish.ai/runs/35c0bdf3-5116-4781-a7d1-6715365c1322) could not advance a fresh player's \`replace_flower\` action, so did not reach claim. Source \`src/table-ui/main.js\` calls native \`window.confirm\` before **every non-discard action** (including \`replace_flower\` and \`pass\`). Automated clicks may not have accepted the native dialog; **do not assert a Rules/Bot defect without confirming the dialog and a rejected legal action** |
-| Settled-match Replay API / frames / findings | **NOT_RUN** | No completed public-origin match. The UI's \`目前只支援已結束的 R3 正式事件複盤\` refusal **before settlement is expected**, not evidence that Replay Engine was never implemented |
+| Complete online WIN/DRAW, settlement, zero-sum | **BLOCKED / NOT VERIFIED** | The run stalled at a claim window after clicking `pass`; no terminal or settlement data was obtained |
+| Native confirm / Claim Window diagnosis | **BLOCKED; root cause NOT ESTABLISHED** | [Diagnostic run](https://agent.tinyfish.ai/runs/35c0bdf3-5116-4781-a7d1-6715365c1322) could not advance a fresh player's `replace_flower` action, so did not reach claim. Source `src/table-ui/main.js` calls native `window.confirm` before **every non-discard action** (including `replace_flower` and `pass`). Automated clicks may not have accepted the native dialog; **do not assert a Rules/Bot defect without confirming the dialog and a rejected legal action** |
+| Settled-match Replay API / frames / findings | **NOT_RUN** | No completed public-origin match. The UI's `目前只支援已結束的 R3 正式事件複盤` refusal **before settlement is expected**, not evidence that Replay Engine was never implemented |
 | Academy lesson exercise | **PASS, distinct from Daily** | [Separate Academy run](https://agent.tinyfish.ai/runs/92c9bb95-f440-4532-89f6-4968c1203e3d) submitted five published course questions; **not** counted as the dedicated Daily TrainingSession gate |
-| Dedicated Daily official submission / reload | **PASS for durable subset** | [Targeted Daily browser run](https://agent.tinyfish.ai/runs/6e087d8a-a7d5-4878-ae92-42ac59c62991): \`data-table-nav=daily\` → create 30-minute Session → submit \`academy-q-003@1.0.0\` through formal UI → RecordRef \`table-7e755b03-01d1-4a66-a101-52823483592e\` → F5 same browser / same Origin → same RecordRef and progress **1/5**, session \`active\`, next question \`academy-q-004\`. No double-count observed. Specific AbilityProfile values and ReviewPlan contents not separately observed, so **whole Daily feature is PARTIAL** |
+| Dedicated Daily official submission / reload | **PASS for durable subset** | [Targeted Daily browser run](https://agent.tinyfish.ai/runs/6e087d8a-a7d5-4878-ae92-42ac59c62991): `data-table-nav=daily` → create 30-minute Session → submit `academy-q-003@1.0.0` through formal UI → RecordRef `table-7e755b03-01d1-4a66-a101-52823483592e` → F5 same browser / same Origin → same RecordRef and progress **1/5**, session `active`, next question `academy-q-004`. No double-count observed. Specific AbilityProfile values and ReviewPlan contents not separately observed, so **whole Daily feature is PARTIAL** |
 | Public Origin offline | **LIVE_OFFLINE_NOT_RUN** | [Offline inspection](https://agent.tinyfish.ai/runs/edddc663-3b1a-4c55-9814-44b9e9920185) could not control offline network or inspect Cache Storage; R5 local Chromium offline PASS remains historical only |
 | Mobile sizes 320/375/390/430/768/1440 | **NOT_RUN at exact widths** | [Mobile inspection](https://agent.tinyfish.ai/runs/6ee53cf1-c6e0-4da6-832c-e3b7442477ac) exercised tile selection/cancel and displayed seats on ~1000×990 desktop viewport; no exact viewport switching was possible. Do not report all widths PASS. Real iPhone/Android Safari/Chrome remain NOT_RUN |
 
-**Evidence-quality check:** One web automation offline report described \`/manifest.json\`, a Next.js \`/_next/\` script and a different theme color, inconsistent with the independently retrieved actual HTML and \`public/manifest.webmanifest\`. These uncorroborated claims were **excluded** from acceptance. Browser-run URLs are audit trails; no Playwright trace ZIP or R6 screenshots were exported. Do not invent artifacts. No direct GameState changes, forged settlement, source rewrite, Vercel promotion, source PR merges, or formal Release.
+**Evidence-quality check:** One web automation offline report described `/manifest.json`, a Next.js `/_next/` script and a different theme color, inconsistent with the independently retrieved actual HTML and `public/manifest.webmanifest`. These uncorroborated claims were **excluded** from acceptance. Browser-run URLs are audit trails; no Playwright trace ZIP or R6 screenshots were exported. Do not invent artifacts. No direct GameState changes, forged settlement, source rewrite, Vercel promotion, source PR merges, or formal Release.
 
 ### 13.4 R6 gates (distinct from R5 historical readiness)
 
 | Gate | R6 result | Evidence / reason |
 | --- | --- | --- |
-| \`R5_EXPERIMENTAL_FULL_MATCH\` | **PASS — prior exact-SHA CI** | §12, 100/100, [run 44706640239](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44706640239) |
-| \`LIVE_PREVIEW_FULL_MATCH\` | **BLOCKED** | Public browser attempted, did not reach terminal; native confirm handling needs reproduction |
-| \`LIVE_PREVIEW_REPLAY\` | **NOT_RUN** | No settled live game |
-| \`LIVE_PREVIEW_DAILY\` | **PARTIAL** | Real official submit, same-Origin F5 readback, and next question PASS; AbilityProfile and ReviewPlan detailed live inspection NOT_RUN |
-| \`LIVE_PREVIEW_OFFLINE\` | **NOT_RUN** | Offline network control unavailable |
-| \`MOBILE_BROWSER_UX\` | **PARTIAL** | ~1000px desktop UI exercised; all six requested exact widths NOT_RUN |
-| \`SOURCE_REVIEW_READY\` | **NO** | Seven Draft PRs, zero submitted approvals, #42 mergeable=false; complete cross-source review not done |
-| \`EXPERIMENTAL_PREVIEW_GO\` | **NO for R6 expanded acceptance** | Existing R5 experimental preview remains reachable; public terminal and Replay not certified |
-| \`FULL_RULES_VERIFIED\` | **NO** | One-winner and simplified tai are experimental |
-| \`FORMAL_RELEASE_GO\` | **NO** | Public complete match, devices, rules certification and review gates incomplete |
+| `R5_EXPERIMENTAL_FULL_MATCH` | **PASS — prior exact-SHA CI** | §12, 100/100, [run 44706640239](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44706640239) |
+| `LIVE_PREVIEW_FULL_MATCH` | **BLOCKED** | Public browser attempted, did not reach terminal; native confirm handling needs reproduction |
+| `LIVE_PREVIEW_REPLAY` | **NOT_RUN** | No settled live game |
+| `LIVE_PREVIEW_DAILY` | **PARTIAL** | Real official submit, same-Origin F5 readback, and next question PASS; AbilityProfile and ReviewPlan detailed live inspection NOT_RUN |
+| `LIVE_PREVIEW_OFFLINE` | **NOT_RUN** | Offline network control unavailable |
+| `MOBILE_BROWSER_UX` | **PARTIAL** | ~1000px desktop UI exercised; all six requested exact widths NOT_RUN |
+| `SOURCE_REVIEW_READY` | **NO** | Seven Draft PRs, zero submitted approvals, #42 mergeable=false; complete cross-source review not done |
+| `EXPERIMENTAL_PREVIEW_GO` | **NO for R6 expanded acceptance** | Existing R5 experimental preview remains reachable; public terminal and Replay not certified |
+| `FULL_RULES_VERIFIED` | **NO** | One-winner and simplified tai are experimental |
+| `FORMAL_RELEASE_GO` | **NO** | Public complete match, devices, rules certification and review gates incomplete |
 
-**Release controls:** \`release:false\`; \`fullyCertifiedTaiwaneseRules:false\`. PR #33 and #44 remain Draft, unmerged. Preserve the old V1 and V0.2 sites; do not assert cross-Origin migration. Formal or experimental R6 promotion requires new **direct live-origin** complete terminal/Replay evidence, not a relabelled CI PASS.
+**Release controls:** `release:false`; `fullyCertifiedTaiwaneseRules:false`. PR #33 and #44 remain Draft, unmerged. Preserve the old V1 and V0.2 sites; do not assert cross-Origin migration. Formal or experimental R6 promotion requires new **direct live-origin** complete terminal/Replay evidence, not a relabelled CI PASS.
