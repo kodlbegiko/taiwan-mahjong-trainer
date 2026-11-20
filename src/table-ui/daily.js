@@ -28,73 +28,146 @@ export async function createDailyPanel(storage) {
     validateAcademyDecisionRecord:learning.validateAcademyDecisionRecord,
     profileId:'local-academy-profile',timezone
   });
-  let progress=null, question=null, lastGrade=null, error='', startedAt=Date.now();
+  let progress=null, question=null, lastGrade=null, lastSaved=null;
+  let error='', startedAt=Date.now(), state='loading', pending=false;
+
+  const sameRef=(a,b)=>!!a&&!!b&&a.questionId===b.questionId&&
+    a.questionVersion===b.questionVersion;
+  const recordId=ref=>typeof ref?.id==='string'&&ref.id.length>0?ref.id:null;
   function setProgress(next) {
-    const prev=short(progress?.nextQuestionRef);
-    progress=next;question=null;
-    if (progress?.nextQuestionRef && progress.status!=='error') {
-      question=ctrl.getQuestion(progress.nextQuestionRef,{asOf:now()});
-      if (short(progress.nextQuestionRef)!==prev) startedAt=Date.now();
-    }
+    if(!next||next.status==='error')throw new Error(
+      'Daily 狀態驗證失敗：'+(next?.error?.code??'INVALID_PROGRESS'));
+    const prev=progress?.nextQuestionRef;
+    const nextQuestion=next.nextQuestionRef?
+      ctrl.getQuestion(next.nextQuestionRef,{asOf:now()}):null;
+    progress=next;question=nextQuestion;
+    if(!sameRef(prev,next.nextQuestionRef))startedAt=Date.now();
   }
   async function refresh() {
-    setProgress(await ctrl.getDailyProgressLocked({asOf:now()}));
-    return progress;
+    if(pending)throw new Error('仍在提交作答，不可並行刷新');
+    state='loading';
+    try {
+      setProgress(await ctrl.getDailyProgressLocked({asOf:now()}));
+      state='ready';error='';
+      return progress;
+    }catch(e){state='failed';error=e.message;throw e;}
   }
   async function start(minutes=30) {
-    if (![10,20,30,60].includes(minutes)) throw new Error('不支援的時間');
-    await ctrl.ensureTodayLocked({asOf:now(),minutes});
-    lastGrade=null;await refresh();return progress;
+    if(pending)throw new Error('提交尚未結束');
+    if(![10,20,30,60].includes(minutes))throw new Error('不支援的訓練長度');
+    state='loading';
+    try {
+      await ctrl.ensureTodayLocked({asOf:now(),minutes});
+      lastGrade=null;lastSaved=null;
+      setProgress(await ctrl.getDailyProgressLocked({asOf:now()}));
+      state='ready';error='';return progress;
+    }catch(e){state='failed';error=e.message;throw e;}
   }
   async function resume() {
-    setProgress(await ctrl.resumeSessionLocked({asOf:now()}));
-    return progress;
+    if(pending)throw new Error('提交尚未結束');
+    state='loading';
+    try {
+      await ctrl.resumeSessionLocked({asOf:now()});
+      setProgress(await ctrl.getDailyProgressLocked({asOf:now()}));
+      lastGrade=null;lastSaved=null;state='ready';error='';
+      return progress;
+    }catch(e){state='failed';error=e.message;throw e;}
   }
   async function finish() {
-    setProgress(await ctrl.completeSessionLocked({asOf:now()}));
-    return progress;
+    if(pending)throw new Error('提交尚未結束');
+    state='loading';
+    try {
+      setProgress(await ctrl.completeSessionLocked({asOf:now()}));
+      state='ready';error='';return progress;
+    }catch(e){state='failed';error=e.message;throw e;}
   }
   async function abort() {
-    setProgress(await ctrl.abortSessionLocked({asOf:now(),reason:'user-aborted'}));
-    return progress;
+    if(pending)throw new Error('提交尚未結束');
+    state='loading';
+    try {
+      setProgress(await ctrl.abortSessionLocked({asOf:now(),reason:'user-aborted'}));
+      state='ready';error='';return progress;
+    }catch(e){state='failed';error=e.message;throw e;}
   }
   function getChoice(root) {
-    const checked=[...root.querySelectorAll('[name="daily-answer"]:checked')].map(x=>Number(x.value));
-    if (!checked.length) throw new Error('尚未選擇答案');
-    if (checked.some(x=>t(x)===null)) throw new Error('非法選項');
-    return question.taskType==='discard' ? checked[0] : checked;
+    const checked=[...root.querySelectorAll('[name="daily-answer"]:checked')]
+      .map(x=>Number(x.value));
+    if(!checked.length)throw new Error('尚未選擇答案');
+    if(checked.some(x=>t(x)===null))throw new Error('非法選項');
+    return question.taskType==='discard'?checked[0]:checked;
   }
+  /**
+   * A saved display is earned only after the official locked readback proves
+   * the exact QuestionRef <-> RecordRef link in the canonical session.
+   * Never treat mere UI copy or the grader's temporary response as persistence.
+   */
   async function submit(root) {
-    if (!question || !progress?.nextQuestionRef) throw new Error('目前沒有可作答的題目');
-    const choice=getChoice(root),ref=progress.nextQuestionRef;
-    const idKey='table-daily-attempt:'+progress.sessionId+':'+short(ref);
+    if(pending)throw new Error('上一筆正式作答仍在提交中');
+    if(state==='recovery-required')
+      throw new Error('有待恢復的提交；請先使用「恢復／刷新 Session」');
+    if(!question||!progress?.nextQuestionRef)throw new Error('目前沒有可作答的題目');
+    const choice=getChoice(root), ref={...progress.nextQuestionRef};
+    const sessionId=progress.sessionId, before=progress.completed;
+    const key='table-daily-attempt:'+sessionId+':'+short(ref);
     let attemptId;
-    try { attemptId=globalThis.sessionStorage?.getItem(idKey); } catch {}
-    if (!attemptId) {
-      attemptId='table-'+(globalThis.crypto?.randomUUID?.() ??
+    try{attemptId=globalThis.sessionStorage?.getItem(key);}catch{}
+    if(!attemptId) {
+      attemptId='table-'+(globalThis.crypto?.randomUUID?.()??
         String(Date.now())+'-'+Math.floor(Math.random()*1000000));
-      try { globalThis.sessionStorage?.setItem(idKey,attemptId); } catch {}
+      try{globalThis.sessionStorage?.setItem(key,attemptId);}catch{}
     }
-    const outcome=await ctrl.submitSessionAnswerLocked({
-      questionRef:ref,choice,asOf:now(),
-      durationMs:Math.max(0,Math.min(86_400_000,Date.now()-startedAt)),
-      attemptId
-    });
-    if (outcome.status==='saved'||outcome.status==='already-answered') {
+    pending=true;state='submitting';error='';lastGrade=null;lastSaved=null;
+    let outcome=null;
+    try {
+      outcome=await ctrl.submitSessionAnswerLocked({
+        questionRef:ref,choice,asOf:now(),
+        durationMs:Math.max(0,Math.min(86_400_000,Date.now()-startedAt)),
+        attemptId
+      });
+      if(!['saved','already-answered'].includes(outcome?.status)){
+        state='recovery-required';
+        error='正式寫入未完成（'+(outcome?.status??'unknown')+'）：'+
+          (outcome?.message??outcome?.errorCode??'需先恢復正式紀錄');
+        return outcome;
+      }
+      const refId=recordId(outcome.recordRef);
+      if(!refId)throw new Error('正式 API 未提供可驗證的 RecordRef');
+      const readback=await ctrl.getDailyProgressLocked({asOf:now()});
+      if(readback?.status==='error'||readback?.sessionId!==sessionId)
+        throw new Error('Daily Session 讀回身分不符');
+      const exactLink=readback.completedQuestions?.some(x=>
+        sameRef(x.questionRef,ref)&&recordId(x.recordRef)===refId);
+      const inSession=readback.recordRefs?.some(x=>recordId(x)===refId);
+      if(!exactLink||!inSession||readback.completed<before||
+          sameRef(readback.nextQuestionRef,ref))
+        throw new Error('正式 RecordRef、QuestionRef 與 Session Progress 讀回不一致');
+      setProgress(readback);
       lastGrade=outcome.gradingResult??null;
-      try {globalThis.sessionStorage?.removeItem(idKey);} catch {}
-      await refresh();
-    } else {
-      error='正式寫入未完成（'+outcome.status+'）：'+
-        (outcome.message??outcome.errorCode??'請先執行恢復，勿重複建立作答紀錄');
-    }
-    return outcome;
+      lastSaved={questionRef:ref,recordRef:outcome.recordRef};
+      state='saved';error='';
+      try{globalThis.sessionStorage?.removeItem(key);}catch{}
+      return {status:'saved',recordRef:outcome.recordRef,gradingResult:lastGrade,
+        officialReadback:true};
+    }catch(e){
+      // Write may already have committed. Never generate a second attempt
+      // before the official recovery protocol reconciles the original ID.
+      state='recovery-required';
+      error='提交結果尚未完成正式持久化驗證：'+e.message;
+      return {status:'recovery-required',errorCode:'UI_READBACK_FAILED',
+        message:e.message,recordRef:outcome?.recordRef??null};
+    }finally{pending=false;}
   }
   function render() {
     const p=progress;
-    const header='<header class="table-heading"><h1 id="table-heading" tabindex="-1">今日正式訓練</h1>'+
+    const header='<section class="table-daily-state" data-daily-state="'+esc(state)+'"'+
+      (lastSaved&&state==='saved'?' data-daily-record-id="'+esc(lastSaved.recordRef.id)+'"':'')+
+      '><header class="table-heading"><h1 id="table-heading" tabindex="-1">今日正式訓練</h1>'+
       '<span class="table-overline">ACADEMY DAILY / 正式 v3 作答</span></header>'+
-      '<p class="table-muted">進度與成績只以 Adaptive / Learning 的持久化結果為準；不另建 UI 資料庫。</p>';
+      '<p class="table-muted">進度與成績只以 Adaptive / Learning 的持久化結果為準；不另建 UI 資料庫。</p>'+
+      '<p role="status" aria-live="polite">提交狀態：'+
+      esc({loading:'讀取中',ready:'可操作',submitting:'正在透過正式 API 儲存',
+        saved:'正式 RecordRef 已讀回', 'recovery-required':'需要恢復驗證',
+        failed:'操作失敗'}[state]??state)+'</p>';
     if (!p) return header+'<section class="table-empty"><p>尚未讀取今日課表。</p>'+
       '<button type="button" data-daily-resume>讀取今日課表</button></section>';
     const progressText='<p role="status">日期 '+esc(p.dayKey)+' · '+esc(p.timezone)+
@@ -114,8 +187,13 @@ export async function createDailyPanel(storage) {
     if (p.status==='active'||p.status==='planned')
       html+='<button type="button" class="secondary" data-daily-abort>結束今日訓練</button>';
     html+='</div>';
-    if (lastGrade)html+='<section class="table-round-summary" role="status">'+
-      '<h2>上一題正式評分</h2><pre class="table-daily-grade">'+esc(JSON.stringify(lastGrade,null,2))+'</pre></section>';
+    if(lastSaved&&state==='saved')
+      html+='<section class="table-round-summary" data-daily-save-confirmed="true" role="status">'+
+        '<h2>正式作答已保存並讀回</h2><p>RecordRef：'+esc(lastSaved.recordRef.id)+
+        '；QuestionRef：'+esc(short(lastSaved.questionRef))+'</p>'+
+        (lastGrade?'<h3>上一題正式評分</h3><pre class="table-daily-grade">'+
+        esc(JSON.stringify(lastGrade,null,2))+'</pre>':
+        '<p>官方已確認作答紀錄；此提交沒有重新回傳評分明細。</p>')+'</section>';
     if (question && p.nextStep==='answer') {
       const q=question,options=q.prompt?.options??[];
       const multiple=q.taskType!=='discard';
@@ -127,15 +205,18 @@ export async function createDailyPanel(storage) {
         '<div class="table-action-buttons" role="group" aria-label="正式題目選項">'+
         options.map(x=>'<label class="table-daily-option"><input name="daily-answer" type="'+
           (multiple?'checkbox':'radio')+'" value="'+esc(x)+'"/>'+tile(x)+'</label>').join('')+
-        '</div><button type="button" class="primary" data-daily-submit>提交正式答案</button></section>';
+        '</div><button type="button" class="primary" data-daily-submit '+
+        (pending||state==='recovery-required'?'disabled':'')+
+        '>提交正式答案</button></section>';
     } else if(p.nextStep==='done')html+='<p>今日 Session 已正式完成，能力摘要以 Adaptive API 為準。</p>';
     else if(p.nextStep==='aborted')html+='<p>今日 Session 已結束；已保存作答不會刪除。</p>';
     if (p.abilityProfile)html+='<section class="table-round-summary"><h2>今日能力摘要</h2>'+
       '<p>校準狀態：'+esc(p.abilityProfile.calibrationStatus??'未校準')+
       '；未校準技能不提供虛構熟練度。</p></section>';
-    if (error)html+='<p class="table-warning" role="alert">'+esc(error)+'</p>';
-    return html;
+    if(error)html+='<p class="table-warning" role="alert">'+esc(error)+'</p>';
+    return html+'</section>';
   }
   return Object.freeze({start,resume,refresh,submit,finish,abort,render,
-    get progress(){return progress;},get error(){return error;}});
+    get progress(){return progress;},get status(){return state;},
+    get saving(){return pending;},get error(){return error;}});
 }
