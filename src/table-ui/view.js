@@ -74,15 +74,20 @@ export function PlayerHand(self, legalActions, selectedId) {
     '</div>';
 }
 function actionName(action) {
-  const extra = (action.tileIds ?? []).map(id => {
-    const type = typeFromTile(id);
-    return type === null ? '花牌' : tileAccessibleName(type);
+  const ids=action.tileIds??[];
+  const extra=ids.map(id=>{
+    const type=typeFromTile(id);
+    return type===null ? (typeof id==='string'&&id.startsWith('f:')?
+      id.slice(2).split(':')[0]:'花牌') : tileAccessibleName(type);
   });
   const reason=action.legalityBasis?.reasonCodes?.[0];
   const kind=action.kind==='kong'?
     (reason==='CONCEALED_KONG'?'暗槓':reason==='ADDED_KONG'?'加槓':'明槓'):
+    action.kind==='win'?(reason==='SELF_DRAW_WIN'?'自摸胡牌':'胡牌'):
     (ACTIONS[action.kind]??action.kind);
-  return kind+(action.kind!=='discard'&&extra.length?' · '+extra.join('、'):'');
+  // Distinguish multiple physically different combinations without fabricating IDs.
+  const physical=action.kind==='chi'&&ids.length?' ['+ids.join(', ')+']':'';
+  return kind+(action.kind!=='discard'&&extra.length?' · '+extra.join('、'):'')+physical;
 }
 export function ActionBar(legalActions, selectedId, busy) {
   const chosen = legalActions.find(a => a.kind === 'discard' && a.actionId === selectedId);
