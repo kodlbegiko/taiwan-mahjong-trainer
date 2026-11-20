@@ -3,6 +3,7 @@ NOT part of legacy sandbox CI. AI6 must run on one merged source SHA and attach 
 No fixtures or fabricated Bot decisions are permitted.
 """
 from pathlib import Path
+import json
 from playwright.sync_api import sync_playwright
 from _release_site import served_site
 
@@ -99,7 +100,7 @@ def full_round(page, folder):
     page.screenshot(path=str(folder/'table-390-real-replay.png'),full_page=True)
     return history
 
-def daily_roundtrip(page):
+def daily_roundtrip(page,folder):
     page.locator('[data-table-nav="daily"]').click()
     # Navigation asynchronously imports the official Adaptive and Learning
     # modules. Wait for a completed Daily view, not the preceding Replay h1.
@@ -112,7 +113,6 @@ def daily_roundtrip(page):
     elif page.locator('[data-daily-resume]').count():
         page.locator('[data-daily-resume]').click()
     else:
-        folder=Path('tw16-r3-full-match-evidence')
         folder.mkdir(parents=True,exist_ok=True)
         page.screenshot(path=str(folder/'table-390-daily-error.png'),full_page=True)
         raise AssertionError('Daily controls unavailable after navigation: '+
@@ -159,6 +159,7 @@ def daily_roundtrip(page):
             after_state['abilityPresent'] and after_state['reviewPresent'],
             'Daily canonical durability failed: '+str(after_state)+
             '; UI='+view[-900:])
+    page.screenshot(path=str(folder/'table-390-daily-durable.png'),full_page=True)
     page.reload(wait_until='networkidle')
     page.locator('[data-table-nav="daily"]').click()
     page.wait_for_function("""() => document.body.dataset.tableView === 'daily'
@@ -166,6 +167,36 @@ def daily_roundtrip(page):
         ?.textContent?.includes('日期 ')""",timeout=25000)
     require('日期 ' in page.locator('#full-table-root').inner_text(),
             'Daily session was not resumed from Adaptive authority')
+    reread=page.evaluate("""() => {
+      const sidecar=JSON.parse(localStorage.getItem('tw-mahjong-master-academy:state:v1')||'{}');
+      const archive=JSON.parse(localStorage.getItem('tw-mahjong-trainer:archive:v3')||'{}');
+      return {
+        recordIds:(archive.records||[]).filter(r=>r.schemaVersion===3).map(r=>r.id),
+        linkedRecordIds:(sidecar.provenanceLinks||[]).map(x=>x.recordRef?.id),
+        sessionRecordIds:(sidecar.trainingSessions||[]).flatMap(s=>(s.recordRefs||[]).map(r=>r.id)),
+        completed:(sidecar.trainingSessions||[]).flatMap(s=>s.recordRefs||[]).length,
+        abilityPresent:!!sidecar.abilityProfile,
+        reviewPresent:!!sidecar.reviewPlan
+      };
+    }""")
+    savedIds=[ref['id'] for ref in after_state['recordRefs']]
+    require(all(rid in reread['recordIds'] and
+                rid in reread['linkedRecordIds'] and
+                rid in reread['sessionRecordIds'] for rid in savedIds)
+            and reread['completed']>=len(savedIds)
+            and reread['abilityPresent'] and reread['reviewPresent'],
+            'Daily durable readback failed across real browser reload: '+str(reread))
+    page.screenshot(path=str(folder/'table-390-daily-reloaded.png'),full_page=True)
+    (folder/'daily-durable-evidence.json').write_text(
+        json.dumps({'status':'verified-browser-readback',
+                    'recordRefs':after_state['recordRefs'],
+                    'canonicalRecordIds':reread['recordIds'],
+                    'provenanceRecordIds':reread['linkedRecordIds'],
+                    'sessionRecordIds':reread['sessionRecordIds'],
+                    'pendingProvenance':after_state['pending'],
+                    'abilityPresent':reread['abilityPresent'],
+                    'reviewPlanPresent':reread['reviewPresent']},
+                   ensure_ascii=False,indent=2),encoding='utf-8')
 
 def run(folder):
     folder.mkdir(parents=True,exist_ok=True)
@@ -184,7 +215,7 @@ def run(folder):
                 page.goto(url,wait_until='networkidle')
                 if width==390:
                     history=full_round(page,folder)
-                    daily_roundtrip(page)
+                    daily_roundtrip(page,folder)
                     # One cold new tab after activation, with network disabled.
                     page.goto(url,wait_until='networkidle')
                     page.evaluate('() => navigator.serviceWorker.ready')
