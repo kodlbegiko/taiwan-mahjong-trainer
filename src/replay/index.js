@@ -158,6 +158,17 @@ export function createReplayService({storage=null}={}) {
         withheld:['opponent concealed tiles','live wall','tail wall','fixture deck','private claims','seed'],
         allowedForDecisionScoring:false}};
   }
+  // Public timeline navigation must use Rules-validated complete-action boundaries,
+  // never raw TurnEvent increments (which can land between WIN and SETTLE).
+  function listReplayFrameBoundaries(replayId,{viewerSeat}={}) {
+    const archive=readArchive(store,replayId),m=archive.manifest;
+    ownerOnly(m,viewerSeat??m.ownerSeat);
+    const boundaries=[...new Set([1,...archive.decisions.map(d=>d.endEventSeq??d.eventSeq)])]
+      .sort((a,b)=>a-b);
+    if(boundaries.at(-1)!==m.eventCount)
+      throw new ReplayError('CORRUPT_REPLAY','Timeline does not end at the canonical event boundary');
+    return Object.freeze(boundaries);
+  }
   function getPlayerDecision(replayId,eventSeq,{viewerSeat}={}) {
     const archive=readArchive(store,replayId),m=archive.manifest;
     ownerOnly(m,viewerSeat??m.ownerSeat);
@@ -270,6 +281,6 @@ export function createReplayService({storage=null}={}) {
       source:{replayId,eventSeq}});
   }
   return Object.freeze({apiVersion:REPLAY_API_VERSION,saveReplay,
-    listReplays,loadReplay,getReplayFrame,getPlayerDecision,getDecisionAnalysis,
+    listReplays,loadReplay,getReplayFrame,listReplayFrameBoundaries,getPlayerDecision,getDecisionAnalysis,
     listCoachingFindings,createReviewQuestion});
 }
