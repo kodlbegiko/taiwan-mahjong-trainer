@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createGame, getRuleProfile, createDeck, listLegalActions,
-  createPlayerView, validateGameState, applyAction, replayGame } from '../../src/rules/index.js';
+  createPlayerView, validateGameState, applyAction, replayGame, listPendingClaimResponders } from '../../src/rules/index.js';
 import { readPlayerView } from '../../src/strategy/view.js';
 import { createBot, chooseBotAction, validateBotDecision, createBotController } from '../../src/bots/index.js';
 import { createReplayService } from '../../src/replay/index.js';
@@ -42,19 +42,37 @@ test('R3 PlayerView can feed a real public-only Bot without private wall or ille
   assert.equal(validateGameState(next),true);
   assert.throws(()=>applyAction(next,{actorSeat:0,actionId:d.actionId,expectedRevision:d.expectedRevision}));
 });
-test('R3 claim window currently stops automated Bot controller instead of inventing a winner',async()=>{
-  const start=r3(),a=listLegalActions(start,0).find(x=>x.kind==='discard');
+test('R3 claim window schedules all three real Bots and Rules performs arbitration',async()=>{
+  let state=r3();
+  const a=listLegalActions(state,0).find(x=>x.kind==='discard');
   assert.ok(a);
-  const after=applyAction(start,{actorSeat:0,actionId:a.actionId,expectedRevision:a.expectedRevision}).state;
-  assert.equal(after.round.phase,'claim_window');
+  state=applyAction(state,{actorSeat:0,actionId:a.actionId,expectedRevision:a.expectedRevision}).state;
+  assert.equal(state.round.phase,'claim_window');
+  assert.deepEqual(listPendingClaimResponders(state),[1,2,3]);
   let submissions=0;
   const bots=[1,2,3].map(seat=>createBot({seat,seed:'phase3-bot'+seat}));
   const controller=createBotController({bots,humanSeat:0,
-    getActingSeat:()=>1,getPlayerView:seat=>createPlayerView(after,seat),
-    submitAction:()=>{submissions++;}});
-  const step=await controller.tick();
-  assert.equal(step.status,'claim-adjudication-unavailable');
-  assert.equal(submissions,0);
+    getActingSeat:()=>listPendingClaimResponders(state)[0]??state.round.currentSeat,
+    getPendingClaimResponders:()=>listPendingClaimResponders(state),
+    getPlayerView:seat=>createPlayerView(state,seat),
+    submitAction:submission=>{
+      const legal=listLegalActions(state,submission.actorSeat);
+      assert.ok(legal.some(x=>x.actionId===submission.actionId&&
+        x.expectedRevision===submission.expectedRevision));
+      state=applyAction(state,submission).state;
+      submissions++;
+    },yieldControl:async()=>{} });
+  for(let i=0;i<3;i++){
+    const oldRevision=state.revision;
+    const step=await controller.tick();
+    assert.equal(step.status,'acted',JSON.stringify(step));
+    assert.ok(state.revision>oldRevision);
+    assert.equal(listPendingClaimResponders(state).length,Math.max(0,2-i));
+  }
+  assert.equal(submissions,3);
+  assert.notEqual(state.round.phase,'claim_window');
+  assert.equal(validateGameState(state,{replay:false}),true);
+  assert.deepEqual(replayGame(state),state);
 });
 test('Replay remains owner-only and deterministic for previously supported sandbox history',()=>{
   let state=createGame({gameId:'phase3-replay-bounded',seed:'phase3-replay-seed',

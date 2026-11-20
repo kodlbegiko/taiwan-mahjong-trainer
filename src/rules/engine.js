@@ -9,7 +9,8 @@ import { getRuleProfile } from './profiles.js';
 import {
   completeCreateGame, completeListLegalActions, completeApplyAction,
   completeReplayGame, completeValidateGameState, completeCreatePlayerView,
-  completeStartNextRound,
+  completeStartNextRound, completeListPendingClaimResponders,
+  completeGetClaimWindowPublic,
 } from './complete-engine.js';
 const isCompleteRef=ref=>ref?.profileId==='tw16-configurable-table';
 
@@ -121,6 +122,23 @@ export function createGame({
  * Lists only executable bounded-subset moves. No chi/pong/kong/win/pass/
  * replace_flower candidates are ever emitted.
  */
+/**
+ * Authority-side scheduler; never provide the private state to a Bot.
+ * Legacy experimental sandbox has no claim windows.
+ */
+export function listPendingClaimResponders(state) {
+  if(isCompleteRef(state?.ruleRef))return completeListPendingClaimResponders(state);
+  profileFor(state);
+  return [];
+}
+
+/** Intents are never included in this public claim-window summary. */
+export function getClaimWindowPublic(state) {
+  if(isCompleteRef(state?.ruleRef))return completeGetClaimWindowPublic(state);
+  profileFor(state);
+  return null;
+}
+
 export function listLegalActions(state, seat) {
   if(isCompleteRef(state?.ruleRef))return completeListLegalActions(state,seat);
   assertSeat(seat);

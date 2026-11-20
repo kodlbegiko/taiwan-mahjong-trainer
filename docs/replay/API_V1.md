@@ -1,13 +1,15 @@
 # Taiwan Mahjong Master Academy — Replay & Decision Coaching API V1
 
 Implementation branch: `feat/tw16-replay-coach`  
-Source baseline: `integration/mahjong-academy` @ `68fb50bc43746a0e6ff9f2f90712904d06a2ccda`  
-Target for Phase 3 (not yet created during implementation): `integration/mahjong-full-game`  
+Current PR base: `integration/mahjong-full-game` (R3 experimental Rules dependency)  
+Historical source baseline: `integration/mahjong-academy` @ `68fb50bc43746a0e6ff9f2f90712904d06a2ccda`  
 Contract: `master-academy/1.0.0`.
 
 ## Scope and release honesty
 
-This module implements **genuine deterministic event-ledger replay and owner-only historical PlayerView** for the existing experimental Rules Engine. It is *not* a complete playable four-player Taiwanese mahjong round, a settlement replay, or a verified win/claim/scoring analysis. Current Rules offers only experimental `draw` and `discard` operations; an archive is always `completionStatus: "incomplete"`. The module intentionally refuses postgame omniscience.
+This module preserves the historical Sandbox replay and now supports the real experimental R3 **single-hand full-round** ledger: deal, flower replacement, draw, discard, private multi-responder claim, chi/pong/kong, win, exhaustive draw and settlement. Every GameState is reconstructed using the Rules Engine's canonical `replayGame`, including **atomic multi-Event LegalAction boundaries**. Random access to a partial `win + settle` or `pass + claim-resolution` transition is rejected as `NON_ATOMIC_EVENT_SEQ`.
+
+R3 `tw16-configurable-table@experimental-full-v1` is **not certified**, so completed R3 replays use `completionStatus: 'settled-experimental'`, not `settled-verified`. Unfinished games remain `incomplete`. The inherited Sandbox remains `incomplete` and never enables postgame disclosure. There is no official Taiwan-wide verified scoring or win-rate model.
 
 Existing Academy scenario scorer registry has `VERIFIED_SCENARIO_SCORER_COUNT = 0`. Consequently all generated replay situations are `unscorable`, and no replay-derived finding enters the Adaptive scoring store. Exactly measured shanten/ukeire differences can be displayed, but they **do not establish an unequivocally bad discard** because score, defense and opponent decisions have no validated model.
 
@@ -17,9 +19,9 @@ The Replay module does not edit `src/rules/**`, `src/strategy/**`, `src/academy/
 
 `createReplayArchive(GameState, { ownerSeat })` and `validateReplayArchive(archive)` in `src/replay/internal.js`:
 
-- `ReplayManifest`: `schemaVersion`, `contractVersion`, `replayVersion = tw16-replay/1.0.0`, complete RuleProfile snapshot and `ruleRef`, `initialSeed`, `dealerSeat`, engine/strategy/scoring/decision versions, game status and corruption checksums.
+- `ReplayManifest`: versioned `ruleRef` and full RuleProfile snapshot, `gameRef`, internal-only `initialSeed` and `initialSeedRef`, `roundConfig`, `dealerSeat`, replay/Rules/Strategy/scoring versions, `eventCount`, `actionCount`, strict completion status, `settlementResultRef` and checksum, `disclosurePolicy`, and corruption checksums. R3 private fixture deck remains only inside internal TurnEvents. Older Sandbox archives keep their V1 format.
 - `ReplayEvent`: versioned immutable TurnEvent entry with full internal event payload and monotonic `seq`.
-- `PlayerDecision`: versioned `eventSeq`, `beforeEventSeq`, `actorSeat`, `actionId` and action kind.
+- `PlayerDecision`: versioned `eventSeq` (first event), `endEventSeq` (last event), `beforeEventSeq` (last atomic boundary), `actorSeat`, `actionId` and actual LegalAction kind. For legacy Sandbox, one event remains one action.
 - `ReplayFrame`: derived **on demand** by seeded canonical replay to event N and Rules Engine `createPlayerView`; never by applying event payload as a trusted mutation.
 - `DecisionAnalysis`: pinned to exact `viewId`, historical event, current engine/strategy versions, and `legalActionIds`; two-draw sampling forced off for deterministic exact comparisons.
 - `CoachingFinding`: contains source replay/event/action, exact comparison evidence, skill tags, explicit heuristic-recommendation status, and `canCountAsWrong:false` / `canScheduleReview:false`.
@@ -57,7 +59,7 @@ const findings = replay.listCoachingFindings(metadata.replayId);
 const scenario = replay.createReviewQuestion(metadata.replayId,2);
 ```
 
-`createReplayService` exposes `apiVersion = tw16-replay-api/1.0.0`. All returned DTOs include `schemaVersion:1`, `contractVersion`, and their own type-specific version. The Replay service reads/writes only:
+`createReplayService` exposes `apiVersion = tw16-replay-api/1.0.0`. All returned DTOs include `schemaVersion:1`, `contractVersion`, and their own type-specific version. The Replay service reads/writes only (no v3, Academy or Adaptive mutation):
 
 - `tw-mahjong-replay:index:v1`
 - `tw-mahjong-replay:archive:v1:<replayId>`
@@ -66,20 +68,24 @@ It never modifies legacy `archive:v3` or the Academy Adaptive sidecar. Saving th
 
 | API | Access | Return / limitation |
 |---|---|---|
-| `listReplays()` | Owner-local store | Safe metadata array, no Seed/events |
-| `loadReplay(replayId)` | Owner-local store | Public manifest only |
-| `getReplayFrame(replayId,eventSeq,{viewerSeat,perspective})` | Only archived owner seat; `player-at-time` | Historic PlayerView, safe current public event, legal actions; refuses `postgame` |
-| `getDecisionAnalysis(replayId,eventSeq,{viewerSeat,actionId})` | Only original owner decisions | All legal candidate analyses, exact shanten/ukeire deltas; unknown risk/scoring |
-| `listCoachingFindings(replayId)` | Owner | Exact metric disadvantages labeled advisory, no unverified score |
-| `createReviewQuestion(replayId,eventSeq)` | Owner, supported discard only | Safe, unscorable `tw16-replay-scenario/1.0.0` |
+| API | Access | Return / limitation |
+|---|---|---|
+| `listReplays()` / `loadReplay(id)` | Owner-local store | Seed-free safe manifest; R3 reports exact experimental status and disclosure policy |
+| `getReplayFrame(id,seq,{viewerSeat,perspective})` | Archived owner only | Historical Rules PlayerView at a complete event-group boundary; `postgame` appends only separately authorized public settlement information |
+| `getPlayerDecision(id,seq,{viewerSeat})` | Only archived owner's own actions | Recorded `actionId`, start/end seq, original legal action IDs and source view; accepts action-start or end seq |
+| `getDecisionAnalysis(id,seq,{viewerSeat,actionId})` | Archived owner only | Formal StrategyAnalysis exact discard shanten/ukeire when available; claim/pass/kong/win/flower get legal-only advisory alternatives with typed unknown risk/scoring |
+| `listCoachingFindings(id)` | Owner | Advisory exact metric comparisons for eligible discards, never official errors or abilities |
+| `createReviewQuestion(id,seq)` | Owner, supported discard only | `unscorable` PlayerView snapshot, not an Academy exam |
 
 `ReplayError.code` examples: `INVALID_REPLAY_ID`, `REPLAY_NOT_FOUND`, `CORRUPT_REPLAY`, `UNKNOWN_RULE_PROFILE`, `INVALID_EVENT_SEQ`, `VIEW_FORBIDDEN`, `POSTGAME_UNAVAILABLE`, `DECISION_NOT_FOUND`, `INVALID_ACTION_ID`, `UNVERIFIED_SCORER`, `STORAGE_WRITE_FAILED`. Callers must handle these explicitly, not silently replace invalid data.
 
 ## Information-boundary guarantees
 
-A frame with `asOfEventSeq=N` replays exactly events 1..N; it returns only the archived owner's **own** concealed tiles, public rivers/melds and legal actions. Opponent concealed information is counts only; draw TurnEvents use the Rules redacted `publicEvents` projection. A later frame, the future event ledger and the wall are never consulted by the Strategy evaluator for a preceding choice.
+A frame with `asOfEventSeq=N` replays exactly events 1..N, where N must be an **atomic Rules action-group boundary**; it returns only the archived owner's **own** concealed tiles, public rivers/melds and legal actions. Opponent concealed information is counts only; draw TurnEvents use the Rules redacted `publicEvents` projection. A later frame, the future event ledger and the wall are never consulted by the Strategy evaluator for a preceding choice.
 
-Postgame omniscient mode is unavailable until a *settled, verified* RuleProfile and an explicit, audited end-of-match disclosure policy exist. Even then, postgame revealed information may be for display and retrospective counterfactual study only: never used as an input to the original decision's `StrategyAnalysis` or official ability score.
+**Postgame disclosure:** saving a settled R3 game requires the explicit option `disclosurePolicy:'settled-public-only'` to expose a separate final settlement summary (reason, winner seat, zero-sum point deltas and experimental tai where available). This does **not** authorize opponent concealed hands, claim intentions, fixture deck, live/tail wall or Seed. The historical PlayerView is identical in `player-at-time` and `postgame` calls. The extra public outcome has an end-of-hand watermark and `allowedForDecisionScoring:false`; it must never be supplied to the original StrategyAnalysis. Default `disclosurePolicy:'none'`, unfinished games, Sandbox and invalid policy requests all **fail closed**. R3 experimental outcomes are never labeled certified.
+
+**Replacement caveat:** while a concealed flower awaits replacement, the Rules PlayerView is authoritative, but Strategy V1's standard-only tile parser cannot evaluate it; Replay retains that Rules view and returns legal-only/unknown coaching instead of mutating the Strategy contract or manufacturing a score.
 
 ## Adaptive and Academy integration policy
 
@@ -87,8 +93,8 @@ Postgame omniscient mode is unavailable until a *settled, verified* RuleProfile 
 
 For future integration, the Academy must first publish versioned, independently validated scenario fixtures and a scorer; an integrator must authenticate the gameplay source, persist the official Academy V1 record in its own sidecar, and apply `evidenceId` as a **unique transactional idempotency key**. Replaying the same match, refreshing or rescoring the same `recordRef` must never increase AbilityProfile evidence counts. Formally validated findings should be separate from advisory structural-disadvantage findings.
 
-## Quality tests
+## Quality tests and outstanding gates
 
-Run `node --test tests/replay/replay.test.js` and the repository's `npm run check`. Tests exercise deterministic seeded replay and random access, post-deal historical views, no future wall or opponent draw IDs, canonical tamper rejection even when checksums are refreshed, invalid action ID, invalid profile, owner scoping, Golden inferior-discard finding classification, unknown probability fields, unverified scorer rejection, persistent reopen, no duplicate saves and unchanged canonical v3 data.
+Run `node --test tests/replay/*.test.js` and `npm run check` on **the exact latest PR head**. Original V1 Sandbox fixtures remain in `tests/replay/replay.test.js`. New `tests/replay/r3-full-round.test.js` covers R3 self-win and discard-win settlement, private concurrent claims and priority, chi/pong, concealed kong and tail replacement, initial flowers, deterministic exhaustion, atomic boundary rejection, player-scoped decisions, public-only postgame outcome, tampered ledger with recomputed checksums, and unchanged v3 persistence.
 
-**Blocked Phase 3 acceptance:** verified complete chi/pong/kong/flower/win/settlement actions, finished-game postgame disclosure, full scoring Golden fixtures, officially verified scenario scorer, Adaptive write integration, bot-driven end-to-end games, and production UI/PWA wiring. None of these may be declared complete by this PR.
+**Not claimed:** `settled-verified` for R3; certified multiwinner/rob-kong/complete regional tai; private postgame reveal; authoritative win/deal-in probabilities; verified scenario scorer; real Adaptive updates; UI or 3-Bot completion. The integration owner must wire the new Replay public APIs and verify the complete Phase 3 application before release. The R3 source Rules and Bot PRs must also pass their own independent gates.

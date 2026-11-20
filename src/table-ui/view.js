@@ -24,7 +24,7 @@ function tileSpan(tile, className = '') {
 }
 function tileButton(tile, action, selected) {
   const t = typeFromTile(tile);
-  if (t === null) return '';
+  if (t === null) return '<span class="table-flower table-hand-flower" role="img" aria-label="'+escapeHtml(tile?.flowerCode ?? '花牌')+'">花</span>';
   return '<button type="button" class="table-tile tile table-hand-tile' +
     (selected ? ' is-selected' : '') + '" aria-pressed="' + (selected ? 'true' : 'false') +
     '" aria-label="' + escapeHtml(tileAccessibleName(t)) +
@@ -74,11 +74,20 @@ export function PlayerHand(self, legalActions, selectedId) {
     '</div>';
 }
 function actionName(action) {
-  const extra = (action.tileIds ?? []).map(id => {
-    const type = typeFromTile(id);
-    return type === null ? '花牌' : tileAccessibleName(type);
+  const ids=action.tileIds??[];
+  const extra=ids.map(id=>{
+    const type=typeFromTile(id);
+    return type===null ? (typeof id==='string'&&id.startsWith('f:')?
+      id.slice(2).split(':')[0]:'花牌') : tileAccessibleName(type);
   });
-  return (ACTIONS[action.kind] ?? action.kind) + (action.kind !== 'discard' && extra.length ? ' · ' + extra.join('、') : '');
+  const reason=action.legalityBasis?.reasonCodes?.[0];
+  const kind=action.kind==='kong'?
+    (reason==='CONCEALED_KONG'?'暗槓':reason==='ADDED_KONG'?'加槓':'明槓'):
+    action.kind==='win'?(reason==='SELF_DRAW_WIN'?'自摸胡牌':'胡牌'):
+    (ACTIONS[action.kind]??action.kind);
+  // Distinguish multiple physically different combinations without fabricating IDs.
+  const physical=action.kind==='chi'&&ids.length?' ['+ids.join(', ')+']':'';
+  return kind+(action.kind!=='discard'&&extra.length?' · '+extra.join('、'):'')+physical;
 }
 export function ActionBar(legalActions, selectedId, busy) {
   const chosen = legalActions.find(a => a.kind === 'discard' && a.actionId === selectedId);
@@ -103,64 +112,83 @@ function lastEvent(events) {
   const prefix = e.actorSeat === undefined ? '牌局' : SEATS[e.actorSeat];
   return prefix + ' · ' + (e.type === 'deal' ? '配牌' : (ACTIONS[e.type] ?? e.type)) + ' · 事件 ' + e.seq;
 }
-export function TableView(snapshot, { selection = null, busy = false, error = '' } = {}) {
-  if (!snapshot) return '';
-  const { view, profile, wallRemaining, botConnected, replayConnected, storageWarning } = snapshot;
-  const opponents = new Map(view.opponents.map(p => [p.seat, p]));
-  const actions = view.legalActions.filter(a => a.actorSeat === view.audienceSeat &&
-    a.expectedRevision === view.asOfEventSeq && typeof a.actionId === 'string');
-  const currentlyHuman = view.round.currentSeat === view.audienceSeat;
-  const claim = actions.filter(a => a.kind !== 'discard');
-  return '<header class="table-heading"><div><span class="table-overline">EXPERIMENTAL / ' +
-    escapeHtml(profile.ruleVersion) + '</span><h1 id="table-heading" tabindex="-1">四人牌桌</h1>' +
-    '<p>Rules Engine 驅動的四座位公開局面；不是正式完整台麻規則。</p></div>' +
-    '<div class="table-header-tools"><span class="table-version">Revision ' +
-    view.asOfEventSeq + '</span><button type="button" class="secondary" data-start-new>重新開局</button></div></header>' +
-    '<div class="table-facts"><span>規則：' + escapeHtml(profile.profileId) +
-    '</span><span>莊家：' + SEATS[view.round.dealerSeat] +
-    '</span><span>輪到：' + SEATS[view.round.currentSeat] +
-    '</span><span>牌山剩餘：' + wallRemaining + ' 張</span></div>' +
-    (storageWarning ? '<p class="table-warning" role="status">' + escapeHtml(storageWarning) + '</p>' : '') +
-    (error ? '<p class="table-warning" role="alert">' + escapeHtml(error) + '</p>' : '') +
-    '<div class="table-grid" aria-label="四人牌桌公開資訊">' +
-    OpponentSeat(opponents.get(2), view.round.currentSeat, view.round.dealerSeat) +
-    OpponentSeat(opponents.get(3), view.round.currentSeat, view.round.dealerSeat) +
-    '<div class="table-felt" aria-label="牌桌中央狀態"><strong>' +
-    (currentlyHuman ? '輪到你' : botConnected ? '等待正式 Bot' : '等待 Bot API') +
-    '</strong><span>' + escapeHtml(lastEvent(view.publicEvents)) +
-    '</span><small>僅顯示公開資訊 · 不顯示其他玩家暗牌</small></div>' +
-    OpponentSeat(opponents.get(1), view.round.currentSeat, view.round.dealerSeat) +
-    '</div>' +
-    PlayerHand(view.self, actions, selection) +
-    (currentlyHuman ? ActionBar(actions, selection, busy) :
-      '<section class="table-actions" aria-label="等待其他玩家"><h3>目前輪到' +
-      SEATS[view.round.currentSeat] + '</h3><p>' +
-      (botConnected ? 'Bot 正由正式 API 決策；每步仍須符合 LegalAction。'
-        : '目前尚未整合正式 Bot API，牌局已安全暫停。UI 不會自行替 Bot 摸牌或出牌。') +
-      '</p></section>') +
-    '<p class="table-muted">吃／碰／槓／胡與結算必須由正式 Rules Engine 開放。' +
-    (replayConnected ? '已連接正式 Replay Provider。' : '目前沒有正式 Replay Provider。') +
-    '</p>' + RoundSummary(snapshot.result) +
-    '<div class="table-footer-controls"><button type="button" class="secondary" data-show-replay>查看牌局複盤</button>' +
-    '<button type="button" class="secondary" data-return-academy>返回課程學院</button></div>';
+export function TableView(snapshot,{selection=null,busy=false,error='',botStatus=''}={}) {
+  if(!snapshot)return '';
+  const {view,profile,wallRemaining,botConnected,replayConnected,storageWarning,replayWarning}=snapshot;
+  const opponents=new Map(view.opponents.map(p=>[p.seat,p]));
+  const actions=view.legalActions.filter(a=>a.actorSeat===view.audienceSeat &&
+    a.expectedRevision===view.asOfEventSeq&&typeof a.actionId==='string');
+  const humanCanAct=actions.length>0;
+  const ended=view.round.phase==='settled';
+  const claim=view.round.phase==='claim_window';
+  const phaseLabel=snapshot.paused?'對局已暫停':ended?'本局已結束':humanCanAct?
+    (claim?'請回應合法宣告':'輪到你'):botConnected?'等待三位 Bot':'等待 Bot API';
+  return '<header class="table-heading"><div><span class="table-overline">EXPERIMENTAL / '+
+    escapeHtml(profile.ruleVersion)+'</span><h1 id="table-heading" tabindex="-1">四人牌桌</h1>'+
+    '<p>Rules Engine 決定牌局、宣告與結算；此規則與台數政策均未取得完整台灣通用驗證。</p></div>'+
+    '<div class="table-header-tools"><span class="table-version">Revision '+
+    view.asOfEventSeq+'</span><button type="button" class="secondary" data-start-new>重新開局</button></div></header>'+
+    '<div class="table-facts"><span>規則：'+escapeHtml(profile.profileId)+
+    '</span><span>階段：'+escapeHtml(view.round.phase)+
+    '</span><span>莊家：'+SEATS[view.round.dealerSeat]+
+    '</span><span>行動席：'+(ended?'結束':SEATS[view.round.currentSeat])+
+    '</span><span>牌山剩餘：'+wallRemaining+' 張</span></div>'+
+    (storageWarning?'<p role="status" class="table-warning">'+escapeHtml(storageWarning)+'</p>':'')+
+    (replayWarning?'<p role="status" class="table-warning">'+escapeHtml(replayWarning)+'</p>':'')+
+    (error?'<p role="alert" class="table-warning">'+escapeHtml(error)+'</p>':'')+
+    '<div class="table-grid" aria-label="四人牌桌公開資訊">'+
+    OpponentSeat(opponents.get(2),view.round.currentSeat,view.round.dealerSeat)+
+    OpponentSeat(opponents.get(3),view.round.currentSeat,view.round.dealerSeat)+
+    '<div class="table-felt" aria-live="polite"><strong>'+phaseLabel+
+    '</strong><span>'+escapeHtml(botStatus||lastEvent(view.publicEvents))+
+    '</span><small>僅顯示當下的公開牌面與本人手牌</small></div>'+
+    OpponentSeat(opponents.get(1),view.round.currentSeat,view.round.dealerSeat)+'</div>'+
+    PlayerHand(view.self,actions,selection)+
+    (ended?'<section class="table-actions"><h3>正式 Rules 已結算本局</h3></section>':
+      humanCanAct?ActionBar(actions,selection,busy||snapshot.paused):
+        '<section class="table-actions" aria-label="等待其他玩家"><h3>'+
+        (botConnected?'三名 Bot 自動執行中':'Bot API 尚未連接')+'</h3><p>'+
+        (botConnected?'請等待正式 Controller 的合法回合與宣告，不會跳過關鍵 Claim。':
+          '目前僅供 Sandbox 摸打驗證。')+'</p>'+
+        (botConnected&&!busy?'<button type="button" data-continue-bots class="primary">繼續 Bot</button>':'')+
+        '</section>')+
+    (claim?'<p class="table-muted">Claim Window：只顯示本人此版 PlayerView 的有效合法宣告；他家意圖不公開。</p>':'')+
+    '<p class="table-muted">'+
+      (profile.scoringPolicy?.configRef==='tw16-minimal-tai-v1'?
+        '計分為 tw16-minimal-tai-v1 實驗性簡化台數，不代表台灣通用台制。':
+        '此 Sandbox 不具正式胡牌計分能力。')+
+    (replayConnected?' 已建立官方 Replay 歷史封存。':' 尚無完成的 Replay。')+'</p>'+
+    RoundSummary(snapshot.result)+
+    '<div class="table-footer-controls">'+
+    (botConnected&&!ended?'<button type="button" class="secondary" data-'+
+      (snapshot.paused?'resume-bots':'pause-bots')+'>'+
+      (snapshot.paused?'繼續 Bot／玩家':'暫停 Bot')+'</button>':'')+
+    '<button type="button" class="secondary" data-show-replay>'+
+    '查看牌局複盤</button><button type="button" class="secondary" data-return-academy>返回課程學院</button></div>';
 }
 /**
  * Official end-of-round summary only. Unknown or unverified results do not
  * become wins, tai, scores or settlement merely because the UI can display them.
  */
-export function RoundSummary(result) {
-  const summary = result?.verified === true ? result.publicSummary : null;
-  if (!summary || typeof summary !== 'object') return '';
-  const winners = Array.isArray(summary.winnerSeats) ? summary.winnerSeats
-    .filter(s => Number.isInteger(s) && s >= 0 && s <= 3).map(s => SEATS[s]) : [];
-  return '<section class="table-round-summary" aria-label="官方局後結果">' +
-    '<h2>本局結果 · 正式來源</h2>' +
-    '<p>結果：' + escapeHtml(summary.outcome ?? '未提供結算結果') + '</p>' +
-    '<p>胡牌玩家：' + escapeHtml(winners.join('、') || '未提供') + '</p>' +
-    (Array.isArray(summary.settlements) ?
-      '<div class="table-settlements">' + summary.settlements.map(row =>
-        '<p>' + escapeHtml(row.label ?? '結算') + '：' +
-        escapeHtml(row.value ?? '未提供') + '</p>').join('') + '</div>' : '') +
+export function RoundSummary(result){
+  const summary=result?.source==='rules'&&result?.experimental===true?
+    result.publicSummary:result?.verified===true?result.publicSummary:null;
+  if(!summary||typeof summary!=='object')return '';
+  const winners=Array.isArray(summary.winnerSeats)?summary.winnerSeats.filter(x=>
+    Number.isInteger(x)&&x>=0&&x<4).map(x=>SEATS[x]):[];
+  const score=Array.isArray(summary.scoreDelta)&&summary.scoreDelta.length===4?
+    summary.scoreDelta:null;
+  return '<section class="table-round-summary" aria-label="Rules 局後結果">'+
+    '<h2>局後結算 · '+(result.experimental?'EXPERIMENTAL':'正式來源')+'</h2>'+
+    '<p>結果：'+escapeHtml(summary.outcome??'未提供')+'</p>'+
+    '<p>勝方：'+escapeHtml(winners.join('、')||'流局／無')+'</p>'+
+    (summary.winMethod?'<p>胡牌方式：'+escapeHtml(summary.winMethod)+'</p>':'')+
+    (summary.pattern?'<p>官方牌型／台數項目：'+escapeHtml(JSON.stringify(summary.pattern))+'</p>':'')+
+    (Number.isInteger(summary.tai)?'<p>實驗台數：'+summary.tai+'</p>':'')+
+    (score?'<p>四家分數變化：'+score.map((x,i)=>SEATS[i]+' '+x).join(' / ')+'</p>':'')+
+    '<p>計分政策：'+escapeHtml(summary.scoringPolicy??'未提供')+'</p>'+
+    (Number.isInteger(summary.eventCount)?'<p>牌局事件數：'+summary.eventCount+'</p>':'')+
+    (result.experimental?'<p class="table-warning">此為實驗性簡化計分，不可視為通用台灣麻將正式台數。</p>':'')+
     '</section>';
 }
 /** Render historical PlayerView's open information, not today's game state. */
@@ -180,31 +208,43 @@ function ReplayPublicTable(view) {
     riverSection(view.self.river ?? []) + meldSection(view.self.melds ?? []) +
     flowersSection(view.self.flowers ?? []) + '</section>';
 }
-export function ReplayControls(timeline, index) {
-  if (!timeline?.verified || !Array.isArray(timeline.frames) || timeline.frames.length === 0) {
-    return '<section class="table-empty" aria-label="複盤不可用"><h2>牌局複盤尚未開放</h2>' +
-      '<p>目前沒有經正式 Replay API 驗證的事件快照與 CoachingFinding。' +
-      '不會使用當前手牌偽裝歷史牌局，也不產生策略評分。</p>' +
+export function ReplayControls(timeline,index,externalFrame=null){
+  const valid=timeline?.verified===true;
+  const length=Number.isInteger(timeline?.total)?timeline.total:timeline?.frames?.length??0;
+  const frame=externalFrame??timeline?.frames?.[index];
+  if(!valid||length<1||!frame?.view){
+    return '<section class="table-empty" aria-label="複盤不可用"><h2>牌局複盤尚未開放</h2>'+
+      '<p>僅在正式 Replay Service 驗證成功並提供歷史 PlayerView 時可查看；'+
+      '不從現有牌局推造歷史資料或大師失誤分數。</p>'+
       '<button type="button" class="secondary" data-return-table>返回牌桌</button></section>';
   }
-  const frame = timeline.frames[index];
-  const own = frame?.view?.self?.concealed ?? [];
-  const options = frame?.legalActions ?? frame?.view?.legalActions ?? [];
-  return '<section class="table-replay" aria-label="正式牌局複盤"><h2>逐巡複盤</h2>' +
-    '<div class="table-replay-controls"><button type="button" data-replay-first ' +
-    (index === 0 ? 'disabled' : '') + '>開局</button><button type="button" data-replay-prev ' +
-    (index === 0 ? 'disabled' : '') + '>上一巡</button><label>事件<select data-replay-jump>' +
-    timeline.frames.map((f, i) => '<option value="' + i + '"' + (i === index ? ' selected' : '') +
-      '>#' + (f.event?.seq ?? i) + ' ' + escapeHtml(f.event?.type ?? '狀態') + '</option>').join('') +
-    '</select></label><button type="button" data-replay-next ' +
-    (index === timeline.frames.length - 1 ? 'disabled' : '') + '>下一巡</button></div>' +
-    ReplayPublicTable(frame.view) + '<h3>當時你的手牌</h3><div class="table-hand table-replay-hand">' +
-    own.map(t => tileSpan(t)).join('') + '</div>' +
-    '<h3>當時官方合法選項</h3><p>' +
-    (options.length ? options.map(actionName).map(escapeHtml).join('、') : '無可用的合法選項') + '</p>' +
-    '<h3>官方 CoachingFinding</h3><p>' +
-    (frame.coachingFinding?.verified === true
-      ? escapeHtml(frame.coachingFinding.summary ?? '官方已驗證，無文字解說')
-      : '無法評估；尚無可驗證的決策品質分析') +
-    '</p><button type="button" class="secondary" data-return-table>返回牌桌</button></section>';
+  const own=frame.view.self?.concealed??[];
+  const options=frame.legalActions??frame.view.legalActions??[];
+  const findings=frame.findings??[];
+  const analysis=frame.analysis;
+  return '<section class="table-replay" aria-label="正式牌局複盤">'+
+    '<h2>逐事件歷史複盤</h2><p>歷史 PlayerView · 事件 '+(index+1)+' / '+length+
+    ' · '+escapeHtml(timeline.manifest?.completionStatus??'來源已驗證')+'</p>'+
+    '<div class="table-replay-controls"><button type="button" data-replay-first '+
+    (index===0?'disabled':'')+'>開局</button><button type="button" data-replay-prev '+
+    (index===0?'disabled':'')+'>上一事件</button><label for="table-replay-jump">事件</label>'+
+    '<select id="table-replay-jump" data-replay-jump aria-label="跳至指定事件">'+
+    Array.from({length},(_,i)=>'<option value="'+i+'"'+(i===index?' selected':'')+
+      '>#'+(i+1)+'</option>').join('')+'</select>'+
+    '<button type="button" data-replay-next '+(index===length-1?'disabled':'')+
+    '>下一事件</button></div>'+
+    ReplayPublicTable(frame.view)+
+    '<h3>當時你的手牌</h3><div class="table-hand table-replay-hand">'+
+    own.map(x=>tileSpan(x)).join('')+'</div>'+
+    '<h3>當時 Rules 合法選項</h3><p>'+
+    (options.length?options.map(actionName).map(escapeHtml).join('、'):'無合法選項')+'</p>'+
+    '<h3>策略解說與 CoachingFinding</h3>'+
+    (analysis?'<p>策略分析依據為歷史資訊，建議屬啟發式，不構成已驗證失誤評分。</p>'+
+      (analysis.limitations?.length?'<p>限制：'+escapeHtml(analysis.limitations.join('；'))+'</p>':''):
+      '<p>本事件無可授權的玩家決策分析。</p>')+
+    (findings.length?findings.map(x=>'<p>'+escapeHtml(x.kind)+
+       ' · '+escapeHtml(x.rationale??'證據不完整')+
+       ' · '+escapeHtml(x.verificationStatus??'未驗證')+'</p>').join(''):
+      '<p>目前無可驗證的 CoachingFinding；不提供虛構錯誤分數。</p>')+
+    '<button type="button" class="secondary" data-return-table>返回牌桌</button></section>';
 }
