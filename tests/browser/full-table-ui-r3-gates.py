@@ -101,7 +101,12 @@ def full_round(page, folder):
 
 def daily_roundtrip(page):
     page.locator('[data-table-nav="daily"]').click()
-    page.wait_for_selector('#table-heading')
+    # Navigation asynchronously imports the official Adaptive and Learning
+    # modules. Wait for a completed Daily view, not the preceding Replay h1.
+    page.wait_for_function("""() => document.body.dataset.tableView === 'daily'
+      && !!document.querySelector('#full-table-root [data-daily-start],'
+        +'#full-table-root [data-daily-resume],'
+        +'#full-table-root [data-daily-retry]')""",timeout=25000)
     if page.locator('[data-daily-start]').count():
         page.locator('[data-daily-start]').click()
     elif page.locator('[data-daily-resume]').count():
@@ -127,7 +132,9 @@ def daily_roundtrip(page):
                 'Daily canonical grading was not durably recorded')
     page.reload(wait_until='networkidle')
     page.locator('[data-table-nav="daily"]').click()
-    page.wait_for_timeout(700)
+    page.wait_for_function("""() => document.body.dataset.tableView === 'daily'
+      && document.querySelector('#full-table-root [role="status"]')
+        ?.textContent?.includes('日期 ')""",timeout=25000)
     require('日期 ' in page.locator('#full-table-root').inner_text(),
             'Daily session was not resumed from Adaptive authority')
 
