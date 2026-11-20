@@ -93,6 +93,7 @@ def full_round(page, folder):
     page.locator('[data-replay-next]').click()
     require(page.locator('.table-replay').count()==1,'Replay next failed')
     page.locator('[data-replay-jump]').select_option('0')
+    page.wait_for_selector('.table-replay',timeout=20000)
     require('事件 1 /' in page.locator('.table-replay').inner_text(),
             'Replay jump to historical event failed')
     page.screenshot(path=str(folder/'table-390-real-replay.png'),full_page=True)
@@ -163,7 +164,11 @@ def run(folder):
                     ctx.set_offline(False)
                 else:
                     open_game(page)
-                    first=page.locator('.table-hand button[data-pick-action]').first.bounding_box()
+                    available=page.locator('.table-hand button[data-pick-action]:enabled')
+                    if not available.count():
+                        available=page.locator('.table-action-buttons button[data-submit-action]:enabled')
+                    require(available.count()>0, 'no legal player control after R3 start')
+                    first=available.first.bounding_box()
                     require(first and first['width']>=44,
                             str(width)+'px touch target below 44px')
                     require(page.evaluate('document.documentElement.scrollWidth<=innerWidth+1'),
