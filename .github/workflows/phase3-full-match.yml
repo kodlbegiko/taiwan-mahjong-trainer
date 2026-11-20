@@ -67,7 +67,8 @@ jobs:
           d=pathlib.Path('tw16-r3-full-match-evidence')
           d.mkdir(exist_ok=True)
           (d/'acceptance.json').write_text(json.dumps({
-            'testedSourceSHA':os.environ.get('GITHUB_SHA'),
+            'testedSourceSHA':__import__('subprocess').check_output(['git','rev-parse','HEAD'],text=True).strip(),
+            'workflowTriggerSHA':os.environ.get('GITHUB_SHA'),
             'headSourceSHA':'${{ github.event.pull_request.head.sha || github.sha }}',
             'gate':'chromium-full-match-r3',
             'ruleStatus':'experimental',
