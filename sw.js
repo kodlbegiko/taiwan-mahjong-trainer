@@ -1,7 +1,7 @@
 /* Offline-first, atomic shell for GitHub Pages root or /repo/ deployments.
  * IMPORTANT: change CACHE_VERSION whenever any precached file changes.
  * The install event only succeeds if the entire listed release is cached. */
-const CACHE_VERSION = 'tmt-v02-realistic-tiles-master-academy-phase3-integrated-facade-20261120-r4';
+const CACHE_VERSION = 'tmt-v02-realistic-tiles-master-academy-phase3-five-source-20261120-r6';
 const SHELL_CACHE = `tmt-shell-${CACHE_VERSION}`;
 const BASE = new URL('./', self.location.href);
 const SHELL = [
@@ -45,6 +45,7 @@ const SHELL = [
   './src/tile-visuals.js', './src/app.js', './src/tiles.js', './src/practice.js', './src/shanten.js',
   './src/academy-ui/main.js', './src/academy-ui/academy.css',
   './src/table-ui/main.js', './src/table-ui/session.js',
+  './src/table-ui/full-round.js', './src/table-ui/daily.js',
   './src/table-ui/view.js', './src/table-ui/table.css',
   './src/academy-ui/public-facade.js', './src/academy-ui/scenario.js',
   './src/academy-ui/academy-bridge.js', './src/academy-ui/academy-live.js',
@@ -85,7 +86,7 @@ const SHELL = [
   './src/strategy/simulate.js',
   // Phase 3 staged runtime dependencies; experimental-only, NOT full game.
   './src/rules/complete-engine.js', './src/rules/scoring.js',
-  './src/bots/index.js', './src/bots/decision.js', './src/bots/controller.js',
+  './src/bots/index.js', './src/bots/decision.js', './src/bots/controller.js', './src/bots/view.js',
   './src/replay/index.js', './src/replay/internal.js', './src/scenario/index.js',
   './data/academy/manifest-v1.json',
 ].map(path => new URL(path, BASE).href);

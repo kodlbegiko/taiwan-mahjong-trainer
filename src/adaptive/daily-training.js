@@ -4,7 +4,8 @@
  */
 import { createAdaptiveLearningAdapter } from './learning-adapter.js';
 import { localDayKey } from './core.js';
-import { planDailyTraining } from './session.js';
+import { planDailyTraining, transitionTrainingSession } from './session.js';
+import { AcademyStorageError } from './storage.js';
 import { validateTrainingSession } from './validate.js';
 
 export const DAILY_TRAINING_VERSION = 'academy-daily/1.0.0';
@@ -24,7 +25,7 @@ function validateLearningCallbacks(learning) {
 }
 export function createDailyTrainingController(storage, {
   learning, registry, validateAcademyDecisionRecord,
-  profileId='local-academy-profile', timezone='Asia/Taipei',
+  profileId='local-academy-profile', timezone='Asia/Taipei', locks,
 }={}) {
   validateLearningCallbacks(learning);
   if(typeof timezone!=='string' || !timezone.trim() ||
@@ -34,10 +35,21 @@ export function createDailyTrainingController(storage, {
   catch { throw new RangeError('Unknown IANA timezone'); }
   const adaptive=createAdaptiveLearningAdapter(storage,{learning,registry,
     validateAcademyDecisionRecord,profileId,timezone});
+  // Web Locks serializes the entire legacy-v3 -> sidecar -> derived-profile
+  // critical section across same-origin tabs. localStorage alone has no CAS.
+  const lockManager = locks ?? globalThis.navigator?.locks;
+  const lockName = 'tw-mahjong-master-academy:daily:' + profileId;
+  async function exclusive(op) {
+    if (!lockManager || typeof lockManager.request !== 'function') {
+      throw new AcademyStorageError('LOCK_UNAVAILABLE',
+        'Safe concurrent Daily writes require the same-origin Web Locks API');
+    }
+    return lockManager.request(lockName, { mode: 'exclusive' }, op);
+  }
 
   function sourceVerified(q) {
     try {
-      if(!q || q.status!=='validated' || !['discard','tenpai','multi_wait'].includes(q.taskType) ||
+      if(!q || Object.hasOwn(q,'answerKey') || q.status!=='validated' || !['discard','tenpai','multi_wait'].includes(q.taskType) ||
         !q.generator || !Array.isArray(q.prompt?.options) || !q.prompt.options.length ||
         !Array.isArray(q.skillTagIds) || !q.skillTagIds.length ||
         !q.lessonRef || typeof q.lessonRef.lessonId!=='string') return false;
@@ -56,8 +68,17 @@ export function createDailyTrainingController(storage, {
 
   function publishedCatalog() {
     const lessons=learning.listLessons().filter(l=>l.status==='published');
+    // A published lesson is not automatically unlocked. Do not infer
+    // completion from quiz scores: use durable canonical provenance only.
+    const answered=new Set((adaptive.load().provenanceLinks??[])
+      .map(link=>id(link.academyQuestionRef)));
+    const completedLessons=new Set(lessons.filter(lesson=>
+      lesson.questionRefs.length>0 && lesson.questionRefs.every(ref=>answered.has(id(ref))))
+      .map(lesson=>lesson.lessonId));
+    const unlocked=lessons.filter(lesson=>
+      (lesson.prerequisiteLessonIds??[]).every(dep=>completedLessons.has(dep)));
     const unique=new Map();
-    for(const lesson of lessons)for(const ref of learning.listQuestionRefs({lessonId:lesson.lessonId})){
+    for(const lesson of unlocked)for(const ref of learning.listQuestionRefs({lessonId:lesson.lessonId})){
       if(!lesson.questionRefs.some(r=>id(r)===id(ref))) continue;
       const q=learning.toPublicQuestion(ref);
       if(!sourceVerified(q)) continue;
@@ -90,9 +111,11 @@ export function createDailyTrainingController(storage, {
   function ensureToday({asOf,minutes=30}={}) {
     const at=utc(asOf);
     if(![10,20,30,60].includes(minutes)) throw new RangeError('Unsupported DailySession length');
-    adaptive.rebuild({asOf:at});
     const {day,session:existing}=daySessions(at);
     if(existing) { validateTrainingSession(existing); return clone(existing); }
+    const initial=adaptive.rebuild({asOf:at});
+    if(initial.durable!==true) throw new AcademyStorageError('STORAGE_UNAVAILABLE',
+      'Cannot create a DailySession without durable storage');
     const state=adaptive.load();
     if(!state.abilityProfile||!state.reviewPlan)throw new RangeError('Canonical ability/review not available');
     const catalog=publishedCatalog();
@@ -114,7 +137,9 @@ export function createDailyTrainingController(storage, {
     // The V1 Adaptive sidecar is the sole persisted session authority.
     validateTrainingSession(session);
     if(daySessions(at).session) return readToday({asOf:at});
-    adaptive.saveSession(session);
+    const saved=adaptive.saveSession(session);
+    if(saved.durable!==true) throw new AcademyStorageError('STORAGE_UNAVAILABLE',
+      'DailySession could not be persisted');
     const durable=readToday({asOf:at});
     if(!durable||!same(durable,session))throw new RangeError('DailySession durable readback mismatch');
     return durable;
@@ -144,7 +169,6 @@ export function createDailyTrainingController(storage, {
     const at=utc(asOf),day=readToday({asOf:at});
     if(!day||!day.questionRefs.some(q=>id(q)===id(ref)))
       throw new RangeError('No active DailySession or unknown question');
-    if(!['planned','active'].includes(day.status))throw new RangeError('DailySession is terminal');
     if(!Number.isSafeInteger(durationMs)||durationMs<0 || durationMs>86_400_000)
       throw new RangeError('Invalid answer duration');
     if(typeof attemptId!=='string'||!attemptId.trim())throw new TypeError('Stable attemptId required');
@@ -153,12 +177,136 @@ export function createDailyTrainingController(storage, {
     const existing=(adaptive.load().provenanceLinks??[]).find(p=>
       p.sessionId===day.sessionId&&id(p.academyQuestionRef)===id(ref));
     if(existing)return {status:'already-answered',recordRef:clone(existing.recordRef),session:day};
+    if(!['planned','active'].includes(day.status))throw new RangeError('DailySession is terminal');
+    // If a crash occurred after the prepare write, recover the original v3
+    // attempt first. Do not create a competing RecordRef with a new attempt ID.
+    const queued=(adaptive.load().pendingProvenance??[]).find(p=>
+      p.link.sessionId===day.sessionId&&id(p.link.academyQuestionRef)===id(ref));
+    if(queued) {
+      try { adaptive.rebuild({asOf:at}); }
+      catch(error) { return {status:'recovery-required',
+        errorCode:error.code??'RECOVERY_FAILED',message:error.message,session:day}; }
+      const recovered=(adaptive.load().provenanceLinks??[]).find(p=>
+        p.sessionId===day.sessionId&&id(p.academyQuestionRef)===id(ref));
+      if(recovered) return {status:'already-answered',recordRef:clone(recovered.recordRef),
+        session:readToday({asOf:at})};
+      if(queued.link.recordRef.id!==attemptId) return {status:'pending-recovery',
+        errorCode:'PENDING_ATTEMPT',recordRef:clone(queued.link.recordRef),session:day};
+    }
     getQuestion(ref,{asOf:at}); // verifies official source and current version
-    const result=adaptive.submitAnswer(ref,choice,{timestamp:at,asOf:at,durationMs,attemptId,sessionId:day.sessionId});
+    let result;
+    try {
+      result=adaptive.submitAnswer(ref,choice,{timestamp:at,asOf:at,durationMs,attemptId,sessionId:day.sessionId});
+    } catch(error) {
+      // The v3 and sidecar writes are two separate stores. On an exception the
+      // caller must resume/recover before attempting another answer.
+      return {status:'recovery-required',errorCode:error.code??'SUBMIT_FAILED',
+        message:error.message,session:readToday({asOf:at})};
+    }
     const durable=result.durable===true && result.provenanceDurable===true &&
       result.derivedFresh===true && result.sessionFresh===true;
-    return {...result,status:durable?'saved':result.durable?'partial':'not-durable',
+    return {...result,status:durable?'saved':'recovery-required',
       session:readToday({asOf:at})};
   }
-  return Object.freeze({version:DAILY_TRAINING_VERSION,readToday,ensureToday,getQuestion,progress,submit});
+  function getDailyProgress({asOf}={}) {
+    let at,day;
+    try {
+      at=utc(asOf);
+      day=localDayKey(at,timezone);
+      const current=progress({asOf:at});
+      if(!current) return {version:DAILY_TRAINING_VERSION,dayKey:day,timezone,
+        status:'not-started',sessionId:null,completed:0,total:0,
+        completedQuestions:[],remainingQuestions:[],recordRefs:[],nextQuestionRef:null,
+        nextStep:'start',abilityProfile:null,reviewPlan:null,error:null};
+      const state=adaptive.load();
+      const session=current.session;
+      const links=(state.provenanceLinks??[]).filter(p=>p.sessionId===session.sessionId);
+      const completed=links.map(p=>({questionRef:clone(p.academyQuestionRef),
+        recordRef:clone(p.recordRef)}));
+      const answered=new Set(completed.map(p=>id(p.questionRef)));
+      const remaining=session.questionRefs.filter(q=>!answered.has(id(q)));
+      const ability=state.abilityProfile;
+      const review=state.reviewPlan;
+      const due=(review?.items??[]).filter(item=>
+        localDayKey(item.dueAt,timezone)<=day &&
+        !item.reasonCodes.some(reason=>reason.startsWith('unavailable:'))).length;
+      return {
+        version:DAILY_TRAINING_VERSION,sessionId:session.sessionId,
+        dayKey:day,timezone,status:session.status,session:clone(session),
+        revision:state.revision,minutes:session.extensions?.['adaptive.plan']?.minutes??30,
+        sources:clone(session.extensions?.['adaptive.plan']?.orderedSources??[]),
+        completed:completed.length,total:session.questionRefs.length,
+        completedQuestions:completed,remainingQuestions:clone(remaining),
+        recordRefs:clone(session.recordRefs),
+        nextQuestionRef:clone(current.nextQuestionRef),
+        nextStep:session.status==='completed'?'done':session.status==='aborted'?'aborted':
+          remaining.length?'answer':'complete',
+        abilityProfile:ability?{
+          profileId:ability.profileId,calibrationStatus:ability.calibrationStatus,
+          legacyImported:ability.legacyImported,
+          sourceRecordRefs:clone(ability.sourceRecordRefs),
+          skills:ability.skills.map(skill=>({
+            tagId:skill.tagId,attempts:skill.attempts,
+            estimatedProficiency:ability.calibrationStatus==='human-calibrated'?
+              skill.estimatedProficiency:null,
+          })),
+        }:null,
+        reviewPlan:review?{planId:review.planId,calibrationStatus:review.calibrationStatus,
+          total:review.items.length,due,method:review.method}:null,
+        pendingRecovery:(state.pendingProvenance??[]).filter(p=>
+          p.link.sessionId===session.sessionId).length,
+        error:null,
+      };
+    } catch(error) {
+      return {version:DAILY_TRAINING_VERSION,dayKey:day??null,timezone,
+        status:'error',error:{code:error.code??'INVALID_STATE',message:error.message},
+        sessionId:null,completed:null,total:null,nextStep:'recover'};
+    }
+  }
+  function resumeSession({asOf,sessionId}={}) {
+    const session=readToday({asOf});
+    if(!session) return getDailyProgress({asOf});
+    if(sessionId!==undefined && sessionId!==session.sessionId)
+      throw new RangeError('Session ID does not match today');
+    return getDailyProgress({asOf});
+  }
+  function completeSession({asOf}={}) {
+    const at=utc(asOf),current=progress({asOf:at});
+    if(!current) throw new RangeError('No DailySession to complete');
+    if(current.session.status==='completed') return getDailyProgress({asOf:at});
+    if(current.session.status!=='active'||current.completed!==current.total)
+      throw new RangeError('Incomplete DailySession cannot be completed');
+    const next=transitionTrainingSession(current.session,'completed',{at});
+    const saved=adaptive.saveSession(next);
+    if(saved.durable!==true)throw new AcademyStorageError('STORAGE_UNAVAILABLE','Completion not durable');
+    return getDailyProgress({asOf:at});
+  }
+  function abortSession({asOf,reason='user-aborted'}={}) {
+    const at=utc(asOf),current=readToday({asOf:at});
+    if(!current) throw new RangeError('No DailySession to abort');
+    if(current.status==='aborted') return getDailyProgress({asOf:at});
+    if(current.status==='completed') throw new RangeError('Completed DailySession cannot be aborted');
+    const next=transitionTrainingSession(current,'aborted',{at,reason});
+    const saved=adaptive.saveSession(next);
+    if(saved.durable!==true)throw new AcademyStorageError('STORAGE_UNAVAILABLE','Abort not durable');
+    return getDailyProgress({asOf:at});
+  }
+  function submitSessionAnswer({questionRef,choice,asOf,durationMs,attemptId}={}) {
+    return submit(questionRef,choice,{asOf,durationMs,attemptId});
+  }
+  // The *Locked methods are the supported multi-tab UI mutation protocol.
+  // Synchronous V1-compatible methods remain available for single-context use,
+  // but cannot make cross-tab localStorage sequences atomic.
+  return Object.freeze({
+    version:DAILY_TRAINING_VERSION,
+    readToday,ensureToday,getQuestion,progress,submit,
+    getTodaySession:readToday,getDailyProgress,resumeSession,
+    submitSessionAnswer,completeSession,abortSession,
+    ensureTodayLocked:options=>exclusive(()=>ensureToday(options)),
+    resumeSessionLocked:options=>exclusive(()=>resumeSession(options)),
+    submitSessionAnswerLocked:options=>exclusive(()=>submitSessionAnswer(options)),
+    completeSessionLocked:options=>exclusive(()=>completeSession(options)),
+    abortSessionLocked:options=>exclusive(()=>abortSession(options)),
+    getDailyProgressLocked:options=>exclusive(()=>getDailyProgress(options)),
+  });
 }

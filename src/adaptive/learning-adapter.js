@@ -38,7 +38,8 @@ export function createAdaptiveLearningAdapter(storage, {
     typeof learning.getLessonPublic !== 'function') {
     throw new TypeError('AI3 public submit/lookup callbacks are required');
   }
-  const legacy = createLocalTrainingStore(storage);
+  // Canonical archive is re-read from storage on each submission; a failed
+  // legacy write must not poison retries with an in-memory phantom record.
   const academy = createAcademyStore(storage, {
     learning, registry, validateAcademyDecisionRecord, profileId, timezone,
   });
@@ -197,7 +198,7 @@ export function createAdaptiveLearningAdapter(storage, {
     if (existing) {
       if (!same(existing, graded.record)) throw new RangeError('Conflicting canonical v3 attempt ID');
     } else {
-      const saved = legacy.addDecision(graded.record.exerciseSnapshot, graded.record.chosen,
+      const saved = createLocalTrainingStore(storage).addDecision(graded.record.exerciseSnapshot, graded.record.chosen,
         { timestamp, durationMs, attemptId: graded.record.id });
       if (!same(saved, graded.record)) throw new RangeError('Official v3 grading mismatch');
     }

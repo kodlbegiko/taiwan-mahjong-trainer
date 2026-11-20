@@ -10,8 +10,9 @@ export {
 export {
   createGame, listLegalActions, applyAction, replayGame,
   validateGameState, createPlayerView, projectPlayerView, startNextRound,
+  listPendingClaimResponders, getClaimWindowPublic, getRuleCapabilities,
 } from './engine.js';
 
 export { scoreWinningHand, settleWin } from './scoring.js';
 
-export { COMPLETE_ENGINE_VERSION } from './complete-engine.js';
+export { COMPLETE_ENGINE_VERSION, RuleCapabilityError } from './complete-engine.js';

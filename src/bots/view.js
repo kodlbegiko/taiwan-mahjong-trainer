@@ -1,0 +1,182 @@
+/**
+ * Bot-only extension for the experimental R3 initial-flower boundary.
+ * The V1 Strategy validator expects 16/17 nonflower tiles and consequently
+ * cannot read a dealer hand still holding physical flowers.  Never weaken
+ * that canonical validator: use this narrow fail-closed replacement adapter.
+ */
+import { readPlayerView } from '../strategy/view.js';
+
+const rootKeys = ['schemaVersion','contractVersion','viewId','gameId','ruleRef',
+  'audienceSeat','asOfEventSeq','round','self','opponents','publicEvents',
+  'legalActions','knownUnavailableTypes','capabilities'];
+const roundKeys = ['schemaVersion','contractVersion','roundId','handIndex',
+  'dealerSeat','currentSeat','phase','prevailingWind','roundWind','scores','lastPublicEventSeq'];
+const publicEventKeys = ['schemaVersion','contractVersion','eventId','gameId','seq',
+  'ruleRef','actorSeat','type','visibility','payload','causedByActionId',
+  'previousEventId','occurredAt'];
+const publicPayloadKeys = ['seat','tileId','tileIds','kind','claimEventId',
+  'concealedCount','reasonCode','sourceSeat','count','countsBySeat'];
+const actionKeys = ['schemaVersion','contractVersion','actionId','kind',
+  'actorSeat','expectedRevision','tileIds','claimEventId','ruleRef','legalityBasis'];
+const allow = (obj, keys, label) => {
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj) ||
+      Object.getPrototypeOf(obj) !== Object.prototype ||
+      Object.keys(obj).some(key => !keys.includes(key)))
+    throw new TypeError('Nonpublic '+label+' fields in Bot PlayerView');
+};
+const required = (cond, message) => {
+  if (!cond) throw new RangeError('Invalid R3 flower PlayerView: '+message);
+};
+const validId = t => t && t.schemaVersion === 1 &&
+  t.contractVersion === 'master-academy/1.0.0' &&
+  typeof t.id === 'string' && Number.isInteger(t.copyIndex) &&
+  (t.kind === 'flower' ?
+    t.id === 'f:'+t.flowerCode+':'+t.copyIndex &&
+      /^[a-z][a-z0-9-]*$/.test(t.flowerCode) && !('tileType' in t) :
+    t.kind === 'standard' && Number.isInteger(t.tileType) &&
+      t.tileType >= 0 && t.tileType <= 33 &&
+      t.copyIndex >= 0 && t.copyIndex <= 3 &&
+      t.id === 't:'+t.tileType+':'+t.copyIndex && !('flowerCode' in t));
+
+/** Deep-detach, rejecting accessor properties, prototypes, symbols and cycles. */
+function detached(input) {
+  const seen = new WeakSet();
+  const visit = (x, depth = 0) => {
+    if (depth > 64) throw new RangeError('PlayerView nesting too deep');
+    if (x === null || typeof x === 'string' || typeof x === 'boolean' ||
+        (typeof x === 'number' && Number.isFinite(x))) return x;
+    if (!x || typeof x !== 'object' ||
+        (!Array.isArray(x) && Object.getPrototypeOf(x) !== Object.prototype) ||
+        seen.has(x)) throw new TypeError('Non-JSON or cyclic PlayerView');
+    seen.add(x);
+    const out = Array.isArray(x) ? [] : {};
+    const keys = Reflect.ownKeys(x);
+    if (Array.isArray(x)) {
+      required(keys.every(k => k === 'length' ||
+        (typeof k === 'string' && /^(0|[1-9][0-9]*)$/.test(k))) &&
+        keys.length === x.length + 1, 'array metadata');
+      for (let i = 0; i < x.length; i++) {
+        const d = Object.getOwnPropertyDescriptor(x, ''+i);
+        required(d && 'value' in d, 'array accessor/hole');
+        out.push(visit(d.value, depth+1));
+      }
+    } else for (const k of keys) {
+      const d = Object.getOwnPropertyDescriptor(x, k);
+      required(typeof k === 'string' && d?.enumerable && 'value' in d,
+        'object accessor/hidden field');
+      Object.defineProperty(out,k,{value:visit(d.value,depth+1),
+        enumerable:true,configurable:true,writable:true});
+    }
+    seen.delete(x);
+    return out;
+  };
+  return visit(input);
+}
+function checkPublicZones(p) {
+  for (const meld of p.melds) {
+    allow(meld,['kind','tileIds','open','sourceSeat','sourceEventId'],'meld');
+    required(['sequence','triplet','kong'].includes(meld.kind) &&
+      typeof meld.open==='boolean' && Array.isArray(meld.tileIds) &&
+      meld.tileIds.length===(meld.kind==='kong'?4:3) &&
+      meld.tileIds.every(id=>/^t:(?:[0-9]|[12][0-9]|3[0-3]):[0-3]$/.test(id)),
+      'public meld');
+  }
+  for (const river of p.river) {
+    allow(river,['tileId','seq','claimedByEventId'],'river');
+    required(typeof river.tileId==='string' &&
+      /^t:(?:[0-9]|[12][0-9]|3[0-3]):[0-3]$/.test(river.tileId) &&
+      Number.isInteger(river.seq), 'river physical tile');
+  }
+  for (const t of p.flowers) {
+    allow(t,['schemaVersion','contractVersion','id','kind',
+      'flowerCode','copyIndex'],'public flower');
+    required(validId(t)&&t.kind==='flower','public flower identity');
+  }
+}
+function replacementView(input) {
+  const v = detached(input);
+  allow(v,rootKeys,'root');allow(v.round,roundKeys,'round');
+  allow(v.ruleRef,['profileId','ruleVersion'],'ruleRef');
+  required(v.schemaVersion===1 && v.contractVersion==='master-academy/1.0.0' &&
+    v.ruleRef.profileId==='tw16-configurable-table' &&
+    v.ruleRef.ruleVersion==='experimental-full-v1' &&
+    v.round.phase==='replacement', 'R3 profile/phase');
+  required(typeof v.gameId==='string' && v.gameId.length>0 &&
+    typeof v.viewId==='string' && Number.isInteger(v.asOfEventSeq) &&
+    v.asOfEventSeq>=1 && Number.isInteger(v.audienceSeat) &&
+    v.audienceSeat>=0 && v.audienceSeat<=3 &&
+    v.round.currentSeat===v.audienceSeat &&
+    v.round.schemaVersion===1 && v.round.contractVersion===v.contractVersion &&
+    typeof v.round.roundId==='string', 'identity/actor/revision');
+  allow(v.self,['seat','concealed','melds','river','flowers'],'self');
+  required(v.self.seat===v.audienceSeat &&
+    Array.isArray(v.self.concealed) &&
+    v.self.concealed.some(t=>t?.kind==='flower') &&
+    v.self.concealed.every(validId), 'own physical tiles');
+  for(const t of v.self.concealed)
+    allow(t,t.kind==='flower'?
+      ['schemaVersion','contractVersion','id','kind','flowerCode','copyIndex']:
+      ['schemaVersion','contractVersion','id','kind','tileType','copyIndex'],
+      'own tile');
+  const physicalIds = new Set(v.self.concealed.map(t=>t.id));
+  required(physicalIds.size===v.self.concealed.length, 'duplicate own tile');
+  required(Array.isArray(v.self.melds) && Array.isArray(v.self.river) &&
+    Array.isArray(v.self.flowers) && v.self.flowers.every(validId),
+    'self public zones');
+  checkPublicZones(v.self);
+  required(Array.isArray(v.opponents) && v.opponents.length===3, 'opponents');
+  const seats=new Set([v.audienceSeat]);
+  for (const p of v.opponents) {
+    allow(p,['seat','concealedCount','melds','river','flowers'],'opponent');
+    required(Number.isInteger(p.seat) && p.seat>=0 && p.seat<=3 &&
+      Number.isInteger(p.concealedCount) && p.concealedCount>=0 &&
+      Array.isArray(p.melds) && Array.isArray(p.river) &&
+      Array.isArray(p.flowers) && !seats.has(p.seat), 'opponent redaction');
+    checkPublicZones(p);
+    seats.add(p.seat);
+  }
+  required(Array.isArray(v.publicEvents), 'public events');
+  for (const e of v.publicEvents) {
+    allow(e,publicEventKeys,'event');
+    allow(e.payload,publicPayloadKeys,'event payload');
+    allow(e.ruleRef,['profileId','ruleVersion'],'event ruleRef');
+    required(e.visibility==='public' && e.gameId===v.gameId &&
+      Number.isInteger(e.seq) && e.seq<=v.asOfEventSeq &&
+      e.ruleRef?.profileId===v.ruleRef.profileId &&
+      e.ruleRef?.ruleVersion===v.ruleRef.ruleVersion, 'event redaction');
+  }
+  required(Array.isArray(v.knownUnavailableTypes) &&
+    v.knownUnavailableTypes.every(t=>Number.isInteger(t)&&t>=0&&t<=33),
+    'known public tiles');
+  allow(v.capabilities,['structuralScore','roundActions','settlement'],'capabilities');
+  required(Object.values(v.capabilities).every(x=>typeof x==='boolean'),
+    'capabilities');
+  required(Array.isArray(v.legalActions) && v.legalActions.length>0,
+    'replacement actions');
+  for(const a of v.legalActions){
+    allow(a,actionKeys,'legal action');
+    allow(a.ruleRef,['profileId','ruleVersion'],'action ruleRef');
+    allow(a.legalityBasis,['engineVersion','reasonCodes'],'legality basis');
+    required(a.actorSeat===v.audienceSeat &&
+      a.expectedRevision===v.asOfEventSeq &&
+      a.ruleRef.profileId===v.ruleRef.profileId &&
+      a.ruleRef.ruleVersion===v.ruleRef.ruleVersion &&
+      typeof a.actionId==='string' && a.actionId.length>0 &&
+      a.kind==='replace_flower' && Array.isArray(a.tileIds) &&
+      a.tileIds.length===1 &&
+      v.self.concealed.some(t=>t.kind==='flower' && t.id===a.tileIds[0]) &&
+      Array.isArray(a.legalityBasis.reasonCodes),
+      'untrusted replacement action');
+  }
+  return {view:v,hand:[],visible:[],fixedMelds:v.self.melds.length};
+}
+
+/** Always use strict Strategy validation, except a *current actor's* R3
+ * initial flower replacement; never send special-case views to Strategy. */
+export function readBotView(input) {
+  const flower = input?.ruleRef?.profileId==='tw16-configurable-table' &&
+    input?.round?.phase==='replacement' &&
+    Array.isArray(input?.self?.concealed) &&
+    input.self.concealed.some(t=>t?.kind==='flower');
+  return flower ? replacementView(input) : readPlayerView(input);
+}

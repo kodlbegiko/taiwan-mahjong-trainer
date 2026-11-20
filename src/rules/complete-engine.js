@@ -12,6 +12,16 @@ import {calculateShanten} from '../core/efficiency.js';
 import {settleWin, scoreWinningHand} from './scoring.js';
 
 export const COMPLETE_ENGINE_VERSION='rules-engine/0.2.0-experimental';
+
+/** Explicit failure rather than a guessed fallback for an unsupported house rule. */
+export class RuleCapabilityError extends RangeError {
+  constructor(capability) {
+    super('Unsupported rule capability: '+capability);
+    this.name='RuleCapabilityError';
+    this.code='UNSUPPORTED_RULE_CAPABILITY';
+    this.capability=capability;
+  }
+}
 const V1={schemaVersion:SCHEMA_VERSION,contractVersion:CONTRACT_VERSION};
 const clone=x=>JSON.parse(JSON.stringify(x));
 const seatOK=s=>Number.isInteger(s)&&s>=0&&s<=3;
@@ -50,6 +60,54 @@ function profileFor(ref){
 const policyOf=state=>profileFor(state.ruleRef).extensions.tw16;
 const ext=state=>state.extensions.tw16;
 const afterSeat=s=>(s+1)%4;
+
+/**
+ * R4 capability negotiation is STATIC by RuleProfile, not live claim intents.
+ * Safe to pass to a Bot or UI without exposing which seats declared WIN.
+ * No new table rule is implicitly enabled by this metadata.
+ */
+export function completeGetRuleCapabilities(ruleRef) {
+  const profile=profileFor(ruleRef);
+  return {
+    ...V1,ruleRef:{profileId:profile.profileId,ruleVersion:profile.ruleVersion},
+    status:'experimental',
+    claimArbitration:{
+      responders:3,
+      supportedActions:['pass','chi','pong','kong','win'],
+      priority:['win','kong','pong','chi'],
+      singleDiscardWin:'experimental-supported',
+      multipleDiscardWins:{status:'unsupported',capability:'multiple_winners'},
+      robAddedKong:{status:'unsupported',capability:'rob_added_kong'},
+      unsupportedDisposition:'fail-closed-without-settlement',
+    },
+    scoring:{status:'experimental',policy:'tw16-minimal-tai-v1'},
+  };
+}
+
+/**
+ * Rules-host scheduling API. Never pass GameState or this function to a Bot.
+ * Responders are stable clockwise; intents and action identities stay private.
+ */
+export function completeListPendingClaimResponders(state) {
+  profileFor(state?.ruleRef);
+  const w=state.round.phase==='claim_window'?ext(state).window:null;
+  if(!w)return [];
+  return [1,2,3].map(offset=>(w.fromSeat+offset)%4)
+    .filter(seat=>!w.decisions.some(d=>d.seat===seat));
+}
+
+/** Public summary contains no submitted seat, PASS, tile choice or win intent. */
+export function completeGetClaimWindowPublic(state) {
+  profileFor(state?.ruleRef);
+  if(state.round.phase!=='claim_window')return null;
+  const w=ext(state).window;
+  if(!w)throw new RangeError('Invalid declaration window');
+  return {...V1,discardEventId:w.discardEventId,fromSeat:w.fromSeat,
+    responders:[1,2,3].map(offset=>(w.fromSeat+offset)%4),
+    pendingCount:completeListPendingClaimResponders(state).length,
+    claimPolicyVersion:policyOf(state).housePolicyVersion,
+    status:'open',expectedRevision:state.revision};
+}
 const remove=(arr,id)=>{const i=arr.indexOf(id);if(i<0)throw new RangeError('Not owned PhysicalTileId: '+id);arr.splice(i,1);};
 const sortIds=ids=>[...ids].sort((a,b)=>a.localeCompare(b));
 function event(state,type,visibility,seat,payload,causedByActionId){
@@ -107,6 +165,7 @@ function endSupplement(state,seat,drawnId){
 function exhaustIfNeeded(state,triggerActionId){
   if(state.wall.length>policyOf(state).reserveTail)return false;
   ext(state).window=null;state.round.phase='settled';
+  state.round.scores=[0,0,0,0];
   ext(state).result={reason:'exhaustive-draw',winnerSeat:null,delta:[0,0,0,0],tai:0};
   event(state,'settle','public',undefined,
     {reason:'exhaustive-draw',delta:[0,0,0,0]},triggerActionId);
@@ -245,6 +304,10 @@ function resolveClaim(state,triggerActionId){
   const w=ext(state).window;
   if(w.decisions.length!==3)return;
   const priority={...Object.fromEntries(policyOf(state).claimOrder.map((kind,index)=>[kind,index])),pass:9};
+  // This experimental profile has no multi-winner settlement. Never pick an
+  // arbitrary winner if two legal win intents are submitted concurrently.
+  if(w.decisions.filter(d=>d.kind==='win').length>1)
+    throw new RuleCapabilityError('multiple_winners');
   const choices=w.decisions.filter(d=>d.kind!=='pass').sort((a,b)=>
     priority[a.kind]-priority[b.kind]||
     ((a.seat-w.fromSeat+4)%4)-((b.seat-w.fromSeat+4)%4));
@@ -295,8 +358,10 @@ export function completeApplyAction(state,submission){
     if(kind!=='win'&&completeListLegalActions(next,actorSeat).some(a=>a.kind==='win'))
       e.passLocks[actorSeat]=true;
     w.decisions.push({seat:actorSeat,kind,actionId:action.actionId,tileIds:action.tileIds});
+    // PASS and claims are equally private until the last responder resolves
+    // the window. A public PASS would reveal a participant's hidden intent.
     event(next,kind==='pass'?'pass':'claim',
-      kind==='pass'?'public':'seat-private',actorSeat,
+      'seat-private',actorSeat,
       {kind,claimEventId:w.discardEventId,
         ...(kind==='pass'?{}:{tileIds:action.tileIds})},actionId);
     resolveClaim(next,actionId);
@@ -347,6 +412,8 @@ export function completeApplyAction(state,submission){
   return {state:next,event:clone(next.events[before]),events:clone(next.events.slice(before))};
 }
 function publicEvent(evt){
+  const hiddenClaim=evt.visibility==='seat-private'&&
+    (evt.type==='claim'||evt.type==='pass');
   let payload={};
   if(evt.type==='deal')payload={countsBySeat:clone(evt.payload.countsBySeat)};
   else if(evt.type==='draw')payload={count:1};
@@ -361,8 +428,8 @@ function publicEvent(evt){
   else if(evt.type==='win')payload={seat:evt.payload.winnerSeat,
     sourceSeat:evt.payload.sourceSeat};
   return {...V1,eventId:evt.eventId,gameId:evt.gameId,seq:evt.seq,
-    ruleRef:clone(evt.ruleRef),type:evt.type,visibility:'public',
-    ...(evt.actorSeat===undefined?{}:{actorSeat:evt.actorSeat}),
+    ruleRef:clone(evt.ruleRef),type:hiddenClaim?'claim':evt.type,visibility:'public',
+    ...(hiddenClaim||evt.actorSeat===undefined?{}:{actorSeat:evt.actorSeat}),
     payload,...(evt.previousEventId?{previousEventId:evt.previousEventId}:{}),
     ...(evt.visibility==='public'&&evt.causedByActionId?{causedByActionId:evt.causedByActionId}:{})};
 }
@@ -520,12 +587,34 @@ export function completeValidateGameState(state,{replay=true}={}){
   }
   if(publicSeq!==state.round.lastPublicEventSeq)
     throw new RangeError('Invalid public event watermark');
+  if(state.round.phase==='settled'){
+    const r=e.result;
+    if(!r||!['win','exhaustive-draw'].includes(r.reason)||
+      !Array.isArray(r.delta)||r.delta.length!==4||
+      r.delta.some(n=>typeof n!=='number'||!Number.isFinite(n))||
+      r.delta.reduce((sum,n)=>sum+n,0)!==0||
+      !same(state.round.scores,r.delta)||
+      state.events.at(-1)?.type!=='settle')
+      throw new RangeError('Invalid or non-zero-sum settlement');
+    if(r.reason==='win'&&(!seatOK(r.winnerSeat)||!seatOK(r.sourceSeat)||
+      !['self-draw','discard'].includes(r.via)||
+      !state.events.some(x=>x.type==='win')))
+      throw new RangeError('Invalid winning settlement');
+    if(r.reason==='exhaustive-draw'&&(r.winnerSeat!==null||
+      r.delta.some(x=>x!==0)))
+      throw new RangeError('Invalid exhaustive draw settlement');
+  }else if(e.result!==null)throw new RangeError('Settlement before finished hand');
   if(state.round.phase==='claim_window'){
     const w=e.window;
     if(!w||w.decisions.length>2||w.fromSeat===state.round.currentSeat||
       state.events[w.discardSeq-1]?.type!=='discard'||
       w.tileId!==state.events[w.discardSeq-1].payload.tileId||
-      w.decisions.some(d=>d.seat===w.fromSeat)||
+      w.discardEventId!==state.events[w.discardSeq-1].eventId||
+      w.fromSeat!==state.events[w.discardSeq-1].actorSeat||
+      state.round.currentSeat!==afterSeat(w.fromSeat)||
+      w.decisions.some(d=>d.seat===w.fromSeat||
+        !seatOK(d.seat)||!['pass','win','chi','pong','kong'].includes(d.kind)||
+        typeof d.actionId!=='string'||!Array.isArray(d.tileIds))||
       new Set(w.decisions.map(d=>d.seat)).size!==w.decisions.length)
       throw new RangeError('Invalid declaration window');
   }else if(e.window!==null)throw new RangeError('Unexpected declaration window');
