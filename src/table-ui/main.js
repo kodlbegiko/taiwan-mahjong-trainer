@@ -171,27 +171,32 @@ async function ensureDaily() {
 }
 async function dailyAction(kind) {
   if(busy)return;
-  // Preserve the user's selection before any loading rerender.
+  // Read values before the progress indicator rerenders the form.
   const selectedMinutes=kind==='start'?
     Number(root.querySelector('#daily-minutes')?.value??30):null;
+  if(kind==='abort'&&!window.confirm(
+    '結束今天的訓練？已保存的正式成績不會刪除。'))return;
   busy=true;lastError='';
-  if(kind!=='submit')draw();
   try{
-    if(kind==='retry'){daily=null;await ensureDaily();return;}
+    if(kind==='retry'){
+      daily=null;
+      await ensureDaily();
+      return;
+    }
     if(!daily)throw new Error('Daily Controller 不可用');
-    if(kind==='start')await daily.start(selectedMinutes);
-    if(kind==='resume')await daily.resume();
-    if(kind==='submit'){
-      // Capture the selected QuestionPublic answer before redrawing an in-flight state.
-      const operation=daily.submit(root);
-      draw();
-      await operation;
-    }
-    if(kind==='complete')await daily.finish();
-    if(kind==='abort'){
-      if(!window.confirm('結束今天的訓練？已保存的正式成績不會刪除。'))return;
-      await daily.abort();
-    }
+    // Invoke the panel method first: it sets loading/submitting synchronously.
+    // Then paint that explicit state, while the official locked API is pending.
+    let operation;
+    if(kind==='start')operation=daily.start(selectedMinutes);
+    else if(kind==='resume')operation=daily.resume();
+    else if(kind==='submit')operation=daily.submit(root);
+    else if(kind==='complete')operation=daily.finish();
+    else if(kind==='abort')operation=daily.abort();
+    else throw new Error('不支援的 Daily UI 操作');
+    draw();
+    const result=await operation;
+    if(result?.status==='recovery-required'||result?.status==='pending-recovery')
+      lastError='正式提交需要恢復與讀回，未標示為成功儲存。';
   }catch(error){lastError='Daily 操作未完成：'+error.message;}
   finally{busy=false;draw();}
 }
