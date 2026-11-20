@@ -3,6 +3,7 @@ NOT part of legacy sandbox CI. AI6 must run on one merged source SHA and attach 
 No fixtures or fabricated Bot decisions are permitted.
 """
 from pathlib import Path
+import json
 from playwright.sync_api import sync_playwright
 from _release_site import served_site
 
@@ -99,7 +100,7 @@ def full_round(page, folder):
     page.screenshot(path=str(folder/'table-390-real-replay.png'),full_page=True)
     return history
 
-def daily_roundtrip(page):
+def daily_roundtrip(page,folder):
     page.locator('[data-table-nav="daily"]').click()
     # Navigation asynchronously imports the official Adaptive and Learning
     # modules. Wait for a completed Daily view, not the preceding Replay h1.
@@ -112,7 +113,6 @@ def daily_roundtrip(page):
     elif page.locator('[data-daily-resume]').count():
         page.locator('[data-daily-resume]').click()
     else:
-        folder=Path('tw16-r3-full-match-evidence')
         folder.mkdir(parents=True,exist_ok=True)
         page.screenshot(path=str(folder/'table-390-daily-error.png'),full_page=True)
         raise AssertionError('Daily controls unavailable after navigation: '+
@@ -123,13 +123,52 @@ def daily_roundtrip(page):
         error.first.inner_text() if error.count() else ''))
     before=page.locator('#full-table-root').inner_text()
     require('日期 ' in before and ' 題' in before,'Daily official DTO missing')
-    if page.locator('[data-daily-submit]').count():
-        page.locator('[name="daily-answer"]').first.check()
-        page.locator('[data-daily-submit]').click()
-        page.wait_for_timeout(1000)
-        text=page.locator('#full-table-root').inner_text()
-        require('上一題正式評分' in text or '完成訓練' in text,
-                'Daily canonical grading was not durably recorded')
+    require(page.locator('[data-daily-submit]').count()==1,
+            'Daily created a Session without a real QuestionPublic answer form')
+    # Assert canonical storage, not translated UI text. Capture only metadata,
+    # never the private answer keys or a raw legacy archive in CI logs.
+    before_state=page.evaluate("""() => {
+      const v=JSON.parse(localStorage.getItem('tw-mahjong-master-academy:state:v1')||'{}');
+      return {links:(v.provenanceLinks||[]).length,
+              records:(v.trainingSessions||[]).reduce((n,s)=>n+(s.recordRefs||[]).length,0)};
+    }""")
+    page.locator('[name="daily-answer"]').first.check()
+    page.locator('[data-daily-submit]').click()
+    page.locator('[data-daily-state="saved"][data-daily-record-id]').wait_for(timeout=25000)
+    require(page.locator('[data-daily-save-confirmed="true"]').count()==1,
+            'Daily UI claims saved without an explicit verified RecordRef readback')
+    ui_record_id=page.locator('[data-daily-state="saved"]').get_attribute('data-daily-record-id')
+    require(ui_record_id is not None and len(ui_record_id)>0,
+            'Daily UI did not expose validated public RecordRef')
+    after_state=page.evaluate("""() => {
+      const sidecar=JSON.parse(localStorage.getItem('tw-mahjong-master-academy:state:v1')||'{}');
+      const archive=JSON.parse(localStorage.getItem('tw-mahjong-trainer:archive:v3')||'{}');
+      const records=(archive.records||[]).filter(r=>r.schemaVersion===3);
+      const sessions=(sidecar.trainingSessions||[]);
+      const links=sidecar.provenanceLinks||[];
+      return {links:links.length,recordCount:records.length,
+        sessionCount:sessions.length,
+        recordRefs:sessions.reduce((a,s)=>a.concat(s.recordRefs||[]),[]),
+        linkedRecordIds:links.map(x=>x.recordRef?.id),
+        canonicalRecordIds:records.map(x=>x.id),
+        pending:(sidecar.pendingProvenance||[]).length,
+        abilityPresent:!!sidecar.abilityProfile,reviewPresent:!!sidecar.reviewPlan};
+    }""")
+    view=page.locator('#full-table-root').inner_text()
+    require(ui_record_id in after_state['linkedRecordIds'] and
+            ui_record_id in after_state['canonicalRecordIds'] and
+            ui_record_id in [r['id'] for r in after_state['recordRefs']],
+            'Saved UI RecordRef is absent from canonical archive/sidecar/session')
+    require(after_state['links']>before_state['links'] and
+            len(after_state['recordRefs'])>before_state['records'] and
+            all(ref.get('id') in after_state['canonicalRecordIds'] and
+                ref.get('id') in after_state['linkedRecordIds']
+                for ref in after_state['recordRefs']) and
+            after_state['pending']==0 and
+            after_state['abilityPresent'] and after_state['reviewPresent'],
+            'Daily canonical durability failed: '+str(after_state)+
+            '; UI='+view[-900:])
+    page.screenshot(path=str(folder/'table-390-daily-durable.png'),full_page=True)
     page.reload(wait_until='networkidle')
     page.locator('[data-table-nav="daily"]').click()
     page.wait_for_function("""() => document.body.dataset.tableView === 'daily'
@@ -137,6 +176,37 @@ def daily_roundtrip(page):
         ?.textContent?.includes('日期 ')""",timeout=25000)
     require('日期 ' in page.locator('#full-table-root').inner_text(),
             'Daily session was not resumed from Adaptive authority')
+    reread=page.evaluate("""() => {
+      const sidecar=JSON.parse(localStorage.getItem('tw-mahjong-master-academy:state:v1')||'{}');
+      const archive=JSON.parse(localStorage.getItem('tw-mahjong-trainer:archive:v3')||'{}');
+      return {
+        recordIds:(archive.records||[]).filter(r=>r.schemaVersion===3).map(r=>r.id),
+        linkedRecordIds:(sidecar.provenanceLinks||[]).map(x=>x.recordRef?.id),
+        sessionRecordIds:(sidecar.trainingSessions||[]).flatMap(s=>(s.recordRefs||[]).map(r=>r.id)),
+        completed:(sidecar.trainingSessions||[]).flatMap(s=>s.recordRefs||[]).length,
+        abilityPresent:!!sidecar.abilityProfile,
+        reviewPresent:!!sidecar.reviewPlan
+      };
+    }""")
+    savedIds=[ref['id'] for ref in after_state['recordRefs']]
+    require(all(rid in reread['recordIds'] and
+                rid in reread['linkedRecordIds'] and
+                rid in reread['sessionRecordIds'] for rid in savedIds)
+            and reread['completed']>=len(savedIds)
+            and reread['abilityPresent'] and reread['reviewPresent'],
+            'Daily durable readback failed across real browser reload: '+str(reread))
+    page.screenshot(path=str(folder/'table-390-daily-reloaded.png'),full_page=True)
+    (folder/'daily-durable-evidence.json').write_text(
+        json.dumps({'status':'verified-browser-readback',
+                    'uiSavedRecordId':ui_record_id,
+                    'recordRefs':after_state['recordRefs'],
+                    'canonicalRecordIds':reread['recordIds'],
+                    'provenanceRecordIds':reread['linkedRecordIds'],
+                    'sessionRecordIds':reread['sessionRecordIds'],
+                    'pendingProvenance':after_state['pending'],
+                    'abilityPresent':reread['abilityPresent'],
+                    'reviewPlanPresent':reread['reviewPresent']},
+                   ensure_ascii=False,indent=2),encoding='utf-8')
 
 def run(folder):
     folder.mkdir(parents=True,exist_ok=True)
@@ -155,7 +225,7 @@ def run(folder):
                 page.goto(url,wait_until='networkidle')
                 if width==390:
                     history=full_round(page,folder)
-                    daily_roundtrip(page)
+                    daily_roundtrip(page,folder)
                     # One cold new tab after activation, with network disabled.
                     page.goto(url,wait_until='networkidle')
                     page.evaluate('() => navigator.serviceWorker.ready')
