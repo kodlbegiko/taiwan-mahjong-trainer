@@ -109,3 +109,7 @@ four-seat conservation, revision/rules rejection, event replay, private-wall
 permutations that preserve the public `PlayerView`, and property trials.
 The root `npm run check` already executes `node --test`, so Rules Engine
 tests are included without changing existing testing scripts or protected files.
+
+## R5 one-winner policy distinction
+
+The original `tw16-configurable-table@experimental-full-v1` rejects concurrent discard-win claims. A separate `tw16-single-winner-interception@experimental-v1` accepts concurrent legal WIN **intents** but resolves to a single nearest-clockwise winner; it is still experimental. It does **not** implement payment to multiple winners, added-kong robbery, regional scoring or certified real-table rules. The `claimResolution` metadata is additive for new-profile discard wins and requires cross-owner Phase 3 / Replay adaptation review. See `docs/rules/CLAIM_ARBITRATION_API.md`.
