@@ -218,10 +218,31 @@ export function readSettledBotView(input) {
   }
   for (const event of v.publicEvents) {
     allow(event, publicEventKeys, 'settled event');
+    allow(event.payload, [...publicPayloadKeys, 'claimResolution'],
+      'settled public payload');
     required(event.visibility === 'public' &&
       event.ruleRef?.profileId === v.ruleRef.profileId &&
       event.ruleRef?.ruleVersion === v.ruleRef.ruleVersion,
       'settled public event');
+    if (event.payload.claimResolution !== undefined) {
+      // All winning intents are disclosed only by the final public WIN.
+      required(v.ruleRef.profileId === 'tw16-single-winner-interception' &&
+        event.type === 'win', 'claim resolution disclosure phase');
+      const resolution = event.payload.claimResolution;
+      allow(resolution, ['schemaVersion','policyVersion','winPriority',
+        'discardEventId','fromSeat','selectedSeat',
+        'selectedClaimActionId','declaredWinSeats','interceptedWinSeats'],
+        'public claim resolution');
+      required(resolution.schemaVersion === 1 &&
+        resolution.winPriority === 'nearest-clockwise-from-discarder' &&
+        Number.isInteger(resolution.selectedSeat) &&
+        Array.isArray(resolution.declaredWinSeats) &&
+        Array.isArray(resolution.interceptedWinSeats) &&
+        resolution.declaredWinSeats.every(s => Number.isInteger(s) &&
+          s >= 0 && s <= 3) &&
+        resolution.interceptedWinSeats.every(s => Number.isInteger(s) &&
+          s >= 0 && s <= 3), 'public claim resolution schema');
+    }
   }
   return {view:v};
 }
