@@ -123,13 +123,42 @@ def daily_roundtrip(page):
         error.first.inner_text() if error.count() else ''))
     before=page.locator('#full-table-root').inner_text()
     require('日期 ' in before and ' 題' in before,'Daily official DTO missing')
-    if page.locator('[data-daily-submit]').count():
-        page.locator('[name="daily-answer"]').first.check()
-        page.locator('[data-daily-submit]').click()
-        page.wait_for_timeout(1000)
-        text=page.locator('#full-table-root').inner_text()
-        require('上一題正式評分' in text or '完成訓練' in text,
-                'Daily canonical grading was not durably recorded')
+    require(page.locator('[data-daily-submit]').count()==1,
+            'Daily created a Session without a real QuestionPublic answer form')
+    # Assert canonical storage, not translated UI text. Capture only metadata,
+    # never the private answer keys or a raw legacy archive in CI logs.
+    before_state=page.evaluate("""() => {
+      const v=JSON.parse(localStorage.getItem('tw-mahjong-master-academy:state:v1')||'{}');
+      return {links:(v.provenanceLinks||[]).length,
+              records:(v.trainingSessions||[]).reduce((n,s)=>n+(s.recordRefs||[]).length,0)};
+    }""")
+    page.locator('[name="daily-answer"]').first.check()
+    page.locator('[data-daily-submit]').click()
+    page.wait_for_timeout(1400)
+    after_state=page.evaluate("""() => {
+      const sidecar=JSON.parse(localStorage.getItem('tw-mahjong-master-academy:state:v1')||'{}');
+      const archive=JSON.parse(localStorage.getItem('tw-mahjong-trainer:archive:v3')||'{}');
+      const records=(archive.records||[]).filter(r=>r.schemaVersion===3);
+      const sessions=(sidecar.trainingSessions||[]);
+      const links=sidecar.provenanceLinks||[];
+      return {links:links.length,recordCount:records.length,
+        sessionCount:sessions.length,
+        recordRefs:sessions.reduce((a,s)=>a.concat(s.recordRefs||[]),[]),
+        linkedRecordIds:links.map(x=>x.recordRef?.id),
+        canonicalRecordIds:records.map(x=>x.id),
+        pending:(sidecar.pendingProvenance||[]).length,
+        abilityPresent:!!sidecar.abilityProfile,reviewPresent:!!sidecar.reviewPlan};
+    }""")
+    view=page.locator('#full-table-root').inner_text()
+    require(after_state['links']>before_state['links'] and
+            len(after_state['recordRefs'])>before_state['records'] and
+            all(ref.get('id') in after_state['canonicalRecordIds'] and
+                ref.get('id') in after_state['linkedRecordIds']
+                for ref in after_state['recordRefs']) and
+            after_state['pending']==0 and
+            after_state['abilityPresent'] and after_state['reviewPresent'],
+            'Daily canonical durability failed: '+str(after_state)+
+            '; UI='+view[-900:])
     page.reload(wait_until='networkidle')
     page.locator('[data-table-nav="daily"]').click()
     page.wait_for_function("""() => document.body.dataset.tableView === 'daily'
