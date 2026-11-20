@@ -94,6 +94,9 @@ test('R5 Seed 87: unchanged action trace, atomic last PASS, intercepted WIN reta
   assert.deepEqual(applied.events.map(e=>e.type),['pass','win','settle']);
   assert.equal(applied.state.revision,165);
   const r=check(applied.state,3,2);
+  assert.equal(r.tai,0,'fixed minimal-tai Seed 87 fixture');
+  assert.deepEqual(r.delta,[0,0,-100,100],
+    'seat 2 alone pays seat 3; intercepted seat 0 scores zero');
   assert.deepEqual(r.claimResolution.declaredWinSeats,[3,0]);
   assert.deepEqual(r.claimResolution.interceptedWinSeats,[0]);
   assert.equal(r.claimResolution.selectedClaimActionId,before.extensions.tw16.window.decisions[0].actionId);
