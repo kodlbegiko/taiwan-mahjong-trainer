@@ -53,3 +53,53 @@ npm run check
 ```
 
 The root `npm run check` already runs `node --test` and therefore preserves the two mandatory 10,000-hand Oracle suites. The added `tests/rules/claim-arbitration.test.js` exercises hidden-intent noninterference, stale and duplicate claims, typed unsupported multiwinner, four fixed-seed full round lifecycles, terminal zero sum and replay. Existing `tests/rules/complete-golden.test.js` continues to cover chi, pong, open/concealed/added kong, win, flower, collision and exhaustive-draw Golden fixtures.
+
+
+## R4 — Seed 87 multiwinner capability diagnosis (2026-11-20)
+
+### Verified reproduction (no Bot code modified here)
+
+The full 157-action successful trace generated from Bot PR #40's actual Beginner policy is stored under `tests/rules/fixtures/seed-87-r4-trace.js` and re-executed by `tests/rules/r4-seed-87.test.js`.
+
+- `gameId: bot-r3-87`, `seed: fixed-round-87`.
+- At revision **160**, seat **2** discarded physical tile `t:26:0`.
+- Seat **3** submitted Rules-issued `WIN` (160 → 161); seat **0** submitted a second Rules-issued `WIN` (161 → 162). Both are independently legal five-meld-and-eye discard-win intents under the current experimental structural checker.
+- Seat **1** was the final pending responder; Rules issued only `PASS` with `expectedRevision:162`. Its attempted submission triggers `resolveClaim`, which cannot settle two winners under this explicitly unsupported profile.
+- Original `RuleCapabilityError`: `name:'RuleCapabilityError'`, `code:'UNSUPPORTED_RULE_CAPABILITY'`, `capability:'multiple_winners'`. The source state is unchanged, at revision/events 162, with no fabricated `SettlementResult`; it validates and replays deterministically.
+- **Classification:** not an illegal Bot action (A), nor evidence of a wrong win declaration or claim priority (C). The PASS is legal as a **response**, but completing its associated atomic arbitration is **unsupported** (B at transaction completion, D/E policy gap). Do not turn either winning declaration into PASS, pick an arbitrary winner, or classify this as exhaustive draw.
+
+### R4 static RuleProfile capability query
+
+`getRuleCapabilities(ruleRef)` is exported from `src/rules/index.js`. This takes **only** a public `{profileId,ruleVersion}`, not GameState, and always returns detached static metadata. It cannot reveal current claim actors, actual winners, concealed tiles, wall, private intents or outcome.
+
+```js
+import { getRuleCapabilities } from './src/rules/index.js';
+const caps=getRuleCapabilities({
+  profileId:'tw16-configurable-table',
+  ruleVersion:'experimental-full-v1',
+});
+console.log(caps.claimArbitration.multipleDiscardWins);
+// {status:'unsupported', capability:'multiple_winners'}
+console.log(caps.claimArbitration.robAddedKong);
+// {status:'unsupported', capability:'rob_added_kong'}
+```
+
+The R4 response also contains versioned `ruleRef`, `status:'experimental'`, `claimArbitration.responders:3`, `supportedActions`, `priority`, `singleDiscardWin:'experimental-supported'`, `unsupportedDisposition:'fail-closed-without-settlement'` and `scoring:{status:'experimental',policy:'tw16-minimal-tai-v1'}`. The old draw/discard-only sandbox returns `supportedActions:[]` and unsupported win capability. This is a **capability contract**, not a new RuleProfile version and does not change any legal winner selection.
+
+### Future configurable settlement contract (PROPOSED ONLY, NOT IMPLEMENTED)
+
+A future *distinct versioned profile* may support simultaneous winning claims only after an externally reviewed and version-pinned table policy defines all of:
+
+1. `winMultiplicity.mode` and explicit behavior when two or three seats legally claim one discard; whether all win or a precisely ranked single claimant wins; which tie rules and deadline/cancellation semantics apply.
+2. Payment matrix and dealer adjustments for every supported number of winners, negative deltas and discharger liability; require `sum(deltas) === 0` for every fixture, with no currency or unverified regional tai invented.
+3. Physical winning tile ownership and event ledger semantics with multiple winners referring to one discarded physical ID without duplicate ownership; deterministic Action/replay and post-game disclosure.
+4. Mandatory positive and negative Golden fixtures for all competing WIN/PASS/PONG/KONG/CHI combinations, zero-sum payoff, no double settlement, historical PlayerView redaction and fixed-seed replay.
+5. A separate `ruleVersion`, explicitly declared scoring policy and version migration/replay compatibility approval.
+
+Until these requirements are provided and tested, the current `tw16-configurable-table@experimental-full-v1` must **continue to reject** Seed 87 with `UNSUPPORTED_RULE_CAPABILITY / multiple_winners`, and Phase 3's 100/100 completion and release gate remain **NO-GO**.
+
+### AI 3 and AI 6 boundary
+
+**AI 3 (Bots):** `getRuleCapabilities(ruleRef)` may be read at initialization, but must not peek at `GameState`, inspect current opponent private claim intent, suppress a legitimate WIN, or change last PASS merely to bypass the capability block. Continue returning `{status:'unsupported',reason:'unsupported-rule-capability',capability:'multiple_winners'}` when Rules refuses the atomic settlement.
+
+**AI 6 (Integrator):** pin the exact latest Rules PR #43 HEAD; preserve the original Seed 87 failure as an **expected, explicitly reported unsupported fixture**, not a successful terminal game. Keep the strict original 100/100 test gate; it cannot pass until a *separately approved* and tested multiwinner RuleProfile is implemented or a different explicit contractual acceptance criterion is authorized. Re-run combined Node, two 10k Oracles, browser/PWA and full-match replay at the same source SHA. Do not mark experimental profiles verified.
