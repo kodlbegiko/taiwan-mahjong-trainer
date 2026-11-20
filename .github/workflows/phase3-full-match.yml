@@ -38,6 +38,10 @@ jobs:
           node --check src/table-ui/full-round.js
           node --check src/table-ui/daily.js
           node --test tests/rules/claim-arbitration.test.js tests/bots/r3-full-round.test.js tests/bots/r3-host-contract.test.js tests/replay/r3-full-round.test.js tests/integration/phase3-source-boundaries.test.js
+      - name: Strict Legacy unsupported and R5 Rules / Replay arbitration
+        run: node --test tests/rules/r4-seed-87.test.js tests/rules/r5-single-winner.test.js tests/replay/r4-seed87-atomic.test.js tests/replay/r5-single-winner-replay.test.js
+      - name: Strict single-winner 100 fixed seeds (all must settle)
+        run: node --test tests/bots/r5-single-winner-full-match.test.js
   r3-chromium:
     name: Full human + 3 bots / settlement / Replay / Daily / PWA
     runs-on: ubuntu-24.04
@@ -58,7 +62,7 @@ jobs:
           git rev-parse HEAD
           echo "TESTED_SOURCE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
       - name: Chromium 320 / 390 / 1440, real full match, daily, service worker, offline
-        run: python tests/browser/full-table-ui-r3-gates.py --screenshots tw16-r3-full-match-evidence
+        run: PHASE3_REQUIRE_SINGLE_WINNER=1 python tests/browser/full-table-ui-r3-gates.py --screenshots tw16-r3-full-match-evidence
       - name: Evidence manifest (only after complete browser gate)
         if: success()
         run: |

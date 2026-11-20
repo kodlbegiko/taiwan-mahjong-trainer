@@ -8,8 +8,11 @@ import * as rules from '../rules/index.js';
 const KEY = 'tw-mahjong-master-academy:full-table:r3:v1';
 const HUMAN = 0;
 const copy = x => JSON.parse(JSON.stringify(x));
-const isR3 = p => p?.profileId === 'tw16-configurable-table' &&
-  p.ruleVersion === 'experimental-full-v1' && p.status === 'experimental';
+const isR3 = p => p?.status === 'experimental' && (
+  (p.profileId === 'tw16-configurable-table' && p.ruleVersion === 'experimental-full-v1') ||
+  (p.profileId === 'tw16-single-winner-interception' && p.ruleVersion === 'experimental-v1'));
+const isR5 = p => p?.profileId === 'tw16-single-winner-interception' &&
+  p.ruleVersion === 'experimental-v1' && p.status === 'experimental';
 
 export function fullRoundCapability() {
   try {
@@ -119,10 +122,11 @@ export async function createFullRoundSession({storage} = {}) {
       return false;
     }
   }
-  function start({profileId='tw16-configurable-table',
-                  ruleVersion='experimental-full-v1'}={}) {
+  function start({profileId,ruleVersion}={}) {
     if (blocked) throw new Error(storageWarning);
-    const p=rules.getRuleProfile(profileId,ruleVersion);
+    const preferred=rules.listRuleProfiles().find(isR5) ?? rules.listRuleProfiles().find(isR3);
+    const p=rules.getRuleProfile(profileId??preferred?.profileId,ruleVersion??preferred?.ruleVersion);
+    profileId=p.profileId;ruleVersion=p.ruleVersion;
     if (!isR3(p)) throw new Error('目前只支援明確 experimental R3 RuleProfile');
     const seed='r3-'+(globalThis.crypto?.randomUUID?.() ??
       String(Date.now())+'-'+Math.floor(Math.random()*1000000));

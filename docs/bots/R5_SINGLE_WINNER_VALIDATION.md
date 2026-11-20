@@ -1,0 +1,48 @@
+# R5 — Three-Bot single-winner interception: source adapter and pending acceptance
+
+Status: **SOURCE-ONLY / NOT FULL-MATCH ACCEPTED / DRAFT**.
+Owner: Bots PR #40, branch `feat/tw16-opponent-bots`.
+Dependency: Rules PR #43 at `684df00afac540c082713c152d06e80e72eea3de` when investigated.
+Replay PR #41 and Integration PR #44 require independent versioned-source integration.
+
+## Profiles (not interchangeable)
+
+| RuleProfile | multipleDiscardWins | Seed 87 expected terminal result |
+| --- | --- | --- |
+| `tw16-configurable-table@experimental-full-v1` | typed unsupported | `UNSUPPORTED_RULE_CAPABILITY / multiple_winners`; revision 162, NOT settled |
+| `tw16-single-winner-interception@experimental-v1` | experimental single-winner | winner seat 3; intercepted seat 0; final revision 165, Rules-only delta `[0,0,-100,100]` |
+
+The new policy does **not** implement a general multiple-winner payout or added-kong robbery; those remain unsupported by the Rules capability schema. The experimental minimal tai scorer is not a verified venue scoring policy.
+
+## Changes owned by Bots
+
+- `src/bots/view.js` recognizes only the two exact versioned RuleRefs; initial flower replacement still requires Rules-issued, seat-specific LegalActions. Controller-only settled views accept publicly released WIN `claimResolution` after arbitration, while refusing wall/private payloads/opponent concealed tiles.
+- `src/bots/controller.js` keeps all responders' legal submissions, including multiple WIN. There is no Bot-selected winner, claim suppression, WIN→PASS rewrite, fabricated draw or Bot-side scoring. Every action carries Rules-issued `actionId`, `actorSeat`, `expectedRevision`. Final `settled` is recognized without giving post-game metadata to decision strategy.
+- `src/bots/decision.js` uses unchanged seeded public-only heuristics on both profiles; Rules-issued WIN remains highest priority. Exact-version profile matching applies to claims; no special-case for Seed 87.
+- The controller's existing max-action/event budget, stale revision, duplicate tick, pause/resume and sticky unsupported behavior remain in force.
+
+## Tests
+
+1. `node --test tests/bots/r5-profile-wiring.test.js` — adapter-only tests on a relabeled, previously valid Legacy Rules PlayerView. They prove schema compatibility and redaction, **not** R5 adjudication. This test must run on the Bot branch before Rules arrives.
+2. `node --test tests/bots/r5-single-winner-full-match.test.js` — automatically runs when the **real** R5 `getRuleProfile` and `getRuleCapabilities` are available in the same checkout. Before then, its R5 cases are explicitly skipped with dependency reason; a skip is neither PASS nor FULL_MATCH_GO.
+3. Real R5 tests: independent static capabilities, exact Seed 87 Legacy vs R5 comparison and unmodified action prefix, same-revision counterfactual opponent WIN vs PASS PlayerViews, representative Seeds `0,1,6,19,37,42,50,72,87,99`, and original fixed `0..99` 100 full hands. No Seed exclusion or changed strategy strength.
+4. For every test hand, emit `BOT_R5_FIXED_SEED` including seed, profile, completed, finish, winnerSeat, claimWindows, claimResponses, legalActions, legalChoicesOffered, invalidActions, stalls, unsupportedCapability, replayMatch, SettlementResult and elapsedMs. `BOT_R5_FAILED_TRACE` prints action provenance only; no GameState, wall or opponent concealed cards. Global `BOT_R5_100_SUMMARY` counts wins, exhaustive draws, unsupported, invalid, stalled, replay mismatches, total completion, decision timings on the test runner and failing seed IDs.
+5. Strict `FULL_MATCH_GO` assertion requires 100/100 settled, 100/100 replay matches, zero illegal actions and zero stalls. Any unsupported Seed is a failed Seed. The Legacy R4 100-seed test still executes all original seeds: until real R5 Rules is integrated its strict NO-GO assertion remains red; after R5 is present it explicitly asserts the unchanged Legacy 99 settled + 1 unsupported classification, while the separate R5 100/100 test remains strict.
+
+## R5 dependency handoff
+
+The new Rules Profile is in **Rules #43 source**, not yet proven in the Bot #40 branch ancestry or Integration #44 on this update. The Rules source mentions independently executed V8 tests, but **no exact-head GitHub Actions result** was confirmed for #43 during the initial check. The R5 Bot 100-seed full-match tests cannot be reported as executed while the dependency is absent. Do not merge, certify the scorer, claim iPhone performance or mark FULL_MATCH_GO / REPLAY_GO / RELEASE_GO on this source-only adapter.
+
+When #43 passes its own exact-head tests and the integrator pins exact reviewed Rules and Bot blobs, the **same-SHA CI** must execute the above R5 test file with no skips. Replay #41 still has its own hardcoded Legacy profile gate and requires separate owner approval before the replay end-to-end acceptance is valid. Do not edit Rules, Replay, UI, integrator tests or CI from this PR.
+
+## Independent mixed-source V8 Seed 87 execution (not CI)
+
+The current Bot adapter modules were loaded together with actual Rules #43 R5 modules, in a fresh standalone V8 JavaScript module loader (17 source modules total). This is an *independent combined-source smoke simulation*, not a repository checkout, `node --test`, `npm run check`, GitHub Actions, Replay #41 or device acceptance.
+
+- R5 `gameId=bot-r3-87`, `seed=fixed-round-87`: 158 applied Rules-issued decisions; 32 claim windows; 96 accepted claim responses; final revision/events 165; 0 reported Rules submission errors and 0 stalls; `phase=settled`, one `result` with `winnerSeat=3`, `declaredWinSeats=[3,0]`, `interceptedWinSeats=[0]`, `delta=[0,0,-100,100]`. The final four actions were discard by seat 2 at 159, WIN by seat 3 at 160, WIN by seat 0 at 161 and PASS by seat 1 at 162; no special-case Seed87 logic.
+- Legacy `gameId=bot-r3-87`, same fixed seed: 157 accepted actions; 32 claim windows; 95 claim responses; final revision/events 162, `phase=claim_window`; attempted final seat-1 PASS returned typed `UNSUPPORTED_RULE_CAPABILITY/multiple_winners`; `result=null` and controller checkpoint remained blocked at revision 162.
+- Isolated V8 wall-clock time: R5 21,763 ms; Legacy 21,940 ms. These are **entire hand runtimes on this particular tool sandbox**, not isolated Bot decision latency or iPhone performance. The two-profile evidence does **not** validate the total 100-seed distribution or Replay #41 compatibility.
+- A separate initial 10-seed V8 execution exceeded the tool time limit; no outcome was recorded for those seeds. No success rate is inferred from an incomplete run.
+- The R5 Seed 87 run did not independently invoke a complete final `replayGame` assertion; Replay correctness remains gated by the actual R5 test and Replay owner.
+
+**Formal status remains NO-GO** until same-SHA Node/Actions and replay acceptance run without R5 dependency skips.

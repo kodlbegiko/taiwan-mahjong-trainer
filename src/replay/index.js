@@ -63,7 +63,7 @@ function frameFrom(archive,seq) {
   // Strategy V1's standard-only view parser does not model that legal phase.
   // In that case the authoritative Rules projection above is used as-is,
   // with no Strategy access until flowers are resolved.
-  const pendingR3Flower=view.ruleRef.profileId==='tw16-configurable-table' &&
+  const pendingR3Flower=['tw16-configurable-table','tw16-single-winner-interception'].includes(view.ruleRef.profileId) &&
     (view.self.concealed.some(x=>x.kind==='flower') ||
       view.legalActions.some(a=>a.kind==='replace_flower'));
   if(!pendingR3Flower)readPlayerView(view);
@@ -148,7 +148,13 @@ export function createReplayService({storage=null}={}) {
     const outcome={reason:result.reason,
       winnerSeat:result.winnerSeat??null,
       delta:clone(result.delta),
-      ...(Number.isInteger(result.tai)?{experimentalTai:result.tai}:{})};
+      ...(Number.isInteger(result.tai)?{experimentalTai:result.tai}:{}),
+      ...(result.claimResolution?{singleWinnerArbitration:{
+        selectedSeat:result.claimResolution.selectedSeat,
+        declaredWinSeats:clone(result.claimResolution.declaredWinSeats),
+        interceptedWinSeats:clone(result.claimResolution.interceptedWinSeats),
+        status:'experimental',
+      }}:{})};
     return {...frame,perspective:'postgame-public',
       informationBoundary:'historic PlayerView unchanged; end-of-game public result is separate',
       postgameDisclosure:{
@@ -200,7 +206,7 @@ export function createReplayService({storage=null}={}) {
     if(!legal || legal.kind!==decision.kind) throw new ReplayError('INVALID_ACTION_ID','Recorded action is not legal at the original decision point');
     if(actionId!==undefined && actionId!==decision.actionId)
       throw new ReplayError('INVALID_ACTION_ID','Requested action is not the recorded decision');
-    const pendingR3Flower=view.ruleRef.profileId==='tw16-configurable-table' &&
+    const pendingR3Flower=['tw16-configurable-table','tw16-single-winner-interception'].includes(view.ruleRef.profileId) &&
       (view.self.concealed.some(x=>x.kind==='flower') ||
         view.legalActions.some(a=>a.kind==='replace_flower'));
     const strategy=pendingR3Flower?{

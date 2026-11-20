@@ -2,7 +2,7 @@
  * Bot decision boundary. Only a strict, detached PlayerView is accepted.
  * Rules Engine owns legality, phase changes, wall, scoring and adjudication.
  */
-import { readBotView } from './view.js';
+import { readBotView, isSupportedBotTableProfile } from './view.js';
 import { analyzePlayerView } from '../strategy/index.js';
 import { analyzeDiscards, analyzeDraws } from '../core/efficiency.js';
 
@@ -124,7 +124,7 @@ export function chooseBotAction(bot, playerView) {
   // This is a bounded heuristic, NOT post-claim Rule authorization or odds.
   const pass = legal.find(a => a.kind === 'pass');
   const claims = legal.filter(a => ['chi','pong','kong'].includes(a.kind));
-  if (pass && claims.length && view.ruleRef.profileId === 'tw16-configurable-table' &&
+  if (pass && claims.length && isSupportedBotTableProfile(view.ruleRef) &&
       view.round.phase === 'claim_window' && view.capabilities.structuralScore) {
     const owned = new Set(view.self.concealed.map(t => t.id));
     const baseline = analyzeDraws(hand, {visible,fixedMelds}).shanten;
@@ -153,7 +153,7 @@ export function chooseBotAction(bot, playerView) {
     const threshold=bot.difficulty==='Beginner' ? 1 : 0;
     if (best && best.benefit>=threshold &&
         (bot.difficulty!=='Beginner' || roll(seed+'|open-claim')<0.45))
-      return make(best.a,'ready',['R3_LEGAL_CLAIM','PUBLIC_POST_MELD_SHANTEN_HEURISTIC',
+      return make(best.a,'ready',['RULES_LEGAL_CLAIM','PUBLIC_POST_MELD_SHANTEN_HEURISTIC',
         'UNCALIBRATED_CLAIM_VALUE'],'canonical-efficiency/claim-heuristic');
   }
   if (pass) return make(pass, 'ready', ['ENGINE_LEGAL_PASS','CLAIM_VALUE_UNVERIFIED']);

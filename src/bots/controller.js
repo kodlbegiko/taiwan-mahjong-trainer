@@ -2,7 +2,7 @@
  * Rules-authoritative bot orchestration. The adapter holds GameState privately.
  * Bots receive only PlayerView, and submission returns are intentionally ignored.
  */
-import { readBotView } from './view.js';
+import { readBotView, readSettledBotView, isSupportedBotTableProfile } from './view.js';
 import { chooseBotAction, validateBotDecision } from './decision.js';
 
 const copy = value => JSON.parse(JSON.stringify(value));
@@ -87,7 +87,12 @@ export function createBotController({
   let blocked = checkpoint?.blocked ? copy(checkpoint.blocked) : null;
   const decisions = [];
   async function readSeat(seat) {
-    const { view } = readBotView(await getPlayerView(seat));
+    const projected = await getPlayerView(seat);
+    // Final single-winner public events have extra *post-resolution* metadata.
+    // No Bot gets a terminal view or performs a strategy evaluation on it.
+    const { view } = projected?.round?.phase === 'settled'
+      ? readSettledBotView(projected)
+      : readBotView(projected);
     if (view.audienceSeat !== seat) throw new RangeError('Authoritative view seat mismatch');
     return view;
   }
@@ -123,8 +128,7 @@ export function createBotController({
           phase:initial.round.phase};
       return {seat:preferred,view:initial};
     }
-    if (initial.ruleRef.profileId !== 'tw16-configurable-table' ||
-        initial.ruleRef.ruleVersion !== 'experimental-full-v1')
+    if (!isSupportedBotTableProfile(initial.ruleRef))
       return {status:'claim-adjudication-unavailable'};
     // When available, the trusted Rules host may offer the newer R3
     // listPendingClaimResponders(state) result as an ordered seat list.
@@ -216,8 +220,7 @@ export function createBotController({
     if (primary.asOfEventSeq>maxRevision)
       return {status:'unsupported',reason:'max-event-budget-exceeded'};
     const isClaim=primary.round.phase==='claim_window' &&
-      primary.ruleRef.profileId==='tw16-configurable-table' &&
-      primary.ruleRef.ruleVersion==='experimental-full-v1';
+      isSupportedBotTableProfile(primary.ruleRef);
     if (primary.round.phase==='claim_window' && !isClaim)
       return {status:'claim-adjudication-unavailable'};
     if (!isClaim && preferred!==humanSeat) return {status:'not-human-turn'};

@@ -12,7 +12,8 @@ import {
   completeStartNextRound, completeListPendingClaimResponders,
   completeGetClaimWindowPublic, completeGetRuleCapabilities,
 } from './complete-engine.js';
-const isCompleteRef=ref=>ref?.profileId==='tw16-configurable-table';
+const isCompleteRef=ref=>['tw16-configurable-table',
+  'tw16-single-winner-interception'].includes(ref?.profileId);
 
 
 const V1 = { schemaVersion: SCHEMA_VERSION, contractVersion: CONTRACT_VERSION };

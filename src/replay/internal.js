@@ -44,8 +44,13 @@ function assertProfile(ruleRef) {
   catch (error) { throw new ReplayError('UNKNOWN_RULE_PROFILE','Replay RuleProfile is unavailable',error); }
 }
 
-const isR3 = ref => ref?.profileId==='tw16-configurable-table' &&
-  ref?.ruleVersion==='experimental-full-v1';
+/** Both table policies share the complete Rules event/action protocol.
+ * Keep the legacy profile's unsupported multi-WIN behavior untouched. */
+const isR3 = ref =>
+  (ref?.profileId==='tw16-configurable-table' &&
+    ref?.ruleVersion==='experimental-full-v1') ||
+  (ref?.profileId==='tw16-single-winner-interception' &&
+    ref?.ruleVersion==='experimental-v1');
 const replayConfig = (manifest, events) => ({
   gameId:manifest.gameId,seed:manifest.initialSeed,
   dealerSeat:manifest.dealerSeat,ruleRef:manifest.ruleRef,
