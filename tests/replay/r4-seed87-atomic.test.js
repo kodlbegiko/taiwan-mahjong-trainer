@@ -32,7 +32,7 @@ function seed87() {
     state=submit(state,legal);
     assert.equal(state.revision,after,'atomic Rules transition');
     assert.equal(state.events.length,after);
-    if([2,77,78,89,90,91,93,159,160,161,162].includes(after))
+    if([2,76,78,89,90,91,93,159,160,161,162].includes(after))
       snapshots.set(after,createPlayerView(state,1));
   }
   assert.equal(GOLDEN.successfulActions.length,157);
@@ -109,7 +109,7 @@ test('Seed87: timeline boundaries exactly follow each successful Rules atomic ac
       code(()=>replay.getReplayFrame(manifest.replayId,intermediate),
         'NON_ATOMIC_EVENT_SEQ');
     }
-  for(const seq of [1,2,77,78,89,90,91,93,159,160,161,162]){
+  for(const seq of [1,2,76,78,89,90,91,93,159,160,161,162]){
     const view=replay.getReplayFrame(manifest.replayId,seq,{viewerSeat:1}).playerView;
     assert.deepEqual(view,snapshots.get(seq),'Rules projected historical PlayerView at '+seq);
     assert.equal(view.asOfEventSeq,seq);
