@@ -183,8 +183,8 @@ def daily_roundtrip(page,folder):
     page.reload(wait_until='networkidle')
     page.locator('[data-table-nav="daily"]').click()
     page.wait_for_function("""() => document.body.dataset.tableView === 'daily'
-      && document.querySelector('#full-table-root [role="status"]')
-        ?.textContent?.includes('日期 ')""",timeout=25000)
+      && Array.from(document.querySelectorAll('#full-table-root [role="status"]'))
+        .some(node => node.textContent?.includes('日期 '))""",timeout=25000)
     require('日期 ' in page.locator('#full-table-root').inner_text(),
             'Daily session was not resumed from Adaptive authority')
     reread=page.evaluate("""() => {
