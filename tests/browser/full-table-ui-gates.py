@@ -123,7 +123,7 @@ def run(out):
                 page.wait_for_function("""(args) => {
                   const p=localStorage.getItem(args.key);
                   return p && JSON.parse(p).gameState.revision>args.rev;
-                }""",{'key':KEY,'rev':pre['gameState']['revision']},timeout=25000)
+                }""",arg={'key':KEY,'rev':pre['gameState']['revision']},timeout=25000)
                 post=read_checkpoint(page)
                 require(post['gameState']['revision']>pre['gameState']['revision'],
                         'legal submission did not advance authoritative Rules revision')
