@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {performance} from 'node:perf_hooks';
+import * as R3Authority from '../../src/rules/index.js';
 import {
   createGame,createPlayerView,listLegalActions,applyAction,replayGame,
   validateGameState,startNextRound,
@@ -29,6 +30,9 @@ async function fullRound(seed,{difficulty='Beginner',maxEvents=1500}={}){
     bots,humanSeat:0,
     getActingSeat:()=>state.round.currentSeat,
     getPlayerView:seat=>createPlayerView(state,seat),
+    ...(typeof R3Authority.listPendingClaimResponders==='function'
+      ? {getPendingClaimResponders:()=>R3Authority.listPendingClaimResponders(state)}
+      : {}),
     submitAction:submission=>{
       lastRulesError=null;
       try { state=applyAction(state,submission).state; }
@@ -227,6 +231,75 @@ test('R3 stale and forged claim actions are rejected by authoritative Rules',()=
   const after=move(game,candidate,legal);
   assert.throws(()=>applyAction(after,{actorSeat:candidate,
     actionId:legal.actionId,expectedRevision:legal.expectedRevision}),/Stale/);
+});
+
+test('R4 Seed 87: deterministic revision-162 arbitration evidence, no stale action and replayable prefix',async()=>{
+  const r=await fullRound('87');
+  const {state,controller,...publicResult}=r;
+  console.log('BOT_R4_SEED87 '+JSON.stringify({
+    seed:r.seed,ruleProfile:r.ruleProfile,policy:r.botPolicy,
+    status:r.terminalCategory,events:r.events,steps:r.steps,
+    unsupportedCapability:r.unsupportedCapability,
+    failedSubmission:r.failedSubmission,failedContext:r.failedContext,
+    finalPublicActions:r.failureActionTrace?.slice(-12)??null,
+    prefixReplayMatch:r.prefixReplayMatch,
+    decisionMs:r.decisionMs,elapsedMs:r.elapsedMs,
+  }));
+  assert.equal(r.invalidActions,0);
+  assert.equal(r.stalls,0);
+  assert.equal(r.prefixReplayMatch,true);
+  assert.deepEqual(replayGame(state),state);
+  if(r.terminalCategory==='unsupported'){
+    assert.equal(r.reason,'unsupported-rule-capability');
+    assert.equal(r.unsupportedCapability,'multiple_winners');
+    assert.equal(state.revision,162);
+    assert.equal(state.round.phase,'claim_window');
+    assert.equal(r.failedSubmission.actorSeat,1);
+    assert.equal(r.failedSubmission.expectedRevision,162);
+    assert.ok(r.failedSubmission.actionId.includes(':pass:CLAIM_WINDOW_PASS:'));
+    assert.equal(r.failedContext.rulesError.code,'UNSUPPORTED_RULE_CAPABILITY');
+    assert.equal(r.failedContext.rulesError.capability,'multiple_winners');
+    assert.ok(r.failedContext.legalActions.some(a=>
+      a.actionId===r.failedSubmission.actionId &&
+      a.expectedRevision===162 && a.actorSeat===1));
+    const preceding=r.failureActionTrace.slice(-2);
+    assert.deepEqual(preceding.map(x=>[x.revision,x.actorSeat,
+      x.actionId.includes(':win:'),x.expectedRevision]),
+      [[160,3,true,160],[161,0,true,161]]);
+    assert.equal(r.completed,false);
+    assert.equal(r.finish,null);
+    assert.equal((await controller.tick()).status,'unsupported');
+    assert.equal((await controller.runUntilHuman({maxActions:4})).capability,
+      'multiple_winners');
+    assert.equal(controller.checkpoint().blocked.expectedRevision,162);
+    assert.equal(state.revision,162,'must not retry the failed claim');
+  }else{
+    // The older R3 source tree did not enforce explicit multiwinner rejection.
+    // A settlement there is NOT evidence that the latest R4 Rules support it.
+    assert.equal(r.terminalCategory,'settled');
+    assert.equal(r.completed,true);
+    assert.equal(r.replayMatch,true);
+  }
+  assert.ok(!JSON.stringify(r.failedContext??{}).includes('"wall"'));
+  assert.ok(!JSON.stringify(r.failedContext??{}).includes('"concealed"'));
+});
+
+test('R4 10 representative fixed seeds: explicit terminal classifications',async()=>{
+  const seeds=['0','1','6','19','37','42','50','72','87','99'],results=[];
+  for(const seed of seeds){
+    const {state,controller, failureActionTrace,...r}=await fullRound(seed);
+    results.push({seed,status:r.terminalCategory,finish:r.finish,
+      capability:r.unsupportedCapability,events:r.events,
+      replayPrefix:r.prefixReplayMatch,invalidActions:r.invalidActions,
+      stalls:r.stalls,decisionMs:r.decisionMs,elapsedMs:r.elapsedMs});
+    assert.equal(r.prefixReplayMatch,true);
+    assert.equal(r.invalidActions,0);
+    assert.equal(r.stalls,0);
+    assert.ok(r.terminalCategory==='settled'||(
+      seed==='87' && r.terminalCategory==='unsupported' &&
+      r.unsupportedCapability==='multiple_winners'));
+  }
+  console.log('BOT_R4_TEN_SEED '+JSON.stringify(results));
 });
 
 test('R3 100 fixed-seed complete hands: observed coverage, settlements and replay',async()=>{
