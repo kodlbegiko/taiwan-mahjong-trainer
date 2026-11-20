@@ -1,5 +1,38 @@
 # Phase 3 Daily Training — public API, durability and integration
 
+## R4 durable-grading acceptance (source-owned)
+
+At the current Phase 3 combined SHA `ca7ce4dd0d855ade1827873623e9e7eaf5c2bfb1`, the real Chromium job **Full human + 3 bots / settlement / Replay / Daily / PWA** succeeded: [run 44657599345](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44657599345). The overall workflow is still RED due to an independent full-match/Seed 87 Node gate. This evidence predates the R4 extra proof and must not be presented as same-SHA proof for later source commits.
+
+### Canonical write and independent readback contract
+
+1. The UI must send `QuestionPublic`'s exact `questionRef`, selected `choice`, a stable retry `attemptId`, ISO `asOf`, and measured `durationMs` through `submitSessionAnswerLocked`. It must **await** the returned promise.
+2. The Adaptive Learning adapter calls the published Learning scorer. It constructs `DecisionRecord v3` and `RecordRef {kind:'legacy-v3',id}` without inventing an Academy-only grade.
+3. The prepared `pendingProvenance` is written before the original local v3 writer. Every submission creates a **fresh** `createLocalTrainingStore(storage)` so an earlier QuotaExceeded phantom in a writer's memory cannot silently block retry. Re-read the archive from storage and require exact canonical record bytes.
+4. Store official provenance, rebuild AbilityProfile/ReviewPlan from durable records, and append RecordRef to the authoritative Session. Do not modify original v3 or v1 schemas.
+5. **R4 final proof:** `saved` is returned only if an independent `adaptive.readLegacy()` and `adaptive.load()` confirm *one* canonical v3 record, *one* matching provenance link, exactly one Session RecordRef, an AbilityProfile source evidence reference, and a compatible ReviewPlan.
+6. On success, `outcome.status === 'saved'`, `outcome.gradingResult` is official Learning output, `outcome.recordRef` references the v3 archive, and `outcome.durabilityProof` is `{status:'verified',archive:'legacy-v3',recordRef,sessionId,sidecarRevision,abilityEvidence:true,reviewPlanId}`. The UI must not announce formal completion on `recovery-required` or `pending-recovery`.
+7. `already-answered` on a nonterminal Session also includes a verified `durabilityProof`, without rerunning the scorer. A completed or aborted Session **rejects all new submits**, including previously answered references. Read-only resume and review remain supported.
+
+A damaged v3 archive or inconsistent provenance/derived state **fails closed**; do not recreate source records to repair it. Quota or crash may leave an existing durable canonical v3 answer but unfinished sidecar: use `resumeSessionLocked` under the lock to reconcile `pendingProvenance`; if an interrupted attempt's canonical record is absent, reuse its original `attemptId`, original answer, timestamp and duration (do not silently invent a different attempt).
+
+### Lock / error semantics
+
+The guarded calls use `navigator.locks.request(name,{mode:'exclusive',signal})` with a default **15-second acquisition timeout** (configurable constructor option `lockTimeoutMs` from 10–60000 ms). A request that cannot acquire a lock fails with `LOCK_TIMEOUT` instead of hanging indefinitely; once a lock callback starts, its *operation errors* are preserved, not misclassified as timeout. `LOCK_UNAVAILABLE` means the browser has no abortable Web Locks. Locking only covers cooperating same-origin tabs, not cross-device storage transactions.
+
+`DURABLE_PROOF_FAILED` is an integrity failure: do not show a completed grade. Re-open the Daily panel and run read-only progress/recovery; preserve raw evidence for debugging. A corrupted sidecar must retain original bytes; do not silently overwrite it or retroactively claim verified SkillTags.
+
+### AI 5 / AI 6 connection
+
+AI 5 should consume `outcome.status`, `outcome.gradingResult` and `outcome.durabilityProof.status` *after awaiting the locked submission*. Do not treat an immediate click or a visual progress count as proof of persistence. For newly created sessions, read `getDailyProgressLocked` and `getQuestion`; after refresh call `resumeSessionLocked`. Clear any temporary `sessionStorage` attempt key only after `saved` or verified `already-answered`; preserve the original ID otherwise. AI 6 owns real Chromium gate `tests/browser/full-table-ui-r3-gates.py`, service worker precache, stale source SHA audits and complete integration tests.
+
+### R4 source-level regression matrix
+
+Six new test cases cover full write/readback proof across new controller instances, corrupt derived evidence rejection, corrupt provenance preservation, full Session completion and terminal reject, abortable Web Locks timeout, and IANA local-day differences. Existing tests cover QuotaExceeded with same attemptId retry, injected crash after canonical write, duplicate suppression, concurrent tabs, original v1 byte preservation, and unverified scorer exclusion.
+
+The `node --test tests/adaptive/daily-training.test.js` and `npm run check` outputs must be reported **for the exact final commit**, not inferred from any earlier green Chromium run. Independent R3 Node test failure for unsupported Seed 87 is not a Daily scoring defect, but it keeps the complete project gate RED.
+
+
 **Owner:** Adaptive · `feat/academy-daily-training` / PR #45  
 **Contract:** `master-academy/1.0.0` + `academy-daily/1.0.0` under experimental Phase 3  
 **Release:** Draft source; not a full-game feature, not a production deployment gate.
