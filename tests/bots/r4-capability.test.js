@@ -50,6 +50,7 @@ test('R4: Bot unsupported is sticky; duplicate tick and resumed checkpoint never
   const first=await ctl.tick();
   assert.equal(first.status,'unsupported');
   assert.equal(first.capability,'multiple_winners');
+  assert.equal(first.code,'UNSUPPORTED_RULE_CAPABILITY');
   assert.equal(first.reason,'unsupported-rule-capability');
   assert.equal(first.seat,1);
   assert.equal(submissions,1);
@@ -64,7 +65,8 @@ test('R4: Bot unsupported is sticky; duplicate tick and resumed checkpoint never
   assert.equal(checkpoint.blocked.expectedRevision,before);
   assert.deepEqual(checkpoint.blocked,{
     status:'unsupported',reason:'unsupported-rule-capability',
-    capability:'multiple_winners',gameId,expectedRevision:before,seat:1,
+    code:'UNSUPPORTED_RULE_CAPABILITY',capability:'multiple_winners',
+    gameId,expectedRevision:before,seat:1,
   });
   const resumed=createBotController({...config,checkpoint});
   resumed.resume();
@@ -94,6 +96,7 @@ test('R4: human Rules capability failure is sticky but never counted as a comple
   });
   assert.equal(fail.status,'unsupported');
   assert.equal(fail.capability,'multiple_winners');
+  assert.equal(fail.code,'UNSUPPORTED_RULE_CAPABILITY');
   assert.equal((await ctl.tick()).status,'unsupported');
   assert.equal(calls,1);
   assert.notEqual(state.round.phase,'settled');
