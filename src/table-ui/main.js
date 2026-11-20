@@ -26,7 +26,7 @@ function profiles() {
   return profilesList().map(p=>'<option value="'+safe(p.profileId+'@'+p.ruleVersion)+'">'+
     safe(p.profileId==='tw16-single-winner-interception'?'一炮一響／攔胡（實驗性）':
       p.profileId==='tw16-configurable-table'?'舊實驗桌規（多人胡牌拒絕）':p.profileId)+
-      ' · '+safe(p.ruleVersion)+' · '+safe(p.status)+'</option>').join('');
+      ' ['+safe(p.profileId)+'] · '+safe(p.ruleVersion)+' · '+safe(p.status)+'</option>').join('');
 }
 function renderEmpty() {
   return '<header class="table-heading"><div><span class="table-overline">PHASE 3 · EXPERIMENTAL</span>'+

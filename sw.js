@@ -1,7 +1,7 @@
 /* Offline-first, atomic shell for GitHub Pages root or /repo/ deployments.
  * IMPORTANT: change CACHE_VERSION whenever any precached file changes.
  * The install event only succeeds if the entire listed release is cached. */
-const CACHE_VERSION = 'tmt-v02-realistic-tiles-master-academy-phase3-five-source-20261120-r7';
+const CACHE_VERSION = 'tmt-v02-realistic-tiles-master-academy-phase3-r5-interception-20261120-r8';
 const SHELL_CACHE = `tmt-shell-${CACHE_VERSION}`;
 const BASE = new URL('./', self.location.href);
 const SHELL = [
@@ -84,7 +84,7 @@ const SHELL = [
   './src/strategy/view.js',
   './src/strategy/structure.js',
   './src/strategy/simulate.js',
-  // Phase 3 staged runtime dependencies; experimental-only, NOT full game.
+  // Phase 3 R5 runtime dependencies; experimental table policy, NOT certified full rules.
   './src/rules/complete-engine.js', './src/rules/scoring.js',
   './src/bots/index.js', './src/bots/decision.js', './src/bots/controller.js', './src/bots/view.js',
   './src/replay/index.js', './src/replay/internal.js', './src/scenario/index.js',
