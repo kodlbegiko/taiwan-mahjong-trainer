@@ -384,3 +384,31 @@ At exact `b53a998f21ffe17e43f1b81175551a51378a6623`:
 | `RELEASE_GO` | **false** — PR #44 remains Draft |
 
 **Deployment:** no new Phase 3 immutable HTTPS preview authorized; existing separate V1 Vercel preview and V0.2 remain untouched. **Physical devices / accessibility:** iPhone Safari, Android, VoiceOver and TalkBack **NOT_RUN**. No protected main push, force push, PR #33/#44 merge, formal tag/release or fake certified settlement.
+
+
+### 11.6 Final observed R4 CI outcomes: all eight workflows completed at code SHA `b53a998`
+
+**GitHub verified actual checkout:** `b53a998f21ffe17e43f1b81175551a51378a6623`. This is the latest application-changing commit; this quality-report append is docs-only, not an additional executed application test. At 2026-11-20 approximately 11:12 Asia/Taipei, **all eight workflow runs had completed with overall conclusion FAILURE**. Their actual first failing Node test was the **same strict Seed87 unsupported capability**, not eight separate regressions.
+
+| Workflow (exact `b53a998`) | Browser or other independent job | First failing required Job | Root classification |
+| --- | --- | --- | --- |
+| [Verify #44665180689](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44665180689) | — | `test` — `not ok 119` | `tests/bots/r3-full-round.test.js` Seed87 |
+| [Master Academy combined #44665180705](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44665180705) | **PASS** real Lesson / v3 / Adaptive / review / offline 390/1440 | `R/S/L/A, Golden & both 10k Oracles` | Shared `npm run check` Seed87 |
+| [Academy UI #44665180740](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44665180740) | **PASS** Academy mobile/desktop/offline Chromium | `Academy public boundary / canonical Node` | Shared check Seed87 |
+| [V0.2 Browser #44665180672](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44665180672) | Not reached after preflight | `chromium`, `Run npm run check` | Shared check Seed87; not a new V0.2 UI assertion |
+| [V0.2 Independent UI #44665180712](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44665180712) | Chrome UI job failed in `Validate candidate P0` shared preflight | Node `Run npm run check`; Chrome preflight | Same Seed87, not independent visual proof |
+| [V0.2 Tile Faces #44665180718](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44665180718) | Not reached after shared Node | `Full existing Node gates plus SVG contract tests` | Shared check Seed87 |
+| [Table UI #44665180885](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44665180885) | **PASS** 320–1440px Chromium / real sandbox / offline | Node `Run npm run check` | Shared check Seed87, no independent Browser failure remaining |
+| [Phase 3 real full match #44665180727](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44665180727) | **PASS** actual Rules + human + three Bots + Replay + durable Daily reload + cold offline PWA | `Rules, three Bots, 100 fixed seeds, Replay and integrity` | Direct strict 100-seed gate Seed87 |
+
+**Exact latest Node totals:** Verify and the combined `npm run check` jobs: **327 tests / 325 PASS / 1 FAIL / 1 optional SKIP**. The standalone Phase 3 full-match Node subset: **26 tests / 25 PASS / 1 FAIL / 0 SKIP**. The single FAIL is `R3 100 fixed-seed complete hands: observed coverage, settlements and replay`, strict `FULL_MATCH_GO=false` because `UNSUPPORTED_RULE_CAPABILITY/multiple_winners`. The latest exact-code 100-seed result **again** reports 100 executed, 88 WIN, 11 exhaustive DRAW, one unsupported Seed87, 0 illegal, 0 stalled, 99 settled, 99 complete replay matches, 100 valid-prefix replays and 4,449 claim windows. No FULL_MATCH_GO.
+
+**Required independent Oracle subtests actually PASS** in Verify logs at `b53a998`: 10,000 mixed physical 16/17-tile independently oracled hands; 10,000 complete 17-tile win oracle; 10,000 seeded uniform shanten oracle; 10,000 integration legal 16/17-tile shanten oracle. An additional opt-in 10,000+ numerical stress cross-check remained **SKIP** (requires `MAHJONG_STRESS=1`). Oracle subtest PASS does **not** turn the overall `npm run check` green.
+
+**Actual uploaded real-browser artifacts, pinned to the exact R4 code test run:**
+- [Full R3 settled round + Replay + formal Daily storage/reload + offline screenshots and `daily-durable-evidence.json` artifact #14596933806](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44665180727/artifacts/14596933806).
+- [320–1440px Table UI sandbox / 17 legal physical discard / offline screenshots artifact #14597577655](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44665180885/artifacts/14597577655).
+- [Academy official v3 provenance/review/offline browser artifact #14597597245](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44665180705/artifacts/14597597245).
+- [Independent Academy mobile/desktop/offline screenshot artifact #14597607170](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44665180740/artifacts/14597607170).
+
+**Final gate semantics:** `V1_BASELINE_PASS` historically true at #33's separate pinned SHA, Academy R4 browser regression PASS; `EXPERIMENTAL_RULES_PASS` bounded Golden/Oracle subtests PASS; `THREE_BOT_MATCH_PASS=false` (100-seed NO-GO); settled `REPLAY_PASS`, `DAILY_UI_PASS`, `TABLE_UI_PASS` and Chromium offline `PWA_PASS` have positive exact-code browser-job evidence, but their encompassing workflows remain RED because of the shared Seed87 check. Complete `FULL_GAME_PREVIEW_READY=false`, `FULL_RULES_VERIFIED=false`, `RELEASE_GO=false`. Physical iPhone Safari, Android, VoiceOver, TalkBack and installed-device PWA upgrades **NOT_RUN**. No Phase3 preview, main mutation, tag, PR merge or official release.
