@@ -202,7 +202,8 @@ export async function createDailyPanel(storage) {
     if (question && p.nextStep==='answer') {
       const q=question,options=q.prompt?.options??[];
       const multiple=q.taskType!=='discard';
-      html+='<section class="table-actions table-daily-question"><h2>'+esc(q.taskType)+
+      html+='<section class="table-actions table-daily-question" data-daily-question-ref="'+
+        esc(short(q))+'"><h2>'+esc(q.taskType)+
         ' · '+esc(q.questionId)+'</h2><p>題型由已發布 Learning QuestionPublic 提供。'+
         (multiple?'可複選有效牌。':'請選擇一張捨牌。')+'</p>'+
         '<div class="table-daily-hand" aria-label="題目手牌">'+
