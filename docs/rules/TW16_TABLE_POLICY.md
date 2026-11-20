@@ -31,7 +31,7 @@ These references differ on added-kong robbery, open-kong seating, flower-only wi
 | Win | Canonical 16-tile five completed melds + a pair, using \`fixedMelds\`; self draw or discard | Structural gate exact; full gameplay experimental |
 | Pass win | If eligible to win on a discard but electing any other action, block wins until the actor's own next discard | Experimental; variants differ |
 | Exhaustive draw | When the live wall reaches 16 reserved tiles and all responses pass, declare no-winner settlement | Experimental |
-| Winner count | One winner; nearest seat takes precedence for simultaneous discard wins | Experimental |
+| Winner count | One-winner settlement only; two or three simultaneous legal discard-WIN declarations are **UNSUPPORTED** (`multiple_winners`) and fail closed without adjudication or payout. Nearest-seat tie-break applies only where the supported claim kinds can be resolved. | Experimental / multiwinner unavailable |
 | Next round | `startNextRound(previous,{gameId,seed})` initializes a separately replayable next hand, links previous game/revision and rotates or retains dealer | Experimental; **not** one continuous multi-round ledger |
 | Special hands | Flower-only wins, seven-pair variants, and other non-five-meld hands **not implemented** | Unavailable |
 
@@ -113,3 +113,12 @@ These forced legal real-engine scenarios include:
 Every rule is limited to the explicitly versioned experimental table, not a blanket certification of other Taiwan house rules. RuleProfile changes that introduce unsupported configurations, including multiwinner and rob-kong, must fail closed until separate action/settlement logic and Golden cases are implemented.
 
 The \`startNextRound\` API accepts only a previously **settled** hand, a **distinct gameId** and a **new explicit seed**. It increments \`round.handIndex\`, retains the dealer on self-win or drawn hand according to the pinned table policy, and otherwise rotates dealer. The new \`deal\` event persistently records \`previousRoundRef={gameId,roundId,revision}\`; each hand is independently replayable. A cryptographically authenticated cross-round match ledger, dealer streak tai, and annual/match score accumulation are outside this implementation.
+
+
+## R4 correction: simultaneous WIN claims are a capability gap, not a nearest-seat win
+
+The previous text incorrectly implied the engine implemented nearest-seat priority for multiple `WIN` declarations. In the actual `tw16-configurable-table@experimental-full-v1` implementation, **multiple legal discard winners cannot be settled**. The current `extensions.tw16.singleWinner=true` describes the only supported *terminal settlement* case; it must **not** be used to invalidate a second legal WIN intent or silently award one winner.
+
+For a concrete reproducible negative Golden, see `tests/rules/r4-seed-87.test.js`. At Seed `fixed-round-87`, after Seat 2's discard `t:26:0`, Seat 3 and Seat 0 independently declare valid WIN, then Seat 1's valid PASS cannot close the transaction; the Rules engine returns `UNSUPPORTED_RULE_CAPABILITY` with `capability:'multiple_winners'`, preserving revision 162, original private decisions, physical tile conservation and replay.
+
+Use the **public, static** `getRuleCapabilities({profileId,ruleVersion})` API for the current version's supported/unsupported capabilities; it never inspects the window and cannot leak private intents. No unsupported capability is automatically enabled by this change. An actual multiwinner rule needs a **new, distinctly versioned RuleProfile** with declared arbitration, score liability and event ownership, plus table-source-reviewed fixtures. See [R4 capability design](./CLAIM_ARBITRATION_API.md#r4--seed-87-multiwinner-capability-diagnosis-2026-11-20).
