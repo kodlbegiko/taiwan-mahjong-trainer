@@ -165,6 +165,35 @@ export function createDailyTrainingController(storage, {
     return {session:clone(persisted),completed:seen.size,total:session.questionRefs.length,
       nextQuestionRef:clone(session.questionRefs.find(q=>!seen.has(id(q)))??null)};
   }
+  // Independent proof after every reported successful write: no in-memory
+  // writer state or optimistic success flag can substitute for archive:v3.
+  // Sidecar load also validates persisted Learning provenance against v3.
+  function proveDurableAnswer(sessionId,questionRef,recordRef) {
+    const fail=reason=>{ throw new AcademyStorageError('DURABLE_PROOF_FAILED',
+      'Canonical Daily durability evidence is incomplete: '+reason); };
+    if(recordRef?.kind!=='legacy-v3' || typeof recordRef.id!=='string')fail('record-ref');
+    const {archive,hasCanonicalV3}=adaptive.readLegacy();
+    if(!hasCanonicalV3)fail('archive-v3-missing');
+    const records=archive.records.filter(r=>r.schemaVersion===3&&r.id===recordRef.id);
+    if(records.length!==1)fail('canonical-record-not-unique');
+    const state=adaptive.load();
+    const links=(state.provenanceLinks??[]).filter(p=>
+      p.recordRef.kind===recordRef.kind&&p.recordRef.id===recordRef.id);
+    if(links.length!==1||links[0].sessionId!==sessionId ||
+      id(links[0].academyQuestionRef)!==id(questionRef))fail('provenance-ref');
+    const session=state.trainingSessions.find(s=>s.sessionId===sessionId);
+    if(!session||!session.questionRefs.some(q=>id(q)===id(questionRef)) ||
+      session.recordRefs.filter(r=>r.kind===recordRef.kind&&r.id===recordRef.id).length!==1)
+      fail('session-record-ref');
+    if(!state.abilityProfile?.sourceRecordRefs?.some(r=>
+      r.kind===recordRef.kind&&r.id===recordRef.id))fail('ability-evidence');
+    if(!state.reviewPlan?.planId ||
+      state.reviewPlan.profileId!==state.abilityProfile.profileId)fail('review-plan');
+    return {status:'verified',archive:'legacy-v3',recordRef:clone(recordRef),
+      sessionId,sidecarRevision:state.revision,
+      abilityEvidence:true,reviewPlanId:state.reviewPlan.planId};
+  }
+
   function submit(ref,choice,{asOf,durationMs,attemptId}={}) {
     const at=utc(asOf),day=readToday({asOf:at});
     if(!day||!day.questionRefs.some(q=>id(q)===id(ref)))
@@ -172,12 +201,15 @@ export function createDailyTrainingController(storage, {
     if(!Number.isSafeInteger(durationMs)||durationMs<0 || durationMs>86_400_000)
       throw new RangeError('Invalid answer duration');
     if(typeof attemptId!=='string'||!attemptId.trim())throw new TypeError('Stable attemptId required');
-    // Refuse all duplicate answers BEFORE invoking the scorer: one source record
-    // contributes exactly once to the session and to derived AbilityProfile.
+    // Terminal means no submissions, including retries of already-answered
+    // questions. Resume/review must use the read-only API instead.
+    if(!['planned','active'].includes(day.status))throw new RangeError('DailySession is terminal');
     const existing=(adaptive.load().provenanceLinks??[]).find(p=>
       p.sessionId===day.sessionId&&id(p.academyQuestionRef)===id(ref));
-    if(existing)return {status:'already-answered',recordRef:clone(existing.recordRef),session:day};
-    if(!['planned','active'].includes(day.status))throw new RangeError('DailySession is terminal');
+    if(existing)return {status:'already-answered',
+      recordRef:clone(existing.recordRef),
+      durabilityProof:proveDurableAnswer(day.sessionId,ref,existing.recordRef),
+      session:day};
     // If a crash occurred after the prepare write, recover the original v3
     // attempt first. Do not create a competing RecordRef with a new attempt ID.
     const queued=(adaptive.load().pendingProvenance??[]).find(p=>
@@ -189,6 +221,7 @@ export function createDailyTrainingController(storage, {
       const recovered=(adaptive.load().provenanceLinks??[]).find(p=>
         p.sessionId===day.sessionId&&id(p.academyQuestionRef)===id(ref));
       if(recovered) return {status:'already-answered',recordRef:clone(recovered.recordRef),
+        durabilityProof:proveDurableAnswer(day.sessionId,ref,recovered.recordRef),
         session:readToday({asOf:at})};
       if(queued.link.recordRef.id!==attemptId) return {status:'pending-recovery',
         errorCode:'PENDING_ATTEMPT',recordRef:clone(queued.link.recordRef),session:day};
@@ -205,7 +238,16 @@ export function createDailyTrainingController(storage, {
     }
     const durable=result.durable===true && result.provenanceDurable===true &&
       result.derivedFresh===true && result.sessionFresh===true;
-    return {...result,status:durable?'saved':'recovery-required',
+    if(!durable)return {...result,status:'recovery-required',session:readToday({asOf:at})};
+    let durabilityProof;
+    try {
+      durabilityProof=proveDurableAnswer(day.sessionId,ref,result.recordRef);
+    } catch(error) {
+      return {...result,status:'recovery-required',
+        durabilityProof:null,errorCode:error.code??'DURABLE_PROOF_FAILED',
+        message:error.message,session:readToday({asOf:at})};
+    }
+    return {...result,status:'saved',durabilityProof,
       session:readToday({asOf:at})};
   }
   function getDailyProgress({asOf}={}) {
