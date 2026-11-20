@@ -104,8 +104,14 @@ def daily_roundtrip(page):
     page.wait_for_selector('#table-heading')
     if page.locator('[data-daily-start]').count():
         page.locator('[data-daily-start]').click()
-    else:
+    elif page.locator('[data-daily-resume]').count():
         page.locator('[data-daily-resume]').click()
+    else:
+        folder=Path('tw16-r3-full-match-evidence')
+        folder.mkdir(parents=True,exist_ok=True)
+        page.screenshot(path=str(folder/'table-390-daily-error.png'),full_page=True)
+        raise AssertionError('Daily controls unavailable after navigation: '+
+            page.locator('#full-table-root').inner_text()[-1500:])
     page.wait_for_timeout(800)
     error=page.locator('#full-table-root [role="alert"]')
     require(error.count()==0,'Daily Controller not initialized: '+(
