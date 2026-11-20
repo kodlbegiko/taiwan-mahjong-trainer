@@ -1,5 +1,8 @@
-name: Phase 3 Table UI — sandbox legal actions, Chromium and offline
+name: Phase 3 Table UI — explicit legacy sandbox, Chromium and offline
 on:
+  push:
+    branches:
+      - feat/tw16-full-table-ui
   pull_request:
     paths:
       - 'src/table-ui/**'
@@ -21,7 +24,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node --check src/table-ui/main.js && node --check src/table-ui/session.js && node --check src/table-ui/view.js
+      - run: node --check src/table-ui/main.js && node --check src/table-ui/session.js && node --check src/table-ui/view.js && node --check src/table-ui/daily.js && node --check src/table-ui/full-round.js
       - run: node --test tests/browser/table-session.test.js
       - run: npm run check
   chromium-table:
@@ -37,7 +40,7 @@ jobs:
       - run: google-chrome --version
       - name: Install Chinese fonts
         run: sudo apt-get update -qq && sudo apt-get install -y fonts-noto-cjk
-      - name: Browser quality gate (formal full-game E2E is NOT_RUN)
+      - name: Legacy Sandbox browser gate (R3 full match separately gated)
         run: python tests/browser/full-table-ui-gates.py --screenshots tw16-table-evidence
       - name: Capture browser emulation screenshots
         if: always()
