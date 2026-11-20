@@ -26,8 +26,10 @@ export async function createFullRoundSession({storage} = {}) {
   ]);
   if (typeof botApi.createBotController !== 'function' ||
       typeof botApi.createBot !== 'function' ||
-      typeof replayApi.createReplayService !== 'function')
-    throw new Error('Bot / Replay 正式 API 尚未可用');
+      botApi.BOT_ENGINE_VERSION !== 'tw16-bots/0.2.0-r3-experimental' ||
+      typeof replayApi.createReplayService !== 'function' ||
+      replayApi.REPLAY_API_VERSION !== 'tw16-replay-api/1.0.0')
+    throw new Error('Bot / Replay 正式 API 版本不符；拒絕啟動不完整整局');
   if (!storage || typeof storage.getItem !== 'function' ||
       typeof storage.setItem !== 'function')
     throw new Error('正式 R3 對局需要可靠的本機儲存');
