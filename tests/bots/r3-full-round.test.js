@@ -53,7 +53,8 @@ async function fullRound(seed,{difficulty='Beginner',maxEvents=1500}={}){
   let reason=null,steps=0,claims=0,unsupportedCapability=null,failedSubmission=null,failedContext=null;
   const actionTrace=[];
   for(;steps<maxEvents && state.round.phase!=='settled';steps++){
-    const oldRevision=state.revision,wasClaim=state.round.phase==='claim_window';
+    const oldRevision=state.revision,beforePhase=state.round.phase,
+      wasClaim=beforePhase==='claim_window';
     let result=await controller.tick(),attempted=null,humanDecision=null;
     if(result.status==='human-turn'){
       const view=createPlayerView(state,0);
@@ -105,7 +106,8 @@ async function fullRound(seed,{difficulty='Beginner',maxEvents=1500}={}){
     }
     actionTrace.push({revision:oldRevision,actorSeat:attempted?.actorSeat,
       actionId:attempted?.actionId,expectedRevision:attempted?.expectedRevision,
-      fromPhase:wasClaim?'claim_window':null,
+      fromPhase:beforePhase,wasClaimWindow:wasClaim,
+      decisionReasonCodes:(humanDecision||result.decision)?.reasonCodes??[],
       afterRevision:state.revision,afterPhase:state.round.phase});
     if(wasClaim)claims++;
     if(!wasClaim&&state.round.phase==='claim_window')claimWindows++;
