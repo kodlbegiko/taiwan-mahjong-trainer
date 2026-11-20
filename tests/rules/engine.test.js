@@ -19,7 +19,10 @@ const next = (state, seat, action) => {
 
 test('V1 contract: verified structural profile is not verified four-player gameplay', () => {
   const profiles = listRuleProfiles();
-  assert.equal(profiles.length, 2);
+  assert.equal(profiles.length, 4, 'additive R5 profile must be listed without changing the three prior profiles');
+  assert.equal(profiles.find(p=>p.profileId==='tw16-configurable-table')?.status,'experimental');
+  assert.equal(profiles.find(p=>p.profileId==='tw16-single-winner-interception' &&
+    p.ruleVersion==='experimental-v1')?.status,'experimental');
   const structural = getRuleProfile('tw16-structural-verified', 'structural-only-v1');
   assert.equal(structural.status, 'verified');
   assert.equal(structural.scope, 'structural-16');

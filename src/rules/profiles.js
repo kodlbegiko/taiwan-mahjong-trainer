@@ -27,7 +27,65 @@ const PRESETS = [
     winningPolicy: { mode: 'structural-only' },
     scoringPolicy: { mode: 'undefined' },
   },
+  {
+    schemaVersion: SCHEMA_VERSION, contractVersion: CONTRACT_VERSION,
+    profileId: 'tw16-configurable-table', ruleVersion: 'experimental-full-v1',
+    status: 'experimental', scope: 'four-player',
+    sourceRefs: [
+      'https://cml88.com/賽事規則/',
+      'https://www.gogogame.com.tw/htm/rule_3000.html',
+      'docs/rules/TW16_TABLE_POLICY.md',
+    ],
+    tileSet: {
+      standardTypes: 34, copiesPerType: 4,
+      flowers: { enabled: true, codes: [
+        {code:'season-spring',copies:1},{code:'season-summer',copies:1},
+        {code:'season-autumn',copies:1},{code:'season-winter',copies:1},
+        {code:'plant-plum',copies:1},{code:'plant-orchid',copies:1},
+        {code:'plant-bamboo',copies:1},{code:'plant-chrysanthemum',copies:1},
+      ] },
+    },
+    handShape: BASE_HAND_SHAPE,
+    turnPolicy: { claimPriority: 'configured', replacementDraw: 'configured' },
+    winningPolicy: { mode: 'configured', configRef: 'tw16-win-five-melds-v1' },
+    scoringPolicy: { mode: 'configured', configRef: 'tw16-minimal-tai-v1' },
+    extensions: { tw16: {
+      housePolicyVersion: 'tw16-table-experimental/1.0.0',
+      startingPrevailingWind: 'east', windAdvancePolicy: 'explicit',
+      claimOrder: ['win','kong','pong','chi'], singleWinner: true,
+      multipleDiscardWins: 'unsupported',
+      chiFromPreviousSeatOnly: true,
+      passWinLock: 'until-own-discard',
+      reserveTail: 16,
+      replacementFromTail: true,
+      robAddedKong: false,
+      specialHands: [],
+      scoring: {basePoints:100,pointsPerTai:20,
+        concealedTai:1,selfDrawTai:1,concealedSelfDrawBonusTai:1,
+        dealerInteractionTai:1},
+      dealerRetentionOnDraw: true,
+    } },
+  },
 ];
+
+/**
+ * Additive experimental house rule. The original configurable-table profile
+ * retains fail-closed multiple-WIN behavior and is not reinterpreted.
+ */
+const interceptionProfile = JSON.parse(JSON.stringify(PRESETS[2]));
+interceptionProfile.profileId = 'tw16-single-winner-interception';
+interceptionProfile.ruleVersion = 'experimental-v1';
+interceptionProfile.sourceRefs = ['docs/rules/CLAIM_ARBITRATION_API.md#r5-single-winner-interception'];
+Object.assign(interceptionProfile.extensions.tw16, {
+  housePolicyVersion: 'tw16-single-winner-interception/1.0.0',
+  multipleDiscardWins: 'single-winner',
+  winPriority: 'nearest-clockwise-from-discarder',
+  claimPriority: 'win > open-kong > pong > chi',
+  settlementPolicy: 'single-discard-winner',
+  scoringPolicy: 'tw16-minimal-tai-v1',
+  verificationStatus: 'experimental',
+});
+PRESETS.push(interceptionProfile);
 
 const isObj = x => x !== null && typeof x === 'object' && !Array.isArray(x);
 function fail(message) { throw new RangeError('Invalid RuleProfile: ' + message); }
@@ -66,6 +124,42 @@ export function validateRuleProfile(p) {
       || !['undefined','configured'].includes(p.scoringPolicy.mode)
       || (p.scoringPolicy.mode === 'configured' && !string(p.scoringPolicy.configRef))) fail('scoringPolicy');
   if (p.extensions !== undefined && !isObj(p.extensions)) fail('extensions');
+  if (['tw16-configurable-table','tw16-single-winner-interception'].includes(p.profileId)) {
+    const interception=p.profileId==='tw16-single-winner-interception';
+    const x=p.extensions?.tw16;
+    if (p.ruleVersion !== (interception?'experimental-v1':'experimental-full-v1') || p.status !== 'experimental'
+        || p.scope !== 'four-player' || !isObj(x)
+        || p.turnPolicy.claimPriority !== 'configured'
+        || p.turnPolicy.replacementDraw !== 'configured'
+        || p.winningPolicy.mode !== 'configured'
+        || p.winningPolicy.configRef !== 'tw16-win-five-melds-v1'
+        || p.scoringPolicy.mode !== 'configured'
+        || p.scoringPolicy.configRef !== 'tw16-minimal-tai-v1'
+        || x.housePolicyVersion !== (interception
+          ? 'tw16-single-winner-interception/1.0.0'
+          : 'tw16-table-experimental/1.0.0')
+        || x.multipleDiscardWins !== (interception?'single-winner':'unsupported')
+        || x.startingPrevailingWind !== 'east'
+        || x.windAdvancePolicy !== 'explicit'
+        || !Array.isArray(x.claimOrder)
+        || x.claimOrder.join(',') !== 'win,kong,pong,chi'
+        || x.singleWinner !== true || x.chiFromPreviousSeatOnly !== true
+        || x.robAddedKong !== false || x.passWinLock !== 'until-own-discard'
+        || x.replacementFromTail !== true || x.dealerRetentionOnDraw !== true
+        || !Number.isInteger(x.reserveTail) || x.reserveTail < 0 || x.reserveTail > 32
+        || !Array.isArray(x.specialHands) || x.specialHands.length
+        || !isObj(x.scoring)
+        || Object.values(x.scoring).some(n=>typeof n!=='number'
+          || !Number.isFinite(n)||n<0)) fail('experimental table policy');
+    if (!p.tileSet.flowers.enabled || p.tileSet.flowers.codes.length!==8)
+      fail('experimental table flowers');
+    if (interception && (x.winPriority !== 'nearest-clockwise-from-discarder'
+        || x.claimPriority !== 'win > open-kong > pong > chi'
+        || x.settlementPolicy !== 'single-discard-winner'
+        || x.scoringPolicy !== 'tw16-minimal-tai-v1'
+        || x.verificationStatus !== 'experimental'))
+      fail('interception policy');
+  }
   // Verification in this engine is intentionally restricted to the independently
   // regression-tested concealed-hand structure, not local four-player house rules.
   if (p.status === 'verified' && (p.scope !== 'structural-16' || !p.sourceRefs.length

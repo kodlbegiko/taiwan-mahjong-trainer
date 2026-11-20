@@ -1,0 +1,193 @@
+{
+  "schemaVersion": 1,
+  "kind": "tw16-phase3-r5-experimental-acceptance",
+  "asOf": "2026-11-20",
+  "timeZone": "Asia/Taipei",
+  "release": false,
+  "fullyCertifiedTaiwaneseRules": false,
+  "repository": "https://github.com/kodlbegiko/taiwan-mahjong-trainer",
+  "applicationSourceSha": "7c4b08a4fce6d7ad2458f23397489ea7f6e2c042",
+  "branch": "integration/mahjong-full-game",
+  "integrationPr": 44,
+  "prDraft": true,
+  "sources": {
+    "Rules#43": "684df00afac540c082713c152d06e80e72eea3de",
+    "Bots#40": "2dc05b381211b7ccdbe84c3fe2fd1f4f6f353aba",
+    "Replay#41": "aff59e61042389eea3a7b11f012aeb25031dc68c",
+    "UI#42": "f4814bcce387fb94b7f9266d981845ff0cda70b0",
+    "Daily#45": "f7bca678c010377aaf187b4291f8d5b49d4b0aea"
+  },
+  "ruleProfiles": {
+    "legacy": {
+      "id": "tw16-configurable-table@experimental-full-v1",
+      "multipleDiscardWinners": "unsupported",
+      "seed87": {
+        "completion": false,
+        "typedError": "UNSUPPORTED_RULE_CAPABILITY: multiple_winners",
+        "replayablePrefix": true
+      },
+      "fixedSeeds": {
+        "requested": 100,
+        "executed": 100,
+        "settled": 99,
+        "wins": 88,
+        "draws": 11,
+        "unsupported": 1,
+        "failedSeedIds": [
+          87
+        ],
+        "invalidActions": 0,
+        "stalls": 0,
+        "replayMismatches": 0
+      }
+    },
+    "singleWinner": {
+      "id": "tw16-single-winner-interception@experimental-v1",
+      "ruleStatus": "experimental",
+      "discardWinPolicy": "nearest-clockwise-one-winner",
+      "scoringPolicy": "tw16-minimal-tai-v1-experimental",
+      "seed87": {
+        "completion": true,
+        "winnerSeat": 3,
+        "discarderSeat": 2,
+        "declaredWinSeats": [
+          3,
+          0
+        ],
+        "interceptedWinSeats": [
+          0
+        ],
+        "delta": [
+          0,
+          0,
+          -100,
+          100
+        ],
+        "deltaSum": 0,
+        "finish": "WIN",
+        "replayMatched": true
+      },
+      "fixedSeeds": {
+        "requested": 100,
+        "executed": 100,
+        "settled": 100,
+        "wins": 89,
+        "draws": 11,
+        "unsupported": 0,
+        "invalid": 0,
+        "stalled": 0,
+        "invalidActions": 0,
+        "replayMatches": 100,
+        "replayMismatches": 0,
+        "failedSeedIds": []
+      }
+    }
+  },
+  "node": {
+    "npmCheck": {
+      "tests": 358,
+      "pass": 357,
+      "fail": 0,
+      "skip": 1,
+      "skipReason": "optional MAHJONG_STRESS=1 cross-check; not R5 acceptance"
+    },
+    "phase3Node": {
+      "legacyAndR3": {
+        "tests": 26,
+        "pass": 26,
+        "fail": 0,
+        "skip": 0
+      },
+      "rulesReplay": {
+        "tests": 33,
+        "pass": 33,
+        "fail": 0,
+        "skip": 0
+      },
+      "strictSingleWinner": {
+        "tests": 5,
+        "pass": 5,
+        "fail": 0,
+        "skip": 0
+      }
+    },
+    "oracles": {
+      "independentTenThousandMixedHands": "PASS",
+      "independentTenThousand17TileWins": "PASS",
+      "independentTenThousandSeededShanten": "PASS",
+      "integrationTenThousand16And17TileShanten": "PASS",
+      "optionalExtraStress": "SKIP"
+    }
+  },
+  "browser": {
+    "sameSourceSha": "7c4b08a4fce6d7ad2458f23397489ea7f6e2c042",
+    "chromiumWidthsPx": [
+      320,
+      390,
+      1440
+    ],
+    "realHumanPlusThreeBots": true,
+    "explicitR5Profile": true,
+    "settlement": true,
+    "groupAtomicReplay": true,
+    "dailyDurableReadback": true,
+    "coldNewTabOffline": true,
+    "svg34": true,
+    "serviceWorkerCache": "tmt-v02-realistic-tiles-master-academy-phase3-r5-interception-20261120-r8",
+    "ciArtifactUrl": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44706640239/artifacts/14614609533",
+    "ciArtifactContainsAcceptanceJson": true
+  },
+  "preview": {
+    "url": "https://taiwan-mahjong-phase3-r5-experimental-q4g6cft27-sign2.vercel.app/",
+    "deploymentId": "dpl_EGeDz9KozJVR51PMii4QTMEd3jmR",
+    "projectId": "prj_8vpKCNHxLKWMUyw02ZU6DaWRPLYp",
+    "target": "staging",
+    "sourceSha": "7c4b08a4fce6d7ad2458f23397489ea7f6e2c042",
+    "https": true,
+    "vercelReady": true,
+    "vercelAuthentication": false,
+    "passwordProtection": false,
+    "publicHomepageHttpVerified": true,
+    "publicServiceWorkerHttpVerified": true,
+    "publicBrowserSmokeUrl": "https://agent.tinyfish.ai/runs/ab845369-537f-49a2-98db-f7f2e051da0c",
+    "publicBrowserSmokeScope": "homepage, navigation, selected exact R5 RuleProfile, active 17-tile hand and three Bot seats only; full live online match and offline NOT_RUN",
+    "release": false
+  },
+  "workflowRuns": {
+    "phase3RealFullMatch": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44706640239",
+    "verify": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44706640204",
+    "academyCombined": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44706640119",
+    "academyUI": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44706640254",
+    "phase3TableUI": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44706640142",
+    "v02IndependentUI": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44706640348",
+    "v02BrowserPWA": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44706640148",
+    "v02TileFaces": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44706640306"
+  },
+  "workflowStatus": "8/8 SUCCESS on applicationSourceSha",
+  "gates": {
+    "EXPERIMENTAL_RULES_PASS": true,
+    "THREE_BOT_MATCH_PASS": true,
+    "REPLAY_PASS": true,
+    "DAILY_UI_PASS": true,
+    "TABLE_UI_PASS": true,
+    "PWA_PASS": true,
+    "FULL_GAME_PREVIEW_READY": true,
+    "FULL_RULES_VERIFIED": false,
+    "RELEASE_GO": false
+  },
+  "notRun": [
+    "physical iPhone 17 Pro Safari",
+    "physical Android",
+    "VoiceOver",
+    "TalkBack",
+    "installed-device PWA upgrade"
+  ],
+  "limitations": [
+    "experimental single-winner interception is a configurable table policy, not the sole Taiwanese standard",
+    "official tai and settlement policies not certified",
+    "rob-added-kong and other unverified claim/scoring rules not supported",
+    "Chrome CI emulation is not real-device QA",
+    "no formal tag/release/merge; PR #44 Draft"
+  ],
+  "evidenceIntegrity": "All code, Node and Chromium statuses are bound to applicationSourceSha. This JSON and the quality report are documentation-only commits after the tested application SHA."
+}

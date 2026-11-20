@@ -1,0 +1,266 @@
+{
+  "schemaVersion": 1,
+  "kind": "tw16-phase3-r6-live-preview-acceptance",
+  "recordedAtUtc": "2026-11-20T14:11:19.991Z",
+  "asOf": "2026-11-20",
+  "timeZone": "Asia/Taipei",
+  "release": false,
+  "fullyCertifiedTaiwaneseRules": false,
+  "repository": "https://github.com/kodlbegiko/taiwan-mahjong-trainer",
+  "branch": "integration/mahjong-full-game",
+  "integrationPr": 44,
+  "pinMatrix": {
+    "main": "25870862b6499f7e699967aa76429ae5dcfc5db4",
+    "masterAcademyPr33": "68fb50bc43746a0e6ff9f2f90712904d06a2ccda",
+    "integrationPr44BeforeR6Docs": "80298a3c6b0564c84de3206c7223a36b0c95a9a5",
+    "Rules43": "684df00afac540c082713c152d06e80e72eea3de",
+    "Bots40": "2dc05b381211b7ccdbe84c3fe2fd1f4f6f353aba",
+    "Replay41": "aff59e61042389eea3a7b11f012aeb25031dc68c",
+    "UI42": "f4814bcce387fb94b7f9266d981845ff0cda70b0",
+    "Daily45": "f7bca678c010377aaf187b4291f8d5b49d4b0aea",
+    "applicationSourceSha": "7c4b08a4fce6d7ad2458f23397489ea7f6e2c042",
+    "postApplicationDiff": "2 documentation-only commits, R5 acceptance JSON and quality report"
+  },
+  "deployment": {
+    "id": "dpl_EGeDz9KozJVR51PMii4QTMEd3jmR",
+    "projectId": "prj_8vpKCNHxLKWMUyw02ZU6DaWRPLYp",
+    "fixedUrl": "https://taiwan-mahjong-phase3-r5-experimental-q4g6cft27-sign2.vercel.app/",
+    "stableAlias": "https://taiwan-mahjong-phase3-r5-experimental-sign2.vercel.app/",
+    "state": "READY",
+    "target": "staging",
+    "applicationSourceSha": "7c4b08a4fce6d7ad2458f23397489ea7f6e2c042",
+    "http": {
+      "home": {
+        "status": "PASS",
+        "code": 200
+      },
+      "stableAlias": {
+        "status": "PASS",
+        "code": 200
+      },
+      "tableJavaScript": {
+        "status": "PASS",
+        "code": 200
+      },
+      "tableCss": {
+        "status": "PASS",
+        "code": 200
+      },
+      "serviceWorkerScript": {
+        "status": "PASS",
+        "code": 200
+      },
+      "webManifest": {
+        "status": "PASS",
+        "code": 200,
+        "path": "/public/manifest.webmanifest"
+      },
+      "tileSvgs": {
+        "status": "PASS",
+        "count": 34,
+        "receivedHttp200": 34,
+        "svgMarkup": 34
+      }
+    },
+    "serviceWorkerCacheVersion": "tmt-v02-realistic-tiles-master-academy-phase3-r5-interception-20261120-r8",
+    "aliasWritesPerformed": false,
+    "originIsolation": "Both HTTPS hostnames use separate localStorage origins; do not infer synchronization."
+  },
+  "priorR5ExactSha": {
+    "status": "PASS",
+    "scope": "HISTORICAL_CI_NOT_R6_LIVE",
+    "node": {
+      "tests": 358,
+      "passed": 357,
+      "failed": 0,
+      "optionalSkip": 1
+    },
+    "seeds": {
+      "completed": 100,
+      "requested": 100,
+      "wins": 89,
+      "draws": 11,
+      "unsupported": 0,
+      "invalidActions": 0,
+      "stalls": 0,
+      "replayMismatches": 0
+    },
+    "githubActions": {
+      "status": "PASS",
+      "success": 8,
+      "total": 8,
+      "workflowRunIds": [
+        44706640142,
+        44706640204,
+        44706640119,
+        44706640254,
+        44706640348,
+        44706640148,
+        44706640239,
+        44706640306
+      ]
+    },
+    "codeModifiedInR6": false,
+    "rerunRequiredForDocsOnly": false
+  },
+  "publicBrowser": {
+    "environment": "TinyFish automated public HTTPS browser; not localhost; not Playwright trace; no physical device",
+    "browserTestTime": "2026-11-20 Asia/Taipei (tool did not provide per-step wall-clock timestamps)",
+    "runLinks": {
+      "liveFullMatchAttempt": "https://agent.tinyfish.ai/runs/77f5af62-2afb-4bfb-83dd-c45154f17b22",
+      "nativeConfirmDiagnostic": "https://agent.tinyfish.ai/runs/35c0bdf3-5116-4781-a7d1-6715365c1322",
+      "academyLessons": "https://agent.tinyfish.ai/runs/92c9bb95-f440-4532-89f6-4968c1203e3d",
+      "liveDailyReadback": "https://agent.tinyfish.ai/runs/6e087d8a-a7d5-4878-ae92-42ac59c62991",
+      "mobileInspection": "https://agent.tinyfish.ai/runs/6ee53cf1-c6e0-4da6-832c-e3b7442477ac",
+      "offlineInspection": "https://agent.tinyfish.ai/runs/edddc663-3b1a-4c55-9814-44b9e9920185"
+    },
+    "homepage": {
+      "status": "PASS",
+      "steps": "Opened fixed HTTPS origin; selected four-player table, R5 single-winner profile; JS, CSS, 34 SVG all individually retrieved via Vercel."
+    },
+    "fullGame": {
+      "status": "BLOCKED",
+      "steps": "Started R5-profile four-player game, observed flower replacement, 17-tile player hand, three Bots and legal discard confirmation; clicked PASS on early claim window without terminal advancement.",
+      "lastObservedPhase": "claim_window",
+      "terminalResult": null,
+      "settlementStatus": "NOT_RUN",
+      "replayFromSettledMatch": "NOT_RUN",
+      "suspectedCause": "Source src/table-ui/main.js requires window.confirm for all non-discard Actions, including replace_flower and pass; browser diagnostic could not advance its own replace_flower and never established whether native confirm was accepted.",
+      "confirmedAppDefect": false,
+      "verificationNeeded": "Repeat on public HTTPS with native dialog accepted or Playwright dialog handler. Do not infer Rules/Bot failure from automation click alone."
+    },
+    "daily": {
+      "status": "PARTIAL",
+      "canonicalSubmit": "PASS",
+      "liveSameOriginReload": "PASS",
+      "sessionStatus": "active",
+      "recordRef": "table-7e755b03-01d1-4a66-a101-52823483592e",
+      "questionRef": "academy-q-003@1.0.0",
+      "progressBefore": "1/5",
+      "progressAfter": "1/5",
+      "readbackRefIdentical": true,
+      "nextQuestion": "academy-q-004",
+      "noDuplicateCountObserved": true,
+      "abilityProfileReadback": "NOT_RUN",
+      "reviewPlanReadback": "NOT_RUN",
+      "note": "Five questions in separate Academy Lesson run are not treated as dedicated Daily Session acceptance."
+    },
+    "offline": {
+      "status": "NOT_RUN",
+      "code": "LIVE_OFFLINE_NOT_RUN",
+      "reason": "Browser agent could not disable network or inspect service worker Cache Storage; JS and manifest HTTP availability is not offline proof."
+    },
+    "mobile": {
+      "status": "PARTIAL",
+      "actualViewportApproxPx": "1000x990",
+      "exactWidths": {
+        "320": "NOT_RUN",
+        "375": "NOT_RUN",
+        "390": "NOT_RUN",
+        "430": "NOT_RUN",
+        "768": "NOT_RUN",
+        "1440": "NOT_RUN"
+      },
+      "tileSelection": "PASS",
+      "discardSelectCancel": "PASS",
+      "threeBotSeatsVisible": "PASS",
+      "claimWindowSmallScreen": "NOT_RUN",
+      "settlementLayout": "NOT_RUN",
+      "replayCompletedGame": "NOT_RUN",
+      "physicalIphoneSafari": "NOT_RUN",
+      "physicalAndroid": "NOT_RUN"
+    },
+    "screenshots": [],
+    "playwrightTraces": [],
+    "note": "Browser run URLs are evidence links, not exported Playwright traces or fabricated screenshots. One offline-agent description mentioned manifest.json/Next.js; independently disproven by fetched actual index.html and /public/manifest.webmanifest, therefore excluded as evidence."
+  },
+  "sourceReview": {
+    "allDraft": true,
+    "reviewThreads": {
+      "33": 0,
+      "40": 0,
+      "41": 0,
+      "42": 0,
+      "43": 0,
+      "44": 0,
+      "45": 0
+    },
+    "formalReviews": {
+      "33": 0,
+      "40": 0,
+      "41": 0,
+      "42": 0,
+      "43": 0,
+      "44": 0,
+      "45": 0
+    },
+    "uiPr42Mergeable": false,
+    "completeDiffAudit": false,
+    "sourceReviewReady": false
+  },
+  "gates": {
+    "R5_EXPERIMENTAL_FULL_MATCH": {
+      "status": "PASS",
+      "scope": "R5_EXACT_SHA_CI",
+      "evidence": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44706640239"
+    },
+    "LIVE_PREVIEW_FULL_MATCH": {
+      "status": "BLOCKED",
+      "evidence": "https://agent.tinyfish.ai/runs/77f5af62-2afb-4bfb-83dd-c45154f17b22"
+    },
+    "LIVE_PREVIEW_REPLAY": {
+      "status": "NOT_RUN",
+      "reason": "No public-origin terminated session reached"
+    },
+    "LIVE_PREVIEW_DAILY": {
+      "status": "PARTIAL",
+      "evidence": "https://agent.tinyfish.ai/runs/6e087d8a-a7d5-4878-ae92-42ac59c62991",
+      "reason": "Canonical durable submit/reload PASS; explicit AbilityProfile and ReviewPlan inspection NOT_RUN"
+    },
+    "LIVE_PREVIEW_OFFLINE": {
+      "status": "NOT_RUN",
+      "reason": "LIVE_OFFLINE_NOT_RUN"
+    },
+    "MOBILE_BROWSER_UX": {
+      "status": "PARTIAL",
+      "reason": "One approx 1000px desktop viewport only, six required exact widths NOT_RUN"
+    },
+    "SOURCE_REVIEW_READY": {
+      "status": "FAIL",
+      "reason": "Zero reviewer approvals; PR42 non-mergeable; complete source diff review not performed"
+    },
+    "EXPERIMENTAL_PREVIEW_GO": {
+      "status": "NO",
+      "reason": "R6 Live Full Match and Replay have not passed; R5 experimental preview remains available"
+    },
+    "FULL_RULES_VERIFIED": {
+      "status": "NO",
+      "reason": "Experimental single-winner policy and minimal tai scoring only"
+    },
+    "FORMAL_RELEASE_GO": {
+      "status": "NO",
+      "reason": "R6 Live acceptance incomplete and formal rules/device/review checks outstanding"
+    }
+  },
+  "notRun": [
+    "Public origin full terminal WIN/DRAW and settlement zero-sum",
+    "Public origin postgame Replay stepping",
+    "Live offline network toggle and cold new tab",
+    "320/375/390/430/768/1440 exact viewport checks",
+    "iPhone physical Safari",
+    "Android physical browser",
+    "VoiceOver",
+    "TalkBack",
+    "full Taiwanese local scoring/tai variants",
+    "Formal reviewer approvals"
+  ],
+  "changeControl": {
+    "r6ApplicationCodeChanges": false,
+    "sourcePrChanges": false,
+    "vercelAliasChanges": false,
+    "productionChanges": false,
+    "mergedPrs": [],
+    "createdRelease": false
+  },
+  "evidenceIntegrity": "Only HTTPS HTTP checks and specific TinyFish browser operations are R6 live evidence. R5 CI, 100 Seeds, offline Chromium and Node tests are carried forward as exact-SHA historical evidence. No live terminal or offline result is inferred."
+}

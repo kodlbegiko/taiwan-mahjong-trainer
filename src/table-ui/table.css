@@ -1,0 +1,155 @@
+/* Phase 3 four-player surface: exclusively public PlayerView + original 34 SVGs. */
+#full-table-root { min-width: 0; margin: 0 auto; max-width: 1240px; padding: 18px 0 90px; }
+#full-table-navigation { display: flex; gap: 8px; flex-wrap: wrap; padding: 12px 0; }
+#full-table-navigation button {
+  padding: 9px 14px; min-height: 44px; border: 1px solid #6d8a79;
+  border-radius: 10px; background: #193c36; color: #ecf4ea; font-size: 13px; font-weight: 750;
+}
+#full-table-navigation button[aria-current="page"] { background: #e8c982; color: #183027; }
+body[data-table-view="play"] #academy-navigation,
+body[data-table-view="replay"] #academy-navigation,
+body[data-table-view="play"] .mode-nav,
+body[data-table-view="replay"] .mode-nav,
+body[data-table-view="play"] #academy-root,
+body[data-table-view="replay"] #academy-root,
+body[data-table-view="play"] .intro,
+body[data-table-view="replay"] .intro,
+body[data-table-view="play"] .columns,
+body[data-table-view="replay"] .columns,
+body[data-table-view="play"] .roadmap,
+body[data-table-view="replay"] .roadmap { display: none !important; }
+.table-heading { display: flex; justify-content: space-between; align-items: start; gap: 12px; margin: 7px 0 15px; }
+.table-overline { color: var(--gold); font-size: 11px; font-weight: 750; letter-spacing: .13em; }
+.table-heading h1 { font-size: clamp(25px, 4vw, 35px); margin: 4px 0 5px; }
+.table-heading p { color: var(--muted); margin: 0; font-size: 13px; }
+.table-header-tools { display:flex; align-items:center; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+.table-version { border: 1px solid #668376; border-radius: 30px; padding: 6px 11px; color: var(--gold); font-size: 12px; }
+.table-facts { display:flex; gap:7px; flex-wrap:wrap; margin: 12px 0; }
+.table-facts span { background: #24433e; border: 1px solid #54746a; color: #e4e9dd;
+  border-radius: 9px; padding: 6px 10px; font-size: 12px; }
+.table-warning { border-left:3px solid #e8c982; background:#3b3325; padding:10px 12px; color:#fff0cc; border-radius:4px; }
+.table-grid { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1.65fr) minmax(0,1fr);
+  grid-template-areas: ". top ." "left felt right"; gap: 9px; border-radius: 18px;
+  padding: 13px; background: radial-gradient(ellipse at center, #296e58 0%, #1b4d41 65%, #113f34 100%);
+  box-shadow: inset 0 0 0 2px #426a52, inset 0 0 45px #081f16; max-width: 100%; }
+.table-opponent { min-width:0; min-height:140px; padding: 9px; background:#142f2cdd;
+  border:1px solid #58786a; border-radius:11px; color:#edf5e9; }
+.table-seat-2 { grid-area:top; }
+.table-seat-3 { grid-area:left; }
+.table-seat-1 { grid-area:right; }
+.table-seat-active { box-shadow: 0 0 0 2px #e8c982 inset; }
+.table-seat-heading { display:flex; justify-content:space-between; align-items:center; gap:6px; margin-bottom:9px; }
+.table-seat-heading strong { font-size: 13px; }
+.table-seat-heading span { font-size: 11px; color:#e5d397; }
+.table-concealed { margin:6px 0; padding:8px 5px; text-align:center;
+  background:repeating-linear-gradient(90deg,#316b5d,#316b5d 9px,#225747 9px,#225747 12px);
+  border:1px solid #5a8b75; border-radius:5px; font-weight:750; font-size:11px; }
+.table-felt { grid-area: felt; min-width:0; min-height:190px; padding:15px 9px;
+  display:flex; align-items:center; justify-content:center; flex-direction:column; text-align:center; gap:8px; }
+.table-felt strong { font-size: 22px; color:var(--gold); }
+.table-felt span { font-size:12px; color:#e7f0dd; overflow-wrap:anywhere; }
+.table-felt small { font-size:11px; color:#cfdfd3; }
+.table-river { display: grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:2px; align-content:start;
+  min-width:0; margin-top:8px; }
+.table-river .table-tile { width:100%; min-height:0; aspect-ratio:.72; padding:0; border-bottom-width:2px; }
+.table-river > .table-quiet { grid-column:1 / -1; white-space:nowrap; }
+.table-history-grid { margin: 12px 0; }
+.table-replay-self, .table-round-summary { padding:12px; margin:12px 0; border:1px solid #648778; border-radius:12px; background:#21443d; }
+.table-replay-self h3, .table-round-summary h2 { font-size:15px; margin:0 0 8px; }
+.table-round-summary p, .table-settlements p { margin: 5px 0; }
+.table-melds { display:flex; flex-wrap:wrap; align-items:center; gap:2px; min-width:0; margin-top:5px; }
+.table-meld { display:flex; max-width:100%; gap:2px; }
+.table-meld .table-tile { width:22px; min-height:33px; border-bottom-width:2px; }
+.table-flowers { display:flex; flex-wrap:wrap; gap:4px; margin:4px 0 0; }
+.table-flower { padding: 2px 4px; border:1px solid #e1c477; border-radius:4px; background:#335344; font-size:11px; }
+.table-quiet, .table-muted { color: #c4d6c9; font-size:12px; }
+.table-last-discard { outline:2px solid #e8c982; outline-offset:0; }
+.table-self, .table-actions, .table-empty, .table-replay {
+  margin-top:12px; background:#173633; border:1px solid #577369; border-radius:15px; padding:16px; min-width:0; }
+.table-self .table-seat-heading { margin-bottom: 11px; }
+.table-hand { display:grid; grid-template-columns:repeat(17,minmax(0,1fr)); gap:4px; min-width:0; }
+.table-hand .table-tile { min-height:50px; width:100%; aspect-ratio:.72; border-bottom-width:4px; }
+.table-hand button.table-tile { position:relative; transition:transform .12s ease, outline-color .12s ease; }
+.table-hand button.table-tile.is-selected { outline:3px solid #f5ce67; outline-offset:1px; transform:translateY(-4px); z-index:1; }
+.table-hand button.table-tile:disabled { opacity:.75; }
+.table-hand .tile-face-image, .table-river .tile-face-image,
+.table-meld .tile-face-image { display:block; width:100%; height:auto; max-height:100%; object-fit:contain; }
+.table-actions-heading { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; }
+.table-actions h3 { margin:0; font-size:16px; }
+.table-actions-heading span { font-size:12px; color:#c3d7cb; }
+.table-action-buttons { display:flex; flex-wrap:wrap; gap:8px; }
+.table-action-buttons button, .table-replay-controls button { min-height:44px; }
+.table-selected { padding:10px 0; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.table-selected span { flex: 1 1 140px; font-weight:700; color:#f1d98e; }
+.table-footer-controls { display:flex; justify-content:flex-end; flex-wrap:wrap; gap:8px; padding:12px 0; }
+.table-empty { display:flex; flex-direction:column; align-items:start; gap:12px; padding:24px; }
+.table-empty h2 { margin:0; font-size:20px; }
+.table-empty p { margin:0; line-height:1.7; }
+.table-empty select { width:100%; min-height:44px; padding:9px; border-radius:9px; color:#f3f2e5; background:#24554b; border:1px solid #8aa99a; }
+.table-replay h2, .table-replay h3 { color:#f1e3b6; }
+.table-replay-controls { display:flex; gap:9px; flex-wrap:wrap; align-items:center; }
+.table-replay-controls button, .table-replay-controls select { padding:8px 11px; border-radius:8px;
+  border:1px solid #89a291; background:#214941; color:#fff; }
+.table-replay-controls select { min-height:44px; margin-left:6px; }
+.table-replay-hand { margin: 12px 0; }
+@media(max-width:900px) {
+  .table-hand { grid-template-columns:repeat(12,minmax(0,1fr)); }
+}
+@media(max-width:560px) {
+  #full-table-root { padding-top:8px; padding-bottom:100px; }
+  .table-heading { flex-wrap:wrap; }
+  .table-grid { grid-template-columns:minmax(0,1fr) minmax(0,1.2fr) minmax(0,1fr);
+    gap:5px; padding:7px; }
+  .table-opponent { min-height:125px; padding:6px 4px; border-radius:8px; }
+  .table-seat-heading { gap:3px; flex-wrap:wrap; margin-bottom:5px; }
+  .table-seat-heading strong { font-size:11px; }
+  .table-seat-heading span, .table-concealed { font-size:10px; }
+  .table-felt { min-height:175px; padding:5px 3px; }
+  .table-felt strong { font-size:16px; }
+  .table-felt span, .table-felt small { font-size:10px; }
+  .table-river { grid-template-columns:repeat(4,minmax(0,1fr)); }
+  .table-hand { grid-template-columns:repeat(7,minmax(0,1fr)); gap:5px 4px; }
+  .table-hand .table-tile { min-height:52px; }
+  .table-self, .table-actions { padding:10px; }
+  .table-meld .table-tile { width:15px; min-height:23px; }
+  .table-facts span { font-size:11px; padding:5px 7px; }
+}
+@media(max-width:375px) {
+  .table-hand { grid-template-columns:repeat(6,minmax(0,1fr)); }
+}
+@media(max-width:359px) {
+  .table-hand { grid-template-columns:repeat(5,minmax(0,1fr)); }
+  .table-grid { grid-template-columns:minmax(0,1fr) minmax(0,1.1fr) minmax(0,1fr); }
+}
+@media(prefers-reduced-motion: reduce) {
+  .table-hand button.table-tile, .table-hand button.table-tile.is-selected { transition:none; }
+}
+
+/* Daily route is owned by Table UI; legacy Academy remains intact. */
+body[data-table-view="daily"] #academy-navigation,
+body[data-table-view="daily"] .mode-nav,
+body[data-table-view="daily"] #academy-root,
+body[data-table-view="daily"] .intro,
+body[data-table-view="daily"] .columns,
+body[data-table-view="daily"] .roadmap { display:none !important; }
+#full-table-root { overflow-x:clip; padding-bottom:max(96px, env(safe-area-inset-bottom)); }
+.table-daily-hand { display:flex; flex-wrap:wrap; gap:3px; margin:12px 0; }
+.table-daily-hand .table-tile { width:35px; min-width:35px; min-height:48px; }
+.table-daily-option { display:inline-flex; align-items:center; gap:8px;
+  border:1px solid #79978b; background:#245248; color:#f3eee1; border-radius:9px;
+  padding:8px; min-height:48px; cursor:pointer; }
+.table-daily-option input { width:22px; height:22px; accent-color:#e6c477; }
+.table-daily-option .table-tile { width:32px; min-height:46px; }
+.table-daily-grade { max-height:240px; overflow:auto; white-space:pre-wrap;
+  overflow-wrap:anywhere; font-size:11px; }
+.table-hand-flower { display:flex; align-items:center; justify-content:center; min-height:52px; }
+.table-replay-controls select { max-width:100%; }
+.table-replay .table-hand { grid-template-columns:repeat(auto-fit,minmax(32px,1fr)); }
+.table-actions [data-continue-bots], .table-daily-question [data-daily-submit] {
+  min-height:44px;
+}
+@media(max-width:560px) {
+  .table-actions { position:relative; padding-bottom:calc(10px + env(safe-area-inset-bottom)); }
+  .table-daily-hand .table-tile { width:30px; min-width:30px; min-height:44px; }
+  .table-daily-option { min-height:48px; }
+}

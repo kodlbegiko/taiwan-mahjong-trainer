@@ -1,7 +1,7 @@
 /* Offline-first, atomic shell for GitHub Pages root or /repo/ deployments.
  * IMPORTANT: change CACHE_VERSION whenever any precached file changes.
  * The install event only succeeds if the entire listed release is cached. */
-const CACHE_VERSION = 'tmt-v02-realistic-tiles-master-academy-20261119-r2';
+const CACHE_VERSION = 'tmt-v02-realistic-tiles-master-academy-phase3-r5-interception-20261120-r8';
 const SHELL_CACHE = `tmt-shell-${CACHE_VERSION}`;
 const BASE = new URL('./', self.location.href);
 const SHELL = [
@@ -44,6 +44,9 @@ const SHELL = [
   './public/tiles/33.svg',
   './src/tile-visuals.js', './src/app.js', './src/tiles.js', './src/practice.js', './src/shanten.js',
   './src/academy-ui/main.js', './src/academy-ui/academy.css',
+  './src/table-ui/main.js', './src/table-ui/session.js',
+  './src/table-ui/full-round.js', './src/table-ui/daily.js',
+  './src/table-ui/view.js', './src/table-ui/table.css',
   './src/academy-ui/public-facade.js', './src/academy-ui/scenario.js',
   './src/academy-ui/academy-bridge.js', './src/academy-ui/academy-live.js',
   './src/core/efficiency.js', './src/analysis/explain.js',
@@ -52,6 +55,7 @@ const SHELL = [
   './src/training/progress.js', './src/storage/local.js', './src/storage/archive.js',
   // Actual combined Master Academy runtime graph (no fixture-only provider).
   './src/integration/master-academy-facade.js',
+  './src/integration/phase3-public-facade.js',
   './src/academy/index.js',
   './src/academy/catalog.js',
   './src/academy/lessons.js',
@@ -69,7 +73,7 @@ const SHELL = [
   './src/adaptive/session.js',
   './src/adaptive/storage.js',
   './src/adaptive/validate.js',
-  './src/adaptive/learning-adapter.js',
+  './src/adaptive/learning-adapter.js', './src/adaptive/daily-training.js',
   './src/adaptive/provenance.js',
   './src/rules/index.js',
   './src/rules/tile-constants.js',
@@ -80,6 +84,10 @@ const SHELL = [
   './src/strategy/view.js',
   './src/strategy/structure.js',
   './src/strategy/simulate.js',
+  // Phase 3 R5 runtime dependencies; experimental table policy, NOT certified full rules.
+  './src/rules/complete-engine.js', './src/rules/scoring.js',
+  './src/bots/index.js', './src/bots/decision.js', './src/bots/controller.js', './src/bots/view.js',
+  './src/replay/index.js', './src/replay/internal.js', './src/scenario/index.js',
   './data/academy/manifest-v1.json',
 ].map(path => new URL(path, BASE).href);
 const SHELL_PATHS = new Set(SHELL.map(url => new URL(url).pathname));

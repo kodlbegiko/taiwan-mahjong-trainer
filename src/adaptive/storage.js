@@ -443,20 +443,33 @@ export function createAcademyStore(storage, {
     }
     const sessions = state.trainingSessions.filter(s => s.sessionId !== session.sessionId);
     const previous = state.trainingSessions.find(s => s.sessionId === session.sessionId);
+    // A daily identity is (profileId, IANA timezone, local day, algorithm version).
+    // Reject a second session even when the two callers planned different IDs.
+    const daily = session.extensions?.['adaptive.daily'];
+    if (daily && sessions.some(other => {
+      const ext = other.extensions?.['adaptive.daily'];
+      return other.profileId === session.profileId && ext?.dayKey === daily.dayKey &&
+        ext?.timezone === daily.timezone && ext?.algorithmVersion === daily.algorithmVersion;
+    })) throw new AcademyStorageError('DAILY_CONFLICT', 'A DailySession already exists for this local day');
     if (previous) {
       const oldBytes = canonicalJson(previous), newBytes = canonicalJson(session);
-      if (oldBytes !== newBytes) {
-        const allowed = { planned: ['active', 'aborted'], active: ['completed', 'aborted'],
-          completed: [], aborted: [] };
-        if (!allowed[previous.status].includes(session.status)) throw new RangeError('Illegal persisted status transition');
-        if (previous.seed !== session.seed ||
-          canonicalJson(previous.ruleRef) !== canonicalJson(session.ruleRef) ||
-          canonicalJson(previous.questionRefs) !== canonicalJson(session.questionRefs) ||
-          previous.recordRefs.some(ref => !session.recordRefs.some(next =>
-            next.kind === ref.kind && next.id === ref.id))) {
-          throw new RangeError('Session cannot rewrite question provenance or past attempts');
-        }
+      if (oldBytes === newBytes) return { state, durable: present };
+      const allowed = { planned: ['active', 'aborted'],
+        active: ['active', 'completed', 'aborted'], completed: [], aborted: [] };
+      if (!allowed[previous.status].includes(session.status))
+        throw new RangeError('Illegal persisted status transition');
+      if (previous.profileId !== session.profileId ||
+        previous.seed !== session.seed ||
+        canonicalJson(previous.ruleRef) !== canonicalJson(session.ruleRef) ||
+        canonicalJson(previous.questionRefs) !== canonicalJson(session.questionRefs) ||
+        canonicalJson(previous.extensions?.['adaptive.daily'] ?? null) !==
+          canonicalJson(session.extensions?.['adaptive.daily'] ?? null) ||
+        previous.recordRefs.some(ref => !session.recordRefs.some(next =>
+          next.kind === ref.kind && next.id === ref.id))) {
+        throw new RangeError('Session cannot rewrite question provenance or past attempts');
       }
+      if (session.status === 'active' && session.recordRefs.length === previous.recordRefs.length)
+        throw new RangeError('Active Session update must append durable RecordRefs');
     }
     return save({ ...state, revision: state.revision + 1,
       trainingSessions: [...sessions, cloneJson(session)].sort((a,b) => a.sessionId.localeCompare(b.sessionId)) });
