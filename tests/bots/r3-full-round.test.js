@@ -364,8 +364,11 @@ test('R3 100 fixed-seed complete hands: observed coverage, settlements and repla
     actualSettled:summary.settled,unsupported:summary.unsupported,
     unsupportedCodes:summary.unsupportedCodes,failedSeeds:summary.failedSeeds,
   }));
-  // Coverage/classification is allowed to pass while FULL_MATCH_GO stays NO-GO.
-  // This test never asserts that unsupported counts as completion.
+  // Keep the STRICT full-match acceptance gate independent from the
+  // classification evidence above. With R4's unsupported multiple_winners,
+  // the test must stay RED: 99 settled + 1 unsupported is not 100 settled.
+  assert.equal(summary.fullMatchGo,true,
+    'FULL_MATCH_GO=false: unsupported is not settled; Rules must support the table policy');
   // Explicitly verify Rules-authoritative next-round creation after settlement.
   const sample=await fullRound('next-round');
   assert.equal(sample.completed,true);
