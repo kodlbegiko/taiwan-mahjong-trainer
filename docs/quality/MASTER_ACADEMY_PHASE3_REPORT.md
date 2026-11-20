@@ -155,3 +155,54 @@ The 42 source-owned files are copied by their exact Git blob identities, not a c
 | RELEASE_GO | NO | Full match/preview/device/complete-rules gates not met |
 
 **Do not promote any PENDING gate by inference.** Full Game Preview: NO-GO until same-HEAD terminal browser+replay evidence exists. Formal release: NO-GO. Physical iPhone, Android, VoiceOver, TalkBack: NOT_RUN by request.
+
+
+---
+
+## 9. 2026-11-20 measured combined-source R3 acceptance and repairs (supersedes §8 preliminary estimates)
+
+**Measured CI SHA:** `dda2624f8900701b577ecc90745e02a5845c6c0d`. Only results attributed explicitly to that SHA are empirical. Newer source fixes are candidates and **do not** retroactively change prior failures.
+
+### Same-SHA Node Verify — 305 / 301 PASS / 3 FAIL / 1 SKIP
+
+[Combined Node run #44645403753](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44645403753) failed:
+1. `tests/adaptive/daily-training.test.js:162` — simulated v3 quota failure leaves a durable `pendingProvenance`; reusing original `attemptId` wrongly returns `recovery-required` with `作答 ID 已存在`, rather than `saved`. Diagnosed underlying source: `src/storage/local.js` intentionally retains its unsaved in-memory archive as fallback on quota failure; reusing the same store instance on a **durability-critical Daily retry** creates an in-memory phantom duplicate. Fix is now source-owned [Daily PR #45 `4d91a537`](https://github.com/kodlbegiko/taiwan-mahjong-trainer/commit/4d91a537156dd25e22569f6025acc2b63ec0e251): Adaptive `src/adaptive/learning-adapter.js` creates a fresh legacy writer for every canonical submit and checks its durable readback. No change to original V1 archive schema. Await same-SHA rerun; don't infer PASS.
+2. `tests/bots/r3-full-round.test.js:168` — 100 fixed seeds executed, **99 terminal** (88 win, 11 draw), 1 `unsupported-rule-capability` at **Seed `87`** (game `bot-r3-87`, seed `fixed-round-87`, 162 events, 157 steps, 32 Claim Windows, 95 responses). `invalidActions=0`, `stalls=0`, `replayMatched=99`. Full 100/100 gate **FAIL**. This unsupported event must be treated as an explicit Rules capability gap. In particular multiple simultaneous legitimate winner intents are intentionally fail-closed under experimental RuleProfile: no invented arbitration or forged win. Preserve seed and event trace, retest if Rules separately adds a real table-policy authority.
+3. `tests/tile-assets-integrity.test.js:75` — integrator-only cache version `tmt-phase3-...` violates V1 `tmt-v02-realistic-tiles-` prefix assertion. Fixed in integrator `sw.js` (retains full precache + added R3/Daily/Bot dependencies); rerun pending.
+
+**Independent earlier V1 Chromium:** on that SHA, the Master Academy combined 12-step browser job passed, and the master Academy UI browser job passed. Their matching Node workflows were red due to the three global failures; do not report full V1 latest combined Gate PASS without green Node.
+
+### Same-SHA real Chromium R3 result
+
+[Full-match workflow #44645403861](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44645403861) reached a real **human + 3 Bot** Rules-owned terminal state, displayed authoritative experimental `tw16-minimal-tai-v1` zero-sum settlement (**310 events**), persisted the completed match, loaded historical own-seat Replay and advanced the frame. [Three real screenshots artifact #14588736118](https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/44645403861/artifacts/14588736118). This is concrete full-round browser evidence, but **the workflow FAILED** in Daily route after Replay: the test looked for `[data-daily-start]` or `[data-daily-resume]` before asynchronous Daily route import finished and timed out; root cause and official Daily persistence must be verified, not assumed. Offline new tab / 34 SVG after Daily **NOT_RUN** in this failed flow.
+
+Source-owned corrections:
+- [Replay PR #41 `b5f64675`](https://github.com/kodlbegiko/taiwan-mahjong-trainer/commit/b5f64675b51ac5515329bb4d758dbff6df707ab1) exposes an owner-only `listReplayFrameBoundaries()` that skips intermediate partial legal-action event groups (e.g. `win` before `settle`).
+- [Table UI PR #42 `11974be1`](https://github.com/kodlbegiko/taiwan-mahjong-trainer/commit/11974be1b59e2fd12c61f5761f123ae429af2a6d) navigates those exact event boundaries rather than naively `eventSeq=index+1`.
+- [Table UI PR #42 `9a0b35ad`](https://github.com/kodlbegiko/taiwan-mahjong-trainer/commit/9a0b35ad4ee5b18cca7a0861bbf8fcc5d77cc76c) adds explicit async Daily route readiness and failure screenshot/error reporting. CI Chromium now installs Noto CJK to display Chinese text correctly. Source-specific browser test is **not** a successful combined gate until the final exact integration SHA is tested.
+
+### Current source pin and strict gate matrix
+
+| Item | Exact source HEAD as observed | Combined evidence |
+| --- | --- | --- |
+| Rules #43 | `1f7badfefa50d97e4db4a9a689ea563eb3289232` | Experimental only |
+| Bots #40 | `273ccd9819fad4069540cdbd85021df1ad065ba3` | 99/100 combined; unsupported seed 87 |
+| Replay #41 | `b5f64675b51ac5515329bb4d758dbff6df707ab1` | Corrected group-atomic timeline, rerun pending |
+| Table #42 | `9a0b35ad4ee5b18cca7a0861bbf8fcc5d77cc76c` | Full round + replay observed on prior SHA; Daily browser rerun pending |
+| Daily #45 | `4d91a537156dd25e22569f6025acc2b63ec0e251` | Retry repair staged; rerun pending |
+
+| Status | Current adjudication |
+| --- | --- |
+| V1_BASELINE_PASS | Historical V1 source PASS; newest combined regression PENDING |
+| EXPERIMENTAL_RULES_PASS | Rules golden source evidence; combined follow-up PENDING |
+| CLAIM_ARBITRATION_PASS | Implemented; same-SHA Rule/Bot tests PENDING |
+| THREE_BOT_MATCH_PASS | **FAIL: 99/100, Seed 87 unsupported** |
+| REPLAY_PASS | Historical full-round browser observed; final group-boundary gate PENDING |
+| DAILY_UI_PASS | **FAIL on measured head**; durable retry and browser navigation retest PENDING |
+| TABLE_UI_PASS | Browser terminal game observed; full required E2E PENDING |
+| PWA_PASS | Browser Gate aborted before offline; PENDING |
+| PREVIEW_DEPLOYED | NO |
+| FULL_RULES_VERIFIED | NO — unsupported capabilities/experimental minimal scoring |
+| RELEASE_GO | **NO-GO** |
+
+**Do not conflate a single 310-event settled browser match with 100/100 completion or verified full Taiwanese rules.** The final integration commit must pass the exact-source Node/Chromium/PWA/legacy gates before any Full Game Preview designation. Physical iPhone, Android, VoiceOver and TalkBack remain NOT_RUN.
