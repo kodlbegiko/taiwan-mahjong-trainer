@@ -103,3 +103,67 @@ Until these requirements are provided and tested, the current `tw16-configurable
 **AI 3 (Bots):** `getRuleCapabilities(ruleRef)` may be read at initialization, but must not peek at `GameState`, inspect current opponent private claim intent, suppress a legitimate WIN, or change last PASS merely to bypass the capability block. Continue returning `{status:'unsupported',reason:'unsupported-rule-capability',capability:'multiple_winners'}` when Rules refuses the atomic settlement.
 
 **AI 6 (Integrator):** pin the exact latest Rules PR #43 HEAD; preserve the original Seed 87 failure as an **expected, explicitly reported unsupported fixture**, not a successful terminal game. Keep the strict original 100/100 test gate; it cannot pass until a *separately approved* and tested multiwinner RuleProfile is implemented or a different explicit contractual acceptance criterion is authorized. Re-run combined Node, two 10k Oracles, browser/PWA and full-match replay at the same source SHA. Do not mark experimental profiles verified.
+
+## R5 single-winner interception (implemented, EXPERIMENTAL)
+
+**RuleProfile**: `{profileId:'tw16-single-winner-interception',ruleVersion:'experimental-v1'}`.
+This is a **new additive profile**, not a modification of `tw16-configurable-table@experimental-full-v1`. The old profile continues to reject two or three WIN intents with `UNSUPPORTED_RULE_CAPABILITY / multiple_winners`; its original R4 Golden remains mandatory.
+
+### Explicit house policy
+
+| Property | New R5 policy |
+| --- | --- |
+| `multipleDiscardWins` | `single-winner` (multiple declarations accepted; only one wins) |
+| `winPriority` | `nearest-clockwise-from-discarder` |
+| `claimPriority` | `win > open-kong > pong > chi` (engine internal `kong` is open-kong in claim window) |
+| `settlementPolicy` | `single-discard-winner` |
+| `scoringPolicy` | `tw16-minimal-tai-v1` |
+| `verificationStatus` | `experimental` |
+
+The authoritative seat successor is `(seat+1)%4`; compare responder distance `(seat-fromSeat+4)%4`. All three respondents must submit a fresh, Rules-issued LegalAction before arbitration; priority is independent of response arrival order. For the exact 157-action Seed 87 trace, the legal WIN intents are seat 3 and seat 0 after seat 2's discard. Only after seat 1's final legal PASS, seat 3 is nearest and wins. Seat 0 remains recorded as a real private WIN declaration, but is intercepted rather than paid. Seat 1's PASS is not reclassified. No Bot action is rewritten.
+
+### Additive event/settlement schema diff — for AI 6 contract review
+
+The existing `GameState.extensions.tw16.result` fields and existing `win` and `settle` event types remain unchanged. **Only in the new R5 profile, and only for discard-win arbitration**, these three objects receive the same optional `claimResolution` field:
+
+```js
+claimResolution: {
+  schemaVersion: 1,
+  policyVersion: 'tw16-single-winner-interception/1.0.0',
+  winPriority: 'nearest-clockwise-from-discarder',
+  discardEventId: 'evt:...',      // corresponding source discard
+  fromSeat: 2,
+  selectedSeat: 3,
+  selectedClaimActionId: 'act:...',// original WIN, not the final PASS
+  declaredWinSeats: [3, 0],      // ranked clockwise, not arrival-order
+  interceptedWinSeats: [0],      // actual private WINs not selected
+}
+```
+
+This **additive optional field** is a proposal to integrate into `docs/contracts/PHASE3_FULL_GAME_V1.md`; AI 6 owns the authoritative contract change and replay-adapter review. The raw winning/settlement events remain grouped under the final PASS action ID as their transaction cause; `selectedClaimActionId` separately establishes the selected WIN provenance. Private `claim`/ `pass` events remain indistinguishable in PlayerView until resolution. Once resolved, public `win` projection may disclose `claimResolution`, never beforehand. Old ledger entries without this field replay as before; no new event type is introduced.
+
+All scoring uses existing `scoreWinningHand` and `settleWin`: the sole winner receives the single discarder payment; every intercepted WIN seat receives zero delta, and the four delta entries sum to zero. This is still **abstract experimental points**, not universal Taiwanese tai, local penalties or verified official grading. A failed claim validation or settlement throws before returning the cloned next state; neither input GameState nor original TurnEvent ledger is mutated.
+
+### Capability API for AI 3 and AI 6
+
+```js
+const caps=getRuleCapabilities({
+  profileId:'tw16-single-winner-interception',ruleVersion:'experimental-v1'
+});
+caps.claimArbitration.multipleDiscardWins;
+// { status:'experimental-supported', mode:'single-winner',
+//   priority:'nearest-clockwise-from-discarder' }
+caps.claimArbitration.singleWinner; // true
+caps.claimArbitration.winPriority; // 'nearest-clockwise-from-discarder'
+caps.claimArbitration.settlementPolicy; // 'single-discard-winner'
+caps.claimArbitration.multipleWinnerSettlement.status; // 'unsupported'
+caps.claimArbitration.robAddedKong.status; // 'unsupported'
+caps.scoring.policy; // 'tw16-minimal-tai-v1'
+caps.status; // 'experimental'
+```
+
+AI 3 must obtain the current PlayerView per responder and use only the issued `legalActions`; no suppression of concurrent WIN, no GameState, no inspection of private intents. AI 6 must explicitly select the new `ruleRef` and re-run Bot #40, Replay #41, integration #44, 100-seed full rounds, both 10k Oracle suites, `npm run check`, browser/PWA gates and same-SHA CI. Do not change the old profile's replay defaults. Neither source-only Goldens nor this experimental policy are RELEASE_GO proof.
+
+### Golden verification scope
+
+`tests/rules/r5-single-winner.test.js` covers exact Seed 87 with both original private WINs, old R4 fail-closed, four rotating discarders, three simultaneous WINs, single/no WIN, WIN versus PONG/CHI/OPEN KONG, forged/stale/duplicate submissions, pass-win lock, clone atomicity, zero-sum, deterministic replay, privacy noninterference, tamper rejection and capabilities. The original `tests/rules/r4-seed-87.test.js` remains intact. Test claims are valid **only after actual current-HEAD Node/CI execution**.
