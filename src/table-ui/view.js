@@ -223,14 +223,14 @@ export function ReplayControls(timeline,index,externalFrame=null){
   const findings=frame.findings??[];
   const analysis=frame.analysis;
   return '<section class="table-replay" aria-label="正式牌局複盤">'+
-    '<h2>逐事件歷史複盤</h2><p>歷史 PlayerView · 事件 '+(index+1)+' / '+length+
+    '<h2>逐事件歷史複盤</h2><p>歷史 PlayerView · 事件 '+(frame.asOfEventSeq??(index+1))+' / '+(timeline.manifest?.eventCount??length)+
     ' · '+escapeHtml(timeline.manifest?.completionStatus??'來源已驗證')+'</p>'+
     '<div class="table-replay-controls"><button type="button" data-replay-first '+
     (index===0?'disabled':'')+'>開局</button><button type="button" data-replay-prev '+
     (index===0?'disabled':'')+'>上一事件</button><label for="table-replay-jump">事件</label>'+
     '<select id="table-replay-jump" data-replay-jump aria-label="跳至指定事件">'+
     Array.from({length},(_,i)=>'<option value="'+i+'"'+(i===index?' selected':'')+
-      '>#'+(i+1)+'</option>').join('')+'</select>'+
+      '>#'+(timeline.boundaries?.[i]??(i+1))+'</option>').join('')+'</select>'+
     '<button type="button" data-replay-next '+(index===length-1?'disabled':'')+
     '>下一事件</button></div>'+
     ReplayPublicTable(frame.view)+
