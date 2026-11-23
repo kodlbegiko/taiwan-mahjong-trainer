@@ -158,7 +158,11 @@ export function auditAcademyContent() {
     curriculum:{totalLessons:LESSONS.length,published:lessonRows.filter(x=>x.status==='published').length,
       validated:lessonRows.filter(x=>x.status==='validated').length,
       draft:lessonRows.filter(x=>x.status==='draft').length,
-      fullyAssessedObjectives:lessonRows.filter(x=>x.unassessedObjectiveTagIds.length===0).length},
+      fullyAssessedObjectives:lessonRows.filter(x=>x.unassessedObjectiveTagIds.length===0).length,
+      publishedFullyAssessed:lessonRows.filter(x=>x.status==='published'&&x.unassessedObjectiveTagIds.length===0).length,
+      validatedFullyAssessed:lessonRows.filter(x=>x.status==='validated'&&x.unassessedObjectiveTagIds.length===0).length,
+      // This is TAG coverage, not a proof of student learning outcomes.
+      objectiveTagCoverageMethod:'intersection-of-lesson-objectives-and-canonical-v3-question-tags'},
     bank:{totalQuestions:BANK_SPEC.length,structurallyVerified:questionRows.length,
       failed:failures.length,uniqueShapes:uniqueShapes.size,
       byTaskType:byType,byEstimatedDifficulty:byDifficulty,bySamplingLevel:bySample,
