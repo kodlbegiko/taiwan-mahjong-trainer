@@ -7,7 +7,8 @@
 ## 1. 基準與權威邊界
 
 - 既有 20 堂課：12 `published`、8 `validated`；**R7 不自動修改狀態**。
-- 100 道可確定重播的原始 Exercise v3 結構題，題型為捨牌 40、聽牌 40、多面聽 20；每堂課 5 題。
+- 100 道固定種子、可重播的原始 Exercise v3 結構題，題型為捨牌 40、聽牌 40、多面聽 20；每堂課 5 題。
+- **課程目標與正式題目標籤的直接對應僅 10/20（50%）**：已發布 8/12（66.7%），尚未發布 2/8（25%）。這是根據本版 `Lesson.skillTagIds` 與五題的 `Question.skillTagIds` 交集所做的覆蓋統計，**不是學生學會的比例、難度驗證或教學品質保證**。尚未對應的課程只能提供教材，不應將現有題分數宣稱為該目標的正式能力證據。
 - 真正的官方評分與作答仍由 `createDecisionRecord`、`validateDecisionRecord` 和 `tw-mahjong-trainer:archive:v3` 產生／保存。Academy provenance／Adaptive sidecar 僅保存經 canonical v3 驗證的課程映射；不可建立第二套成績權威。
 - `validated` 只代表已建立可解析內容與可重播結構題的基礎，不表示具備可發布的情境策略教學、台數評分或經專家審核。
 - 第 3–5 級捨牌樣本 `requestedLevel='advanced'` 是**抽樣方式**；`estimatedDifficulty` 是依向聽／聽張數推得的演算法標籤，全部 `humanValidated=false`。不能宣稱已證實屬於人類高手難度。
