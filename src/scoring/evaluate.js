@@ -45,6 +45,7 @@ const name={
   mixedSuit:'混一色',pureSuit:'清一色',allHonors:'字一色',
   smallDragons:'小三元',bigDragons:'大三元',smallWinds:'小四喜',bigWinds:'大四喜',
   concealedTriplets:'暗刻',openKong:'明槓',concealedKong:'暗槓',
+  noHonorsNoFlowers:'無字無花',
 };
 function validateEvidence(p,e){
   validateScoringProfile(p);
@@ -54,6 +55,12 @@ function validateEvidence(p,e){
   assert(seat(e.winnerSeat)&&seat(e.sourceSeat)&&seat(e.dealerSeat),'seat');
   assert(['self-draw','discard'].includes(e.via),'win mode');
   assert(e.via==='self-draw'?e.winnerSeat===e.sourceSeat:e.winnerSeat!==e.sourceSeat,'win source');
+  for(const field of ['waitShape','firstTurnWin','readyDeclaration',
+    'liabilityPolicy','winReason']){
+    if(e[field]!==undefined)throw new ScoringCapabilityError(field);
+  }
+  if(e.via==='self-draw'&&e.winningTile!==undefined)
+    assert(false,'discard winningTile must not accompany self-draw');
   if(e.specialWin!==undefined&&e.specialWin!=='ordinary')
     throw new ScoringCapabilityError(e.specialWin);
   if(e.liability!==undefined&&e.liability!==null)
@@ -134,6 +141,9 @@ export function scoreWinningHand(profile,evidence){
       const types=[...whole];
       const suits=new Set(types.filter(t=>t<27).map(t=>Math.floor(t/9)));
       const honors=types.some(t=>t>=27);
+      if(!honors&&flowers.length===0)
+        add(items,'no-honors-no-flowers','noHonorsNoFlowers',
+          'no honor tile and no flower in the entire winning hand');
       if(suits.size===0)add(items,'all-honors','allHonors','all 17 effective tiles honor types');
       else if(suits.size===1){
         if(honors)add(items,'mixed-suit','mixedSuit','one suited family plus honors');
