@@ -126,3 +126,81 @@ const q=JSON.parse(JSON.stringify(p));mutate(q);
 assert.throws(()=>createScoringProfile(q),/Invalid|Unsupported/);
 }
 });
+
+test('S13 ron completion of a triplet is not an extra concealed pung',()=>{
+const concealed=[3,3,12,12,12,21,21,21,6,7,8,9,9];
+const ron=fixture({concealed,winningTile:3});
+const x=score(ron);
+assert.ok(!x.breakdown.some(e=>e.code==='concealed-triplets:3'));
+const y=score(fixture({concealed:[3,3,3,12,12,12,21,21,21,6,7,8,9],
+winningTile:9}));
+assert.ok(y.breakdown.some(e=>e.code==='concealed-triplets:3'));
+assert.ok(y.tai>x.tai);
+});
+test('S14 big four winds supersede per-wind tai',()=>{
+const hand=[27,27,27,28,28,28,29,29,29,30,30,30,0,0,0,1,1];
+const x=score(fixture({via:'self-draw',sourceSeat:1,concealed:hand,
+winningTile:undefined,melds:[],seatWindType:27,prevailingWindType:27}));
+assert.ok(x.breakdown.some(e=>e.code==='big-winds'));
+assert.ok(!x.breakdown.some(e=>e.code.startsWith('seat-wind:')||
+e.code.startsWith('round-wind:')));
+});
+test('S15 concealed kong retains the closed-hand status',()=>{
+const hand=[0,0,0,1,1,1,2,2,2,3,3,3,4,4];
+const e=fixture({via:'self-draw',sourceSeat:1,concealed:hand,
+winningTile:undefined,melds:[{kind:'kong',open:false,tileIds:[6,6,6,6]}]});
+assert.ok(score(e).breakdown.some(x=>x.code==='concealed-self-draw'));
+assert.ok(!score(e).breakdown.some(x=>x.code.startsWith('kong:')));
+assert.ok(scoreWinningHand(see,e).breakdown.some(x=>x.code==='kong:0'));
+});
+test('S16 pure suit excludes mixed suit, honors-only implicit all-pongs configurable',()=>{
+const mono=[0,0,0,1,1,1,2,2,2,3,3,3,4,4,4,5,5];
+const m=score(fixture({via:'self-draw',sourceSeat:1,concealed:mono,
+winningTile:undefined,melds:[]}));
+assert.ok(m.breakdown.some(x=>x.code==='pure-suit'));
+assert.ok(!m.breakdown.some(x=>x.code==='mixed-suit'));
+const honor=[27,27,27,28,28,28,29,29,29,30,30,30,31,31,31,32,32];
+const evidence=fixture({via:'self-draw',sourceSeat:1,concealed:honor,
+winningTile:undefined,melds:[],seatWindType:27,prevailingWindType:27});
+const h=score(evidence);
+assert.ok(h.breakdown.some(x=>x.code==='all-honors'));
+assert.ok(!h.breakdown.some(x=>x.code==='all-pongs'));
+const q=JSON.parse(JSON.stringify(p));q.variants.allHonorsSuppressAllPongs=false;
+assert.ok(scoreWinningHand(createScoringProfile(q),evidence).breakdown.some(x=>x.code==='all-pongs'));
+});
+test('S17 fixed external table fees also apply to an exhaustive draw',()=>{
+const q=JSON.parse(JSON.stringify(p));q.settlement.fee={mode:'fixed-per-player',points:4};
+const l=settleExhaustiveDraw(createScoringProfile(q));
+assert.deepEqual(l.playerTransferDeltas,[0,0,0,0]);
+assert.deepEqual(l.playerDeltas,[-4,-4,-4,-4]);
+assert.equal(l.houseDelta,16);
+assert.equal(assertLedgerConservation(l),true);
+});
+test('S18 settlement refuses numeric overflow and fabricated duplicate streak references',()=>{
+const q=JSON.parse(JSON.stringify(p));q.points.perTai=Number.MAX_SAFE_INTEGER;
+const e=fixture({via:'self-draw',sourceSeat:1,concealed:dragons,
+winningTile:undefined,melds:[]});
+assert.throws(()=>settleWinningHand(createScoringProfile(q),e),/overflow/);
+assert.throws(()=>score(fixture({dealerStreak:2,
+streakEvidence:{roundRefs:['same','same']}})),/streak/);
+});
+test('S19 payment item and breakdown entries have unique rule codes and sources',()=>{
+const e=fixture({via:'self-draw',sourceSeat:1,concealed:dragons,
+winningTile:undefined,melds:[],dealerStreak:2,
+streakEvidence:{roundRefs:['round1','round2']}});
+const l=settle(e);
+const codes=l.score.breakdown.map(x=>x.code);
+assert.equal(new Set(codes).size,codes.length);
+assert.ok(l.payments.flatMap(x=>x.dealerItems).every(x=>x.ruleVersion===l.scoringVersion&&
+x.source&&x.scope==='payment'));
+});
+test('S20 ledger detects tampering with payments, missing transfers and negative fee',()=>{
+const l=settle(fixture({dealerSeat:0}));
+const corrupted=structuredClone(l);
+corrupted.payments[0].points++;
+assert.throws(()=>assertLedgerConservation(corrupted),/Mismatch/);
+const missing=structuredClone(l);missing.payments=[];
+assert.throws(()=>assertLedgerConservation(missing),/Mismatch/);
+const fee=structuredClone(l);fee.fees=[{seat:1,points:-1}];
+assert.throws(()=>assertLedgerConservation(fee),/Invalid fee/);
+});
