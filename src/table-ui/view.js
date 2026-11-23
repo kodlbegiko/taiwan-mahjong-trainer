@@ -139,12 +139,13 @@ export function TableView(snapshot,{selection=null,busy=false,error='',botStatus
     escapeHtml(profile.ruleVersion)+'</span><h1 id="table-heading" tabindex="-1">四人牌桌</h1>'+
     '<p>Rules Engine 決定牌局、宣告與結算；此規則與台數政策均未取得完整台灣通用驗證。</p></div>'+
     '<div class="table-header-tools"><span class="table-version">Revision '+
-    view.asOfEventSeq+'</span><button type="button" class="secondary" data-start-new>重新開局</button></div></header>'+
+    view.asOfEventSeq+'</span><button type="button" class="secondary" data-start-new '+
+    (busy?'disabled':'')+'>重新開局</button></div></header>'+
     (restartPending?'<div class="table-selected table-confirmation" data-restart-confirmation '+
       'role="group" aria-label="重新開局確認"><p>確定重新開局？目前對局會被取代。</p>'+
       '<button type="button" class="primary" data-confirm-new>確定重新開局</button>'+
       '<button type="button" class="secondary" data-cancel-new>取消</button></div>':'')+
-    '<div class="table-facts"><span>規則：'+escapeHtml(profile.profileId)+
+    '<div class="table-facts" data-table-busy="'+(busy?'true':'false')+'"><span>規則：'+escapeHtml(profile.profileId)+
     '</span><span>階段：'+escapeHtml(view.round.phase)+
     '</span><span>莊家：'+SEATS[view.round.dealerSeat]+
     '</span><span>行動席：'+(ended?'結束':SEATS[view.round.currentSeat])+

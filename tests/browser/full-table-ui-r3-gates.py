@@ -102,7 +102,10 @@ def full_round(page, folder):
         dialog.dismiss()
     page.on('dialog', on_unexpected_dialog)
     open_game(page)
+    page.locator('.table-header-tools [data-start-new]:enabled').wait_for(timeout=25000)
     original_revision=page.locator('.table-version').inner_text()
+    require(page.locator('[data-table-busy="false"]').count()==1,
+            'The real UI is still busy after opening the game')
     page.locator('.table-header-tools [data-start-new]').click()
     require(page.locator('[data-restart-confirmation]').count()==1,
             'Restart must require an in-page confirmation')
