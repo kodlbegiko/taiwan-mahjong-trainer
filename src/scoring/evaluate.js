@@ -149,7 +149,7 @@ export function scoreWinningHand(profile,evidence){
           add(items,'small-winds','smallWinds','three wind triplets and wind pair');
         if(!(windCount===3&&dec.pair>=27&&dec.pair<=30&&!profile.variants.smallWindRetainsWind)){
           for(const t of tripletTypes.filter(t=>t>=27&&t<=30)){
-            if(profile.variants.wind==='all')add(items,'wind:'+t,'roundWind','wind triplet type '+t,1);
+            if(profile.variants.wind==='all')add(items,'wind:'+t,'roundWind','wind triplet type '+t);
             else{
               if(t===evidence.prevailingWindType)add(items,'round-wind:'+t,'roundWind','prevailing wind '+t);
               if(t===evidence.seatWindType)add(items,'seat-wind:'+t,'seatWind','seat wind '+t);
