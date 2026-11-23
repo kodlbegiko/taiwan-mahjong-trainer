@@ -1,7 +1,7 @@
 /* Offline-first, atomic shell for GitHub Pages root or /repo/ deployments.
  * IMPORTANT: change CACHE_VERSION whenever any precached file changes.
  * The install event only succeeds if the entire listed release is cached. */
-const CACHE_VERSION = 'tmt-v02-realistic-tiles-master-academy-phase3-r5-interception-20261120-r8';
+const CACHE_VERSION = 'tmt-v02-realistic-tiles-master-academy-phase3-r7-mobile-pwa-a11y-20261124-r1';
 const SHELL_CACHE = `tmt-shell-${CACHE_VERSION}`;
 const BASE = new URL('./', self.location.href);
 const SHELL = [
@@ -46,7 +46,7 @@ const SHELL = [
   './src/academy-ui/main.js', './src/academy-ui/academy.css',
   './src/table-ui/main.js', './src/table-ui/session.js',
   './src/table-ui/full-round.js', './src/table-ui/daily.js',
-  './src/table-ui/view.js', './src/table-ui/table.css',
+  './src/table-ui/view.js', './src/table-ui/table.css', './src/table-ui/a11y.js',
   './src/academy-ui/public-facade.js', './src/academy-ui/scenario.js',
   './src/academy-ui/academy-bridge.js', './src/academy-ui/academy-live.js',
   './src/core/efficiency.js', './src/analysis/explain.js',
@@ -95,14 +95,21 @@ const SHELL_PATHS = new Set(SHELL.map(url => new URL(url).pathname));
 self.addEventListener('install', event => {
   event.waitUntil((async () => {
     const cache = await caches.open(SHELL_CACHE);
-    // Bypass the HTTP cache, ensuring the new release never reuses old JS bytes.
-    await Promise.all(SHELL.map(async url => {
+    // Wait for *every* request to settle before deleting a failed staging cache.
+    // A failed/partial update must not replace an already working release.
+    const outcomes = await Promise.allSettled(SHELL.map(async url => {
       const response = await fetch(url, { cache: 'reload' });
-      if (!response.ok) throw new Error(`Precache failed: ${url} ${response.status}`);
+      if (!response.ok || response.type === 'opaque') {
+        throw new Error(`Precache failed: ${url} ${response.status}`);
+      }
       await cache.put(url, response);
     }));
-    // Do not force skipWaiting for updates. Let open sessions finish on one
-    // coherent release and prompt before activation.
+    const failed = outcomes.find(result => result.status === 'rejected');
+    if (failed || (await cache.keys()).length !== SHELL.length) {
+      await caches.delete(SHELL_CACHE);
+      throw failed?.reason ?? new Error('Incomplete release shell');
+    }
+    // Installation never force-activates: existing tabs keep their old shell.
   })());
 });
 
@@ -133,8 +140,11 @@ self.addEventListener('fetch', event => {
       : new URL(url.pathname, url.origin).href;
     const cached = await cache.match(canonical);
     if (cached) return cached;
-    // During the initial install and for unexpected URLs, allow an ordinary
-    // network load. Do not silently fabricate or cache unverified module code.
+    // A controlled client must never mix older HTML with a newer uncached JS/CSS
+    // byte. Cache corruption or an incomplete deploy fails closed instead.
+    if (SHELL_PATHS.has(requestedPath) || event.request.mode === 'navigate') {
+      return Response.error();
+    }
     return fetch(event.request);
   })());
 });
