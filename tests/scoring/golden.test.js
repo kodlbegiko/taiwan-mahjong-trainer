@@ -2,8 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {getScoringProfile,listScoringProfiles,createScoringProfile,scoreWinningHand,
 settleWinningHand,settleExhaustiveDraw,assertLedgerConservation,
-evidenceFromSettledRulesState,ScoringCapabilityError} from '../../src/scoring/index.js';
-import {getRuleProfile,scoreWinningHand as legacyScore,settleWin as legacySettle}
+evidenceFromSettledRulesState,scoreRulesState,settleRulesState,ScoringCapabilityError} from '../../src/scoring/index.js';
+import {getRuleProfile,createGame,createDeck,listLegalActions,applyAction,validateGameState,replayGame,
+scoreWinningHand as legacyScore,settleWin as legacySettle}
 from '../../src/rules/index.js';
 const p=getScoringProfile('tw16-gametower-comparative');
 const see=getScoringProfile('tw16-gametower-see-flower-wind');
@@ -203,4 +204,42 @@ const missing=structuredClone(l);missing.payments=[];
 assert.throws(()=>assertLedgerConservation(missing),/Mismatch/);
 const fee=structuredClone(l);fee.fees=[{seat:1,points:-1}];
 assert.throws(()=>assertLedgerConservation(fee),/Invalid fee/);
+});
+
+test('S21 genuine R5 Rules win/settle public-event adapter works without mutating R5',()=>{
+const r5=getRuleProfile('tw16-single-winner-interception','experimental-v1');
+const deck=createDeck(r5),standard=deck.filter(id=>id.startsWith('t:'));
+const seventeen=[0,1,2,3,4].flatMap(t=>[0,1,2].map(copy=>'t:'+t+':'+copy))
+.concat(['t:5:0','t:5:1']);
+const seats=[[...seventeen],[],[],[]],taken=new Set(seventeen);
+for(let seat=1;seat<4;seat++){
+for(const id of standard){if(seats[seat].length>=16)break;
+if(!taken.has(id)){seats[seat].push(id);taken.add(id);}}
+assert.equal(seats[seat].length,16);
+}
+const dealer=[...seats[0]],extra=dealer.pop();
+const fixtureDeck=[...dealer,...seats[1],...seats[2],...seats[3],extra,
+...deck.filter(id=>!taken.has(id))];
+assert.equal(fixtureDeck.length,144);
+assert.equal(new Set(fixtureDeck).size,144);
+const start=createGame({gameId:'scoring-r7-real-win',seed:'scoring-r7-seed',
+fixtureDeck,dealerSeat:0,profileId:'tw16-single-winner-interception',
+ruleVersion:'experimental-v1'});
+const action=listLegalActions(start,0).find(x=>x.kind==='win');
+assert.ok(action);
+const result=applyAction(start,{actorSeat:0,actionId:action.actionId,
+expectedRevision:start.revision}).state;
+assert.equal(validateGameState(result),true);
+assert.deepEqual(replayGame(result),result);
+assert.deepEqual(result.round.scores,[540,-180,-180,-180]);
+const snapshot=JSON.stringify(result);
+const evidence=evidenceFromSettledRulesState(result);
+assert.equal(evidence.dealerStreak,0);
+assert.equal(evidence.prevailingWindType,27);
+const score=scoreRulesState(p,result);
+assert.equal(score.tai,23);
+const l=settleRulesState(p,result);
+assert.deepEqual(l.playerTransferDeltas,[72,-24,-24,-24]);
+assert.equal(assertLedgerConservation(l),true);
+assert.equal(JSON.stringify(result),snapshot);
 });
