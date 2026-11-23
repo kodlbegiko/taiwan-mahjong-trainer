@@ -13,7 +13,3 @@ export {
   validateAcademyProvenance, validateAcademyProvenanceBatch,
   resolveAcademyProvenance,
 } from './provenance.js';
-
-export { ACADEMY_CONTENT_AUDIT_VERSION, auditAcademyContent } from './content-audit.js';
-export { LESSON_GUIDE_VERSION, UNPUBLISHED_LESSON_GUIDES,
-  getUnpublishedLessonGuide, validateUnpublishedLessonGuides } from './unpublished-guides.js';
