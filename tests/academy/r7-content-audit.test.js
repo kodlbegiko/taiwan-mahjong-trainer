@@ -27,6 +27,11 @@ test('R7 content: all 20 states and 100 replayed structural scores are evidenced
   assert.equal(report.createsLearningEvidence,false);
   assert.equal(report.curriculum.totalLessons,20);
   assert.deepEqual([report.curriculum.published,report.curriculum.validated,report.curriculum.draft],[12,8,0]);
+  assert.equal(report.curriculum.fullyAssessedObjectives,10);
+  assert.equal(report.curriculum.publishedFullyAssessed,8);
+  assert.equal(report.curriculum.validatedFullyAssessed,2);
+  assert.equal(report.curriculum.objectiveTagCoverageMethod,
+    'intersection-of-lesson-objectives-and-canonical-v3-question-tags');
   assert.equal(report.bank.totalQuestions,100);
   assert.equal(report.bank.structurallyVerified,100);
   assert.equal(report.bank.failed,0);
