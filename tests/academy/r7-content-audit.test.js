@@ -169,3 +169,32 @@ test('R7 unscored lesson supplements cover the eight held-back lessons without i
   assert.throws(()=>validateUnpublishedLessonGuides(altered),/false evidence/);
   assert.equal(getUnpublishedLessonGuide('academy-l1-01'),null);
 });
+
+test('R7 wrong-answer review: real canonical score leads to available review, not a second grade',()=>{
+  const storage=memory();
+  const facade=createMasterAcademyFacade(storage);
+  const spec=BANK_SPEC.filter(x=>x.taskType==='discard').find(x=>{
+    const ranking=getCanonicalExercise(x.questionId).answer.ranking;
+    return ranking.some(r=>r.shanten>ranking[0].shanten);
+  });
+  assert.ok(spec,'At least one official fixture must contain a worse-shanten discard');
+  const ex=getCanonicalExercise(spec.questionId);
+  const choice=ex.answer.ranking.find(x=>x.shanten>ex.answer.ranking[0].shanten).tile;
+  const attemptId='r7-actual-error';
+  const answer=facade.submitStructuralAnswer(ref(spec.questionId),choice,{
+    timestamp:'2026-11-20T09:00:00.000Z',durationMs:1000,attemptId,
+    asOf:'2026-11-22T09:00:00.000Z'
+  });
+  assert.equal(answer.gradingResult.grade,'improve');
+  assert.equal(answer.gradingResult.score,0);
+  assert.equal(answer.recordRef.kind,'legacy-v3');
+  const dashboard=facade.getDashboard({asOf:'2026-11-22T09:00:00.000Z'});
+  const review=dashboard.reviewPlan.items.find(q=>q.questionId===spec.questionId);
+  assert.ok(review);
+  assert.ok(review.reasonCodes.includes('recent-mistake'));
+  assert.ok(review.reasonCodes.includes('repeated-error'));
+  assert.equal(facade.resolveReviewQuestion(review).available,true);
+  assert.ok(dashboard.recommendation.dueQuestions.some(q=>q.questionId===spec.questionId));
+  assert.equal(JSON.parse(storage.getItem(ARCHIVE_STORAGE_KEY)).records.length,1);
+  assert.equal(createMasterAcademyFacade(storage).getProvenanceLinks().length,1);
+});
