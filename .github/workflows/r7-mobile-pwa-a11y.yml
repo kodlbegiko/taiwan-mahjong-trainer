@@ -40,6 +40,8 @@ jobs:
               *) echo "::error::Out-of-scope file changed: $file"; exit 1 ;;
             esac
           done < <(git diff --name-only origin/integration/mahjong-full-game...HEAD)
+      - name: Fast SVG and Service Worker compatibility contract
+        run: node --test tests/tile-assets-integrity.test.js
       - name: Run existing Node and compatibility regressions
         run: npm run check
   browser-pwa:
