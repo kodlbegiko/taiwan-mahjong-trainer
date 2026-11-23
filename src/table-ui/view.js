@@ -34,14 +34,14 @@ function tileButton(tile, action, selected) {
 }
 
 function meldSection(melds) {
-  return '<div class="table-melds" aria-label="公開副露">' +
+  return '<div class="table-melds" role="group" aria-label="公開副露">' +
     (melds.length ? melds.map(m =>
-      '<div class="table-meld" aria-label="' + escapeHtml(m.kind ?? '副露') + '">' +
+      '<div class="table-meld" role="group" aria-label="' + escapeHtml(m.kind ?? '副露') + '">' +
       (m.tileIds ?? []).map(tile => tileSpan(tile)).join('') + '</div>').join('')
       : '<span class="table-quiet">副露 0</span>') + '</div>';
 }
 function flowersSection(flowers) {
-  return '<div class="table-flowers" aria-label="公開花牌">' +
+  return '<div class="table-flowers" role="group" aria-label="公開花牌">' +
     (flowers.length ? flowers.map(f => '<span class="table-flower">' +
       escapeHtml(f.flowerCode ?? '花') + '</span>').join('') :
       '<span class="table-quiet">花牌 0</span>') + '</div>';
@@ -97,7 +97,7 @@ export function ActionBar(legalActions, selectedId, busy) {
   const declarationActions = legalActions.filter(a => a.kind !== 'discard');
   return '<section class="table-actions" aria-label="合法動作"><div class="table-actions-heading">' +
     '<h3>可操作動作</h3><span>僅顯示 Rules Engine 回傳的 LegalAction</span></div>' +
-    (chosen ? '<div class="table-selected"><span>已選：' + escapeHtml(actionName(chosen)) +
+    (chosen ? '<div class="table-selected"><span role="status" aria-live="polite">已選：' + escapeHtml(actionName(chosen)) +
       '</span><button type="button" data-submit-action="' + escapeHtml(chosen.actionId) +
       '" class="primary" ' + (busy ? 'disabled' : '') + '>確認捨牌</button>' +
       '<button type="button" data-clear-selection class="secondary">取消</button></div>'
@@ -145,7 +145,7 @@ export function TableView(snapshot,{selection=null,busy=false,error='',botStatus
     (storageWarning?'<p role="status" class="table-warning">'+escapeHtml(storageWarning)+'</p>':'')+
     (replayWarning?'<p role="status" class="table-warning">'+escapeHtml(replayWarning)+'</p>':'')+
     (error?'<p role="alert" class="table-warning">'+escapeHtml(error)+'</p>':'')+
-    '<div class="table-grid" aria-label="四人牌桌公開資訊">'+
+    '<div class="table-grid" role="group" aria-label="四人牌桌公開資訊">'+
     OpponentSeat(opponents.get(2),view.round.currentSeat,view.round.dealerSeat)+
     OpponentSeat(opponents.get(3),view.round.currentSeat,view.round.dealerSeat)+
     '<div class="table-felt" aria-live="polite"><strong>'+phaseLabel+
