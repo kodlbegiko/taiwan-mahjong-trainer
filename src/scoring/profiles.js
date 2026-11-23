@@ -31,14 +31,14 @@ const base={
   settlement:{discard:'discarder-only',selfDraw:'all-other-three',liability:'unsupported',
     fee:{mode:'none',points:0}},
   variants:{wind:'round-and-seat',flower:'correct-and-sets',kong:'none',
-    flowerSetsReplaceCorrect:true,smallWindRetainsWind:true},
+    flowerSetsReplaceCorrect:true,smallWindRetainsWind:true,allHonorsSuppressAllPongs:true},
   tai,
 };
 const SEE=clone(base);
 SEE.profileId='tw16-gametower-see-flower-wind';
 SEE.claim='Gametower 見花見字 optional platform switch, not the standard mode';
 SEE.variants={wind:'all',flower:'each',kong:'each',flowerSetsReplaceCorrect:false,
-  smallWindRetainsWind:true};
+  smallWindRetainsWind:true,allHonorsSuppressAllPongs:true};
 SEE.tai.openKong=1;
 SEE.tai.concealedKong=2;
 SEE.tai.correctFlower=1;
@@ -72,7 +72,8 @@ export function validateScoringProfile(p){
     !['correct-and-sets','each'].includes(v.flower)||
     !['none','each'].includes(v.kong)||
     typeof v.flowerSetsReplaceCorrect!=='boolean'||
-    typeof v.smallWindRetainsWind!=='boolean')
+    typeof v.smallWindRetainsWind!=='boolean'||
+    typeof v.allHonorsSuppressAllPongs!=='boolean')
     throw new RangeError('Unsupported scoring variants');
   if(!isObject(p.tai)||keys.some(k=>!Object.hasOwn(p.tai,k))||
     Object.keys(p.tai).some(k=>!keys.includes(k))||
