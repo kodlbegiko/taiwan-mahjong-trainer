@@ -242,4 +242,53 @@ const l=settleRulesState(p,result);
 assert.deepEqual(l.playerTransferDeltas,[72,-24,-24,-24]);
 assert.equal(assertLedgerConservation(l),true);
 assert.equal(JSON.stringify(result),snapshot);
+
+const corrupt=structuredClone(result);
+corrupt.events.at(-1).payload.delta=[-180,540,-180,-180];
+assert.throws(()=>evidenceFromSettledRulesState(corrupt),/linkage/);
+assert.throws(()=>evidenceFromSettledRulesState(result,{prevailingWindType:28}),/prevailing wind mismatch/);
+const incomplete=structuredClone(result);
+incomplete.round.handIndex=1;
+assert.throws(()=>evidenceFromSettledRulesState(incomplete),/Dealer streak/);
+});
+
+test('S22 seeded property golden: 150 legal ordinary hands preserve payout under seat permutation',()=>{
+let state=0x9ac0f112;
+const next=max=>{state=(Math.imul(state,1664525)+1013904223)>>>0;return state%max};
+for(let n=0;n<150;n++){
+const counts=Array(34).fill(0),groups=[];
+for(let g=0;g<5;g++){
+let found=false;
+for(let retry=0;retry<200&&!found;retry++){
+const t=next(34),seq=t<27&&t%9<=6&&next(2)===0;
+const types=seq?[t,t+1,t+2]:[t,t,t];
+if(types.every(x=>counts[x]+types.filter(y=>y===x).length<=4)){
+for(const x of types)counts[x]++;
+groups.push({kind:seq?'sequence':'triplet',tiles:types});found=true;
+}
+}
+assert.ok(found);
+}
+let pairType;
+for(let retry=0;retry<200;retry++){const t=next(34);
+if(counts[t]<=2){pairType=t;break}}
+assert.ok(pairType!==undefined);
+const fixed=next(3);
+const melds=groups.slice(0,fixed).map(g=>({kind:g.kind,open:true,tileIds:g.tiles}));
+const concealed=[...groups.slice(fixed).flatMap(g=>g.tiles),pairType,pairType];
+const selfDraw=next(2)===0;
+const winningTile=selfDraw?undefined:concealed.pop();
+const e=fixture({via:selfDraw?'self-draw':'discard',sourceSeat:selfDraw?1:0,
+dealerSeat:3,seatWindType:28,prevailingWindType:27,
+concealed,melds,winningTile,flowers:[]});
+const l=settle(e);
+assert.equal(assertLedgerConservation(l),true);
+const copy=settle(e);
+assert.deepEqual(copy,l);
+const permutation=fixture({...e,winnerSeat:2,sourceSeat:selfDraw?2:1,
+dealerSeat:0});
+const shifted=settle(permutation);
+for(let seat=0;seat<4;seat++)
+assert.equal(shifted.playerTransferDeltas[(seat+1)%4],l.playerTransferDeltas[seat]);
+}
 });
