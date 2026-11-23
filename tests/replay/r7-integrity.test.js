@@ -126,6 +126,17 @@ test('event deletion, duplication and mutated digests cannot be accepted as a co
   }
 });
 
+test('recomputed FNV and SHA-256 digests do not bypass authoritative Rules action validation',()=>{
+  const state=settledR5(),tampered=createReplayArchive(state);
+  tampered.events[1].turnEvent.causedByActionId='act:invented-r7';
+  tampered.decisions[0].actionId='act:invented-r7';
+  tampered.manifest.integrity.eventsChecksum=checksum(tampered.events);
+  tampered.manifest.integrity.decisionChecksum=checksum(tampered.decisions);
+  tampered.manifest.integrity.sha256=replayIntegrityHashes(
+    tampered.manifest,tampered.events,tampered.decisions,state);
+  code(()=>validateReplayArchive(tampered),'CORRUPT_REPLAY');
+});
+
 test('index quota failure creates no fictional completion; explicit recovery validates existing bytes',()=>{
   const state=sandbox({gameId:'r7-index-failure'}),storage=webStore({failIndex:true});
   const service=createReplayService({storage});
