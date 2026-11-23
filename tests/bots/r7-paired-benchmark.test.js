@@ -71,7 +71,10 @@ function legacyIntermediateAction(bot,input){
 }
 
 const REF={profileId:'tw16-single-winner-interception',ruleVersion:'experimental-v1'};
-const seeds=(process.env.R7_BENCH_SEEDS||'0,1').split(',').map(s=>s.trim());
+// Ten independent seeds by default: 10 x 4 target seats x 2 policies = 80
+// complete real games. Override explicitly for local smoke or larger research.
+const seeds=(process.env.R7_BENCH_SEEDS||
+  Array.from({length:10},(_,i)=>String(i)).join(',')).split(',').map(s=>s.trim());
 if(!seeds.every(s=>/^\d+$/.test(s)))throw new RangeError('R7_BENCH_SEEDS must be comma-separated integer seeds');
 const contenderLevel=process.env.R7_BENCH_LEVEL||'Intermediate';
 if(!['Intermediate','Advanced'].includes(contenderLevel))throw new RangeError('R7_BENCH_LEVEL invalid');
