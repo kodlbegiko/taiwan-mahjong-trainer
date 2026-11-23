@@ -112,6 +112,10 @@ export function scoreWinningHand(profile,evidence){
   let best=null;
   for(const dec of decompositions){
     const all=[...melds,...dec.groups.map(g=>({...g,open:false}))];
+    if(profile.variants.wind==='round-and-seat'&&all.some(g=>
+      g.kind!=='sequence'&&g.type>=27&&g.type<=30))
+      assert(winds.includes(evidence.prevailingWindType)&&
+        winds.includes(evidence.seatWindType),'round/seat wind proofs');
     const roles=evidence.via==='discard'
       ?[...(dec.pair===winningTile?['pair']:[]),
         ...dec.groups.filter(g=>g.type===winningTile||
