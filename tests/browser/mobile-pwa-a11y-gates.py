@@ -12,6 +12,28 @@ def require(ok, message):
     if not ok:
         raise AssertionError(message)
 
+def verify_felt_contrast(page, label):
+    values = page.evaluate("""() => {
+      const lightest = [0x29, 0x6e, 0x58]; // gradient center #296e58
+      const linear = v => {
+        v /= 255;
+        return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+      };
+      const luma = rgb => rgb.reduce((n,v,i) => n + linear(v) * [0.2126,0.7152,0.0722][i], 0);
+      const background = luma(lightest);
+      return ['strong','small'].map(selector => {
+        const element = document.querySelector('.table-felt ' + selector);
+        const color = getComputedStyle(element).color.match(/[\d.]+/g).slice(0,3).map(Number);
+        const foreground = luma(color);
+        const ratio = (Math.max(foreground,background)+0.05)/(Math.min(foreground,background)+0.05);
+        return {selector,ratio};
+      });
+    }""")
+    require(all(item['ratio'] >= 4.5 for item in values),
+            f'{label}: table felt text fails WCAG AA small text contrast: {values}')
+    return values
+
+
 def audit(page, label):
     results = page.evaluate("""() => {
       const root = document.querySelector('#full-table-root');
@@ -72,6 +94,7 @@ def main():
                         page.locator('#full-table-root [data-start-new]').click()
                         page.locator('.table-hand button[data-pick-action]').first.wait_for()
                         measured = audit(page, label)
+                        measured['feltContrast'] = verify_felt_contrast(page, label)
                         page.locator('.table-hand button[data-pick-action]').first.scroll_into_view_if_needed()
                         page.screenshot(path=str(args.evidence / f'mobile-{label}.png'), full_page=True)
                         if width == 375:
