@@ -2,7 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { auditAcademyContent, ACADEMY_CONTENT_AUDIT_VERSION,
   LESSONS, listQuestionRefs, submitAcademyAnswer,
-  validateAcademyProvenanceBatch, toPublicQuestion } from '../../src/academy/index.js';
+  validateAcademyProvenanceBatch, toPublicQuestion,
+  UNPUBLISHED_LESSON_GUIDES, LESSON_GUIDE_VERSION,
+  getUnpublishedLessonGuide, validateUnpublishedLessonGuides } from '../../src/academy/index.js';
 import { BANK_SPEC } from '../../src/academy/catalog.js';
 import { getCanonicalExercise } from '../../src/academy/question-internal.js';
 import { createMasterAcademyFacade } from '../../src/integration/master-academy-facade.js';
@@ -146,4 +148,24 @@ test('R7 refresh/retry: durable archive:v3 is authoritative and score evidence s
   assert.equal(rebuilt.reviewPlan.items.filter(x=>x.questionId===questionRef.questionId).length,1);
   assert.equal(rebuilt.profile.skills.find(x=>x.tagId==='efficiency.shanten').attempts,1);
   assert.equal(createMasterAcademyFacade(storage).getProvenanceLinks().length,1);
+});
+
+test('R7 unscored lesson supplements cover the eight held-back lessons without inventing grades',()=>{
+  assert.equal(validateUnpublishedLessonGuides(),true);
+  assert.equal(UNPUBLISHED_LESSON_GUIDES.length,8);
+  const expected=new Set(report.lessonRows.filter(x=>x.status==='validated')
+    .map(x=>x.lessonRef.lessonId));
+  assert.deepEqual(new Set(UNPUBLISHED_LESSON_GUIDES.map(x=>x.lessonRef.lessonId)),expected);
+  for(const guide of UNPUBLISHED_LESSON_GUIDES){
+    assert.equal(guide.guideVersion,LESSON_GUIDE_VERSION);
+    assert.equal(guide.officialCredit,false);
+    assert.equal(guide.grading,'unscored');
+    assert.deepEqual(getUnpublishedLessonGuide(guide.lessonRef.lessonId),guide);
+    assert.ok(guide.workedReasoning.length>25);
+    assert.ok(guide.acceptanceEvidence.length>25);
+  }
+  const altered=UNPUBLISHED_LESSON_GUIDES.map(clone);
+  altered[0].officialCredit=true;
+  assert.throws(()=>validateUnpublishedLessonGuides(altered),/false evidence/);
+  assert.equal(getUnpublishedLessonGuide('academy-l1-01'),null);
 });
