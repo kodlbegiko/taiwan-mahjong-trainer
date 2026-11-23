@@ -45,7 +45,7 @@ SEE.tai.concealedKong=2;
 SEE.tai.correctFlower=1;
 SEE.tai.roundWind=1;
 SEE.tai.seatWind=0;
-SEE.tai.flowerSet=0;
+SEE.tai.flowerSet=2;
 const PRESETS=freeze([base,SEE]);
 const keys=Object.keys(tai);
 const str=x=>typeof x==='string'&&x.length>0;
