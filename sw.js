@@ -1,7 +1,7 @@
 /* Offline-first, atomic shell for GitHub Pages root or /repo/ deployments.
  * IMPORTANT: change CACHE_VERSION whenever any precached file changes.
  * The install event only succeeds if the entire listed release is cached. */
-const CACHE_VERSION = 'tmt-v02-realistic-tiles-master-academy-phase3-r7-mobile-pwa-a11y-20261124-r3';
+const CACHE_VERSION = 'tmt-v02-realistic-tiles-master-academy-phase3-r7-mobile-pwa-a11y-20261124-r4';
 const SHELL_CACHE = `tmt-shell-${CACHE_VERSION}`;
 const BASE = new URL('./', self.location.href);
 const SHELL = [
@@ -99,9 +99,8 @@ self.addEventListener('install', event => {
     // A failed/partial update must not replace an already working release.
     const outcomes = await Promise.allSettled(SHELL.map(async url => {
       const response = await fetch(url, { cache: 'reload' });
-      if (!response.ok || response.type === 'opaque') {
-        throw new Error(`Precache failed: ${url} ${response.status}`);
-      }
+      if (!response.ok) throw new Error(`Precache failed: ${url} ${response.status}`);
+      if (response.type === 'opaque') throw new Error(`Opaque precache response: ${url}`);
       await cache.put(url, response);
     }));
     const failed = outcomes.find(result => result.status === 'rejected');
