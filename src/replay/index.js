@@ -8,7 +8,7 @@ import { analyzePlayerView, STRATEGY_ENGINE_VERSION } from '../strategy/index.js
 import { readPlayerView } from '../strategy/view.js';
 import { getSkillTag } from '../academy/registry.js';
 import { createUnscoredScenario } from '../scenario/index.js';
-import { V1, clone, checksum, ReplayError, REPLAY_VERSION, FRAME_VERSION,
+import { V1, clone, checksum, same, ReplayError, REPLAY_VERSION, FRAME_VERSION,
   DECISION_VERSION, ANALYSIS_VERSION, FINDING_VERSION,
   createReplayArchive, validateReplayArchive, replayStateAt, publicManifest } from './internal.js';
 
@@ -109,18 +109,35 @@ function findingsFor(analysis) {
  */
 export function createReplayService({storage=null}={}) {
   const store=createStorage(storage);
+  function indexVerifiedArchive(id,ids=indexFrom(store)) {
+    if(!ids.includes(id)) store.write(INDEX_KEY,JSON.stringify([...ids,id].sort()));
+  }
   function saveReplay(gameState,{ownerSeat=0,disclosurePolicy='none',unsupportedSubmission=null}={}) {
     const archive=createReplayArchive(gameState,{ownerSeat,disclosurePolicy,unsupportedSubmission});
     const id=archive.manifest.replayId;
-    if(store.read(DATA_PREFIX+id)!==null && store.read(DATA_PREFIX+id)!==undefined) {
+    // Preflight the index BEFORE writing sensitive archive bytes. A damaged
+    // index must not silently trigger a partially successful new save.
+    const ids=indexFrom(store);
+    const existing=store.read(DATA_PREFIX+id);
+    if(existing!==null && existing!==undefined) {
       const previous=readArchive(store,id);
-      if(checksum(previous)!==checksum(archive))
+      if(!same(previous,archive))
         throw new ReplayError('REPLAY_ALREADY_EXISTS','Cannot overwrite a replay with a different event ledger');
+      // Repair only the index: a previously validated archive can exist even
+      // when an earlier quota/IO failure prevented its index write.
+      indexVerifiedArchive(id,ids);
       return publicManifest(previous);
     }
     store.write(DATA_PREFIX+id,JSON.stringify(archive));
-    const ids=indexFrom(store);
-    if(!ids.includes(id)) store.write(INDEX_KEY,JSON.stringify([...ids,id].sort()));
+    indexVerifiedArchive(id,ids);
+    return publicManifest(archive);
+  }
+  function recoverReplay(replayId,{viewerSeat}={}) {
+    // Caller supplies the exact replay ID. Do not fabricate missing events,
+    // regenerate a seed, or auto-discover/accept unvalidated archive bytes.
+    const archive=readArchive(store,replayId);
+    ownerOnly(archive.manifest,viewerSeat??archive.manifest.ownerSeat);
+    indexVerifiedArchive(replayId);
     return publicManifest(archive);
   }
   function listReplays() {
@@ -286,7 +303,7 @@ export function createReplayService({storage=null}={}) {
     return createUnscoredScenario({playerView:frame.playerView,decisionAnalysis:analysis,
       source:{replayId,eventSeq}});
   }
-  return Object.freeze({apiVersion:REPLAY_API_VERSION,saveReplay,
+  return Object.freeze({apiVersion:REPLAY_API_VERSION,saveReplay,recoverReplay,
     listReplays,loadReplay,getReplayFrame,listReplayFrameBoundaries,getPlayerDecision,getDecisionAnalysis,
     listCoachingFindings,createReviewQuestion});
 }
