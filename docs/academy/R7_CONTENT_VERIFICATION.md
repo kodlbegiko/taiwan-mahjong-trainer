@@ -57,8 +57,9 @@
 ## 4. 修改範圍與自動回歸
 
 - 新增 `src/academy/content-audit.js`，匯出 `auditAcademyContent()`。
+- 新增 `src/academy/unpublished-guides.js`：針對 L4–L5 的 8 堂 validated 課程提供獨立版本的教學補充，包含核心觀念、範例推理、常見誤解及發布所需證據。其 `audience=instructor-review`、`grading=unscored`、`officialCredit=false`，**不是可計分的 8 堂課或經審核的 PlayerView 情境題**。未改寫既有 `Lesson@1.0.0`。
 - 從 `src/academy/index.js` 匯出此唯讀稽核 API。
-- 新增 `tests/academy/r7-content-audit.test.js`：題目來源重播、版本固定、題目公開邊界、所有等分最佳解、8 堂未發布 gate、刷新／重複提交與 canonical v3 單一計分。
+- 新增 `tests/academy/r7-content-audit.test.js`：題目來源重播、版本固定、題目公開邊界、所有等分最佳解、8 堂未發布 gate、教學補充防偽、刷新／重複提交與 canonical v3 單一計分。
 - 仍需跑既有 `tests/academy/*.test.js`、`tests/adaptive/*.test.js`、`tests/integration/master-academy-learning-adaptive.test.js` 以及整套 `npm test`。
 - 不修改 Table UI、Bot、Rules、Replay、Service Worker，不更新 100 題 seed，不覆寫 `LESSONS` 的既有發佈狀態，不改寫 archive:v3 或 Adaptive storage schema。
 
