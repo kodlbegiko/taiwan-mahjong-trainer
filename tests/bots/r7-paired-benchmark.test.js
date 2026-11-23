@@ -80,7 +80,7 @@ const MAX_ACTIONS=1800;
 function runMatch(seed,targetSeat,contender){
   // The host alone owns full state. Decisions receive PlayerView only.
   let state=createGame({
-    gameId:`r7-compare-${seed}-${targetSeat}`,
+    gameId:`r7-compare-${seed}`,
     seed:`fixed-round-${seed}`,dealerSeat:Number(BigInt(seed)%4n),...REF,
   });
   const bots=Array.from({length:4},(_,seat)=>createBot({
