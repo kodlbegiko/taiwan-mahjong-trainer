@@ -14,7 +14,7 @@ const tai={
   allPongs:4,mixedSuit:4,pureSuit:8,allHonors:8,
   smallDragons:4,bigDragons:8,smallWinds:8,bigWinds:16,
   concealedTriplets:{3:2,4:5,5:8},
-  openKong:0,concealedKong:0,dealer:1,dealerStreakEach:2,
+  openKong:0,concealedKong:0,noHonorsNoFlowers:0,dealer:1,dealerStreakEach:2,
 };
 const base={
   contractVersion:SCORING_CONTRACT,
@@ -39,6 +39,7 @@ SEE.profileId='tw16-gametower-see-flower-wind';
 SEE.claim='Gametower 見花見字 optional platform switch, not the standard mode';
 SEE.variants={wind:'all',flower:'each',kong:'each',flowerSetsReplaceCorrect:false,
   smallWindRetainsWind:true,allHonorsSuppressAllPongs:true};
+SEE.tai.noHonorsNoFlowers=2;
 SEE.tai.openKong=1;
 SEE.tai.concealedKong=2;
 SEE.tai.correctFlower=1;
