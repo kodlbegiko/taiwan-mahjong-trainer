@@ -35,6 +35,10 @@ export function evidenceFromSettledRulesState(state,{seatWindType,prevailingWind
       e.actorSeat===r.sourceSeat&&e.payload.tileId===r.winningTileId);
     if(!lastDiscard)throw new RangeError('Discard-win lacks source event provenance');
   }
+  if(prevailingWindType===undefined){
+    const lookup={east:27,south:28,west:29,north:30};
+    prevailingWindType=lookup[state.round.prevailingWind];
+  }
   if(dealerStreak===undefined){
     if(state.round.handIndex!==0)throw new RangeError('Dealer streak requires verified round-chain evidence');
     dealerStreak=0;
