@@ -194,6 +194,11 @@ test('legacy V1 replay without SHA-256 field remains readable and never acquires
   assert.equal(service.recoverReplay(archive.manifest.replayId).replayId,archive.manifest.replayId);
   assert.equal(JSON.parse(store.get(DATA+archive.manifest.replayId)).manifest.integrity.sha256,undefined);
   assert.equal(service.getReplayFrame(archive.manifest.replayId,1).asOfEventSeq,1);
+  // A later settled/checkpoint retry must not collide with this legitimate V1
+  // record merely because modern archives now include SHA-256 metadata.
+  const originalBytes=store.get(DATA+archive.manifest.replayId);
+  assert.equal(service.saveReplay(state).replayId,archive.manifest.replayId);
+  assert.equal(store.get(DATA+archive.manifest.replayId),originalBytes);
 });
 
 test('unfinished replay never exposes postgame result or opponents via an old frame',()=>{
