@@ -1,0 +1,159 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/blob/feat/r7-scoring-engine/docs/scoring/rules-scoring-event-proposal.schema.json",
+  "title": "R7 proposed public Rules-to-Scoring event facts (NOT an R5 emitted event)",
+  "description": "Additive proposal. No private hand, hidden wall or pending claims in this public DTO.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "contractVersion",
+    "roundId",
+    "ruleRef",
+    "winnerSeat",
+    "sourceSeat",
+    "via",
+    "dealerSeat",
+    "dealerStreak",
+    "seatWindType",
+    "prevailingWindType",
+    "publicEventRefs"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "contractVersion": {
+      "const": "tw16-scoring-facts/1.0.0-proposal"
+    },
+    "roundId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "ruleRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profileId",
+        "ruleVersion"
+      ],
+      "properties": {
+        "profileId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ruleVersion": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "winnerSeat": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 3
+    },
+    "sourceSeat": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 3
+    },
+    "via": {
+      "enum": [
+        "self-draw",
+        "discard"
+      ]
+    },
+    "dealerSeat": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 3
+    },
+    "dealerStreak": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "dealerStreakRoundRefs": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "seatWindType": {
+      "type": "integer",
+      "minimum": 27,
+      "maximum": 30
+    },
+    "prevailingWindType": {
+      "type": "integer",
+      "minimum": 27,
+      "maximum": 30
+    },
+    "publicEventRefs": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "winningTileId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "winningTileRole": {
+      "enum": [
+        "pair",
+        "sequence",
+        "triplet",
+        "self-draw"
+      ]
+    },
+    "replacementSource": {
+      "enum": [
+        "none",
+        "live",
+        "flower",
+        "concealed-kong",
+        "open-kong",
+        "added-kong"
+      ]
+    },
+    "waitShape": {
+      "enum": [
+        "unknown",
+        "two-sided",
+        "closed",
+        "edge",
+        "pair"
+      ]
+    },
+    "liabilityPolicy": {
+      "enum": [
+        "none",
+        "unsupported",
+        "explicit-versioned"
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "via": {
+            "const": "discard"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "winningTileId"
+        ]
+      }
+    }
+  ]
+}
