@@ -13,7 +13,8 @@ import {
   completeGetClaimWindowPublic, completeGetRuleCapabilities,
 } from './complete-engine.js';
 const isCompleteRef=ref=>['tw16-configurable-table',
-  'tw16-single-winner-interception'].includes(ref?.profileId);
+  'tw16-single-winner-interception',
+  'tw16-rob-added-kong'].includes(ref?.profileId);
 
 
 const V1 = { schemaVersion: SCHEMA_VERSION, contractVersion: CONTRACT_VERSION };
