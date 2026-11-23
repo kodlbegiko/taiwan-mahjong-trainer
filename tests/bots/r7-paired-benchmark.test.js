@@ -94,14 +94,16 @@ function runMatch(seed,targetSeat,contender){
     assert.ok(Number.isInteger(seat),'Rules must supply pending responder');
     const view=createPlayerView(state,seat);
     const start=performance.now();
-    let actionId;
+    let actionId, proposed=null;
     if(contender&&seat===targetSeat){
-      const d=chooseBotAction(bots[seat],view);
-      validateBotDecision(bots[seat],view,d);
-      actionId=d.status==='ready'?d.actionId:null;
+      proposed=chooseBotAction(bots[seat],view);
+      actionId=proposed.status==='ready'?proposed.actionId:null;
     }else actionId=legacyIntermediateAction(bots[seat],view);
+    // Time decision policy only; the contender's extra validation belongs to
+    // the legality gate, not a one-sided addition to its latency metric.
     decisionMs+=performance.now()-start;
     decisions++;
+    if(proposed!==null)validateBotDecision(bots[seat],view,proposed);
     const offered=view.legalActions.find(a=>a.actionId===actionId);
     if(!offered){invalid++;break;}
     try {
