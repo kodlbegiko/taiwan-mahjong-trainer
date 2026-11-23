@@ -444,3 +444,9 @@ footer { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wr
   .pwa-bar div { flex-wrap: wrap; }
   .pwa-bar p { overflow-wrap: anywhere; }
 }
+
+/* A real iOS Safari installation path exists even without beforeinstallprompt. */
+.pwa-install-help { margin: 10px 0 4px; color: #ccded3; font-size: 12px; line-height: 1.7; }
+.pwa-install-help summary { display: inline-flex; align-items: center; cursor: pointer; min-height: 44px; padding: 6px 8px; color: #f7e0ac; text-decoration: underline; text-underline-offset: 3px; }
+.pwa-install-help summary:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+.pwa-install-help p { margin: 3px 0 9px; max-width: 750px; overflow-wrap: anywhere; }
