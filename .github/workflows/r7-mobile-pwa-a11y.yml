@@ -1,0 +1,75 @@
+name: R7 Mobile PWA Accessibility Regression
+on:
+  pull_request:
+    branches: [integration/mahjong-full-game]
+    paths:
+      - '.github/workflows/r7-mobile-pwa-a11y.yml'
+      - 'index.html'
+      - 'style.css'
+      - 'src/table-ui/table.css'
+      - 'src/table-ui/view.js'
+      - 'src/table-ui/a11y.js'
+      - 'sw.js'
+      - 'public/manifest.webmanifest'
+      - 'tests/browser/mobile-pwa-a11y-gates.py'
+      - 'tests/pwa/mobile-update-gates.py'
+      - 'docs/quality/R7_MOBILE_PWA_A11Y.md'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source-and-node:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Confirm exact tested commit and ownership boundary
+        run: |
+          set -euo pipefail
+          echo "SOURCE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
+          git fetch origin integration/mahjong-full-game
+          while IFS= read -r file; do
+            case "$file" in
+              index.html|style.css|sw.js|public/manifest.webmanifest|src/table-ui/table.css|src/table-ui/view.js|src/table-ui/a11y.js|tests/browser/mobile-pwa-a11y-gates.py|tests/pwa/mobile-update-gates.py|docs/quality/R7_MOBILE_PWA_A11Y.md|.github/workflows/r7-mobile-pwa-a11y.yml) ;;
+              *) echo "::error::Out-of-scope file changed: $file"; exit 1 ;;
+            esac
+          done < <(git diff --name-only origin/integration/mahjong-full-game...HEAD)
+      - name: Run existing Node and compatibility regressions
+        run: npm run check
+  browser-pwa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install browser test dependency
+        run: |
+          python -m pip install playwright==1.56.0
+          google-chrome --version
+      - name: Record exact source under test
+        run: |
+          mkdir -p r7-mobile-evidence
+          git rev-parse HEAD | tee r7-mobile-evidence/tested-sha.txt
+          google-chrome --version > r7-mobile-evidence/browser-version.txt
+      - name: Six viewports, landscape, keyboard and legacy contract
+        run: python tests/browser/mobile-pwa-a11y-gates.py --evidence r7-mobile-evidence
+      - name: Cold offline, broken update rollback and explicit upgrade
+        run: python tests/pwa/mobile-update-gates.py --evidence r7-mobile-evidence
+      - name: Upload PASS/FAIL evidence and screenshots (not real-device certification)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: r7-mobile-pwa-a11y-evidence
+          path: r7-mobile-evidence
+          retention-days: 14
+          if-no-files-found: warn
