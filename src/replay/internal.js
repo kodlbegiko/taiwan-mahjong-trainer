@@ -4,6 +4,7 @@
  */
 import { replayGame, validateGameState, getRuleProfile, listLegalActions, applyAction,
   RuleCapabilityError, ENGINE_VERSION, COMPLETE_ENGINE_VERSION } from '../rules/index.js';
+import { sha256Utf8, REPLAY_HASH_VERSION } from './integrity.js';
 
 export const CONTRACT_VERSION = 'master-academy/1.0.0';
 export const REPLAY_VERSION = 'tw16-replay/1.0.0';
@@ -38,6 +39,22 @@ export function checksum(value) {
   return (n>>>0).toString(16).padStart(8,'0');
 }
 export const same = (a,b) => canonical(a)===canonical(b);
+
+/** Versioned private deterministic event chain and reconstructed-state digest.
+ * Hashes detect corruption, not authenticated substitution.
+ * Legacy V1 archives remain FNV-1a-only, without silent upgrades.
+ */
+export function replayIntegrityHashes(manifest, events, decisions, state) {
+  const initial={domain:'tw16-replay-chain-seed/v1',gameId:manifest.gameId,
+    ruleRef:manifest.ruleRef,initialSeed:manifest.initialSeed,
+    dealerSeat:manifest.dealerSeat,roundConfig:manifest.roundConfig??null};
+  let eventChain=sha256Utf8(canonical(initial));
+  for(const event of events)
+    eventChain=sha256Utf8(eventChain+'\n'+canonical(event));
+  return {version:REPLAY_HASH_VERSION,eventChain,
+    decisions:sha256Utf8(canonical(decisions)),
+    finalState:sha256Utf8(canonical(state))};
+}
 
 function assertProfile(ruleRef) {
   try { return getRuleProfile(ruleRef?.profileId,ruleRef?.ruleVersion); }
@@ -172,7 +189,8 @@ export function createReplayArchive(state,{ownerSeat=0,disclosurePolicy='none',u
   if(r3)m.actionCount=decisions.length;
   m.integrity={algorithm:'fnv1a-32-canonical-checksum-not-signature',
     eventsChecksum:checksum(events),decisionChecksum:checksum(decisions),
-    finalStateChecksum:checksum(state)};
+    finalStateChecksum:checksum(state),
+    sha256:replayIntegrityHashes(m,events,decisions,state)};
   const archive={...V1,replayVersion:REPLAY_VERSION,manifest:m,events,decisions};
   validateReplayArchive(archive);
   return clone(archive);
@@ -226,6 +244,11 @@ export function validateReplayArchive(archive) {
     validateGameState(state);
     if(checksum(state)!==m.integrity?.finalStateChecksum)
       throw new Error('canonical final state mismatch');
+    // Older Replay v1 archives remain readable. A present V2 hash object
+    // must exactly match every Rules-canonical event, decision and final state.
+    if(m.integrity.sha256!==undefined &&
+       !same(m.integrity.sha256,replayIntegrityHashes(m,archive.events,archive.decisions,state)))
+      throw new Error('canonical SHA-256 event chain/decision/state mismatch');
     if(r3){
       if(m.unsupportedInterruption!==undefined){
         const interruption=m.unsupportedInterruption;
