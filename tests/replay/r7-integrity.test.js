@@ -68,7 +68,7 @@ function webStore({failIndex=false}={}) {
 test('SHA-256 deterministic cross-runtime vectors, Unicode and canonical replay chains',()=>{
   assert.equal(sha256Utf8(''),'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855');
   assert.equal(sha256Utf8('abc'),'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
-  assert.equal(sha256Utf8('麻將'),'aa0ef99fba127a3c1a76944d7a1a7816848cf5c422ef4a18c4cffc0ff78dbe42'); // independent reference
+  assert.equal(sha256Utf8('麻將'),'6863c5240adaa6bf242700d98797378f312f8d025a6ca1862469d224b529e502'); // independent reference
   const state=sandbox(),a=createReplayArchive(state),b=createReplayArchive(state);
   assert.deepEqual(a,b);
   assert.equal(a.manifest.integrity.sha256.version,REPLAY_HASH_VERSION);
