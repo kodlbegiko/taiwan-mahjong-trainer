@@ -193,3 +193,8 @@ body[data-table-view="daily"] .roadmap { display:none !important; }
     scroll-behavior: auto !important;
   }
 }
+
+/* R7 WCAG AA: test against the felt gradient's lightest stop (#296e58).
+   Both status and help text must meet 4.5:1 even when mobile makes titles 16px. */
+.table-felt strong { color: #ffe8ac; }
+.table-felt small { color: #e7f0dd; }
