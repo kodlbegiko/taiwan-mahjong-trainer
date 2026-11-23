@@ -39,7 +39,8 @@ def probe_inline_confirmation(page, folder):
             'Legal declaration must open an in-page confirmation')
     require(page.locator('.table-version').inner_text()==initial_revision,
             'Opening a declaration confirmation mutated Rules revision')
-    require(page.locator('[data-confirm-action]').is_focused(),
+    require(page.locator('[data-confirm-action]').evaluate(
+                '(el) => document.activeElement===el'),
             'Keyboard focus must move to the explicit confirmation')
     page.screenshot(path=str(folder/'table-390-r7-declaration-confirm.png'),full_page=True)
     page.locator('[data-cancel-action]').click()
