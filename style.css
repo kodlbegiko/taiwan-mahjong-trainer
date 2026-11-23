@@ -436,3 +436,11 @@ footer { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wr
     transform: none;
   }
 }
+
+/* R7: PWA and legacy V0.2 controls remain tappable on touch screens. */
+.pwa-bar button, .text-btn, #install-app, #update-app { min-height: 44px; }
+.pwa-bar button { touch-action: manipulation; }
+@media (max-width: 640px) {
+  .pwa-bar div { flex-wrap: wrap; }
+  .pwa-bar p { overflow-wrap: anywhere; }
+}
