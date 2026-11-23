@@ -112,6 +112,17 @@ export function createReplayService({storage=null}={}) {
   function indexVerifiedArchive(id,ids=indexFrom(store)) {
     if(!ids.includes(id)) store.write(INDEX_KEY,JSON.stringify([...ids,id].sort()));
   }
+  function sameReplayHistory(previous,next) {
+    if(same(previous,next)) return true;
+    // R5 created legitimate Replay V1 archives before SHA-256 was added.
+    // Preserve those original bytes, while permitting a retry that differs
+    // solely in the new optional integrity digest. Never upgrade on read.
+    if(previous.manifest?.integrity?.sha256!==undefined ||
+       next.manifest?.integrity?.sha256===undefined) return false;
+    const withoutNewDigest=clone(next);
+    delete withoutNewDigest.manifest.integrity.sha256;
+    return same(previous,withoutNewDigest);
+  }
   function saveReplay(gameState,{ownerSeat=0,disclosurePolicy='none',unsupportedSubmission=null}={}) {
     const archive=createReplayArchive(gameState,{ownerSeat,disclosurePolicy,unsupportedSubmission});
     const id=archive.manifest.replayId;
@@ -121,7 +132,7 @@ export function createReplayService({storage=null}={}) {
     const existing=store.read(DATA_PREFIX+id);
     if(existing!==null && existing!==undefined) {
       const previous=readArchive(store,id);
-      if(!same(previous,archive))
+      if(!sameReplayHistory(previous,archive))
         throw new ReplayError('REPLAY_ALREADY_EXISTS','Cannot overwrite a replay with a different event ledger');
       // Repair only the index: a previously validated archive can exist even
       // when an earlier quota/IO failure prevented its index write.
