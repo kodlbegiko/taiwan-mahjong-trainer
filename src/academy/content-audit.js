@@ -29,6 +29,32 @@ const expectedDifficulty = ['beginner','intermediate','advanced'];
 const key = ref => ref.questionId + '@' + ref.questionVersion;
 const sorted = values => [...new Set(values)].sort();
 
+/** Verify exact one-to-one placement, not just that all references exist. */
+export function validateCurriculumQuestionOwnership(lessons=LESSONS,specs=BANK_SPEC) {
+  if(!Array.isArray(lessons)||!Array.isArray(specs))
+    throw new TypeError('Curriculum and bank must both be arrays');
+  const byRef=new Map();
+  for(const spec of specs) {
+    const id=key(spec);
+    if(byRef.has(id))throw new RangeError('Duplicate bank question version');
+    byRef.set(id,spec);
+  }
+  const assigned=new Set();
+  for(const lesson of lessons) {
+    if(!Array.isArray(lesson.questionRefs))throw new RangeError('Lesson has no valid question references');
+    for(const ref of lesson.questionRefs){
+      const id=key(ref), spec=byRef.get(id);
+      if(!spec || spec.lessonId!==lesson.lessonId)
+        throw new RangeError('Question version assigned to the wrong lesson');
+      if(assigned.has(id))throw new RangeError('Question version assigned more than once');
+      assigned.add(id);
+    }
+  }
+  if(assigned.size!==byRef.size)
+    throw new RangeError('Not every question version belongs to exactly one lesson');
+  return true;
+}
+
 function checkQuestion(spec) {
   const q = getFullQuestion(spec.questionId);
   validateAcademyQuestion(q);
@@ -104,6 +130,7 @@ function checkQuestion(spec) {
 export function auditAcademyContent() {
   validateTaxonomy();
   validateLessons(LESSONS,new Set(BANK_SPEC.map(key)));
+  validateCurriculumQuestionOwnership();
   const questionRows=[], failures=[];
   const byType={}, byDifficulty={}, bySample={};
   const uniqueShapes=new Set(), seenIds=new Set();
