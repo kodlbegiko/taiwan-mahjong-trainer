@@ -48,6 +48,7 @@ function checkQuestion(spec) {
   if(available.size===0)throw new RangeError('Question has no accepted answer');
   if([...available].some(t=>!q.prompt.options.includes(String(t))))
     throw new RangeError('Accepted answer outside legal options');
+  let representativeGrade=null;
   if(q.taskType==='discard') {
     const best=exercise.answer.ranking[0];
     const tieSet=exercise.answer.ranking.filter(x=>
@@ -60,13 +61,26 @@ function checkQuestion(spec) {
       if(graded.grade!=='perfect'||graded.score!==1 ||
          graded.scoringVersion!==exercise.answerRules.version)
         throw new RangeError('Tied optimal discard was not scored perfectly');
+      representativeGrade??=graded;
     }
   } else {
     const graded=gradeAcademyQuestion({questionId:q.questionId,questionVersion:q.questionVersion},[...available]);
     if(graded.grade!=='perfect'||graded.score!==1 ||
        graded.scoringVersion!==exercise.answerRules.version)
       throw new RangeError('Complete winning-tile set was not scored perfectly');
+    representativeGrade=graded;
   }
+  const explanation=representativeGrade?.explanation;
+  if(!explanation || explanation.correctnessBasis!=='exact' ||
+     typeof explanation.primaryReason!=='string' || explanation.primaryReason.length<25 ||
+     typeof explanation.answerSummary!=='string' || !explanation.answerSummary ||
+     !Array.isArray(explanation.alternatives) ||
+     !Array.isArray(explanation.conditionalStrategy) ||
+     explanation.conditionalStrategy.length===0 ||
+     explanation.evidence?.exerciseId!==exercise.id ||
+     explanation.evidence?.ruleVersion!==exercise.ruleVersion ||
+     explanation.evidence?.scoringVersion!==exercise.answerRules.version)
+    throw new RangeError('Post-grade explanation has missing or stale replay evidence');
   return {
     questionRef:{questionId:q.questionId,questionVersion:q.questionVersion},
     lessonId:q.lessonRef.lessonId,taskType:q.taskType,
