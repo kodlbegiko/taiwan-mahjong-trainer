@@ -185,6 +185,10 @@ export function scoreWinningHand(profile,evidence){
       }
       if(profile.variants.flower==='each'){
         for(const f of flowers)add(items,'flower:'+f,'correctFlower','flower '+f);
+        for(const [i,group] of [flowerNames.slice(0,4),flowerNames.slice(4,8)].entries()){
+          if(group.every(f=>flowers.includes(f)))
+            add(items,'flower-set:'+i,'flowerSet','complete four-flower set '+i);
+        }
       }else{
         const idx=evidence.seatWindType-27;
         const sets=[flowerNames.slice(0,4),flowerNames.slice(4,8)];
