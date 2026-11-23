@@ -1,0 +1,149 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { auditAcademyContent, ACADEMY_CONTENT_AUDIT_VERSION,
+  LESSONS, listQuestionRefs, submitAcademyAnswer,
+  validateAcademyProvenanceBatch, toPublicQuestion } from '../../src/academy/index.js';
+import { BANK_SPEC } from '../../src/academy/catalog.js';
+import { getCanonicalExercise } from '../../src/academy/question-internal.js';
+import { createMasterAcademyFacade } from '../../src/integration/master-academy-facade.js';
+import { ARCHIVE_STORAGE_KEY } from '../../src/storage/archive.js';
+import { ACADEMY_STORAGE_KEY } from '../../src/adaptive/index.js';
+
+const ref=id=>({questionId:id,questionVersion:'1.0.0'});
+const clone=x=>JSON.parse(JSON.stringify(x));
+const at='2026-11-20T09:00:00.000Z';
+const report=auditAcademyContent();
+const memory=()=>{
+  const map=new Map();
+  return { getItem:k=>map.get(k)??null, setItem:(k,v)=>map.set(k,String(v)) };
+};
+
+test('R7 content: all 20 states and 100 replayed structural scores are evidenced, no synthetic achievement',()=>{
+  assert.equal(report.auditVersion,ACADEMY_CONTENT_AUDIT_VERSION);
+  assert.equal(report.authority,'canonical-v3-decision-records-only');
+  assert.equal(report.createsLearningEvidence,false);
+  assert.equal(report.curriculum.totalLessons,20);
+  assert.deepEqual([report.curriculum.published,report.curriculum.validated,report.curriculum.draft],[12,8,0]);
+  assert.equal(report.bank.totalQuestions,100);
+  assert.equal(report.bank.structurallyVerified,100);
+  assert.equal(report.bank.failed,0);
+  assert.equal(report.bank.uniqueShapes,100);
+  assert.deepEqual(report.bank.byTaskType,{discard:40,tenpai:40,multi_wait:20});
+  assert.equal(report.bank.humanCalibratedQuestions,0);
+  assert.equal(report.bank.withPublicVisibleTiles,0);
+  assert.deepEqual(report.failures,[]);
+  assert.equal(report.lessonRows.length,20);
+  assert.equal(report.questionRows.length,100);
+  assert.equal(report.lessonRows.reduce((n,x)=>n+x.questionCount,0),100);
+  for(const lesson of report.lessonRows){
+    assert.equal(lesson.status,LESSONS.find(x=>x.lessonId===lesson.lessonRef.lessonId).status);
+    assert.equal(lesson.questionCount,5);
+    assert.equal(lesson.verifiedQuestionCount,5);
+    assert.equal(lesson.lessonShapeValidated,true);
+    assert.equal(lesson.statusChangeApproved,false);
+    assert.deepEqual(lesson.taskTypes,['discard','multi_wait','tenpai']);
+  }
+});
+
+test('R7 release gates: 8 validated lessons remain blocked with concrete reasons',()=>{
+  const pending=report.lessonRows.filter(x=>x.status!=='published');
+  assert.equal(pending.length,8);
+  for(const row of pending){
+    assert.equal(row.status,'validated');
+    assert.ok(row.publicationBlockers.length>0,row.lessonRef.lessonId);
+    assert.equal(row.statusChangeApproved,false);
+  }
+  assert.ok(pending.find(x=>x.lessonRef.lessonId==='academy-l4-02')
+    .publicationBlockers.includes('verified-open-meld-actions-missing'));
+  assert.ok(pending.find(x=>x.lessonRef.lessonId==='academy-l4-04')
+    .publicationBlockers.includes('verified-tai-scoring-profile-missing'));
+  assert.ok(pending.find(x=>x.lessonRef.lessonId==='academy-l5-02')
+    .publicationBlockers.includes('mastery-level-difficulty-calibration-missing'));
+  // Existing published content is not equivalent to scoring all claimed skills.
+  assert.ok(report.lessonRows.some(x=>x.status==='published'&&x.unassessedObjectiveTagIds.length>0));
+});
+
+test('R7 difficulty is sourced from original v3 sampling and estimates, never presented as human calibration',()=>{
+  assert.equal(report.bank.bySamplingLevel.beginner,20);
+  assert.equal(report.bank.bySamplingLevel.intermediate,20);
+  assert.equal(report.bank.bySamplingLevel.advanced,60);
+  for(const row of report.questionRows){
+    const ex=getCanonicalExercise(row.questionRef.questionId);
+    assert.deepEqual(row.estimatedDifficulty,ex.estimatedDifficulty);
+    assert.equal(row.requestedSamplingLevel,ex.requestedLevel);
+    assert.equal(row.scoringVersion,ex.answerRules.version);
+    assert.equal(row.structuralValidation,'pass');
+  }
+  assert.ok(Object.keys(report.bank.byEstimatedDifficulty).every(x=>
+    ['beginner','intermediate','advanced'].includes(x)));
+});
+
+test('R7 grading: every optimal discard, including equal-best alternatives, is treated as correct',()=>{
+  for(const s of BANK_SPEC.filter(x=>x.taskType==='discard')){
+    const ex=getCanonicalExercise(s.questionId);
+    const best=ex.answer.ranking[0];
+    const expected=ex.answer.ranking.filter(x=>
+      x.shanten===best.shanten&&x.copies===best.copies).map(x=>x.tile);
+    assert.deepEqual([...ex.answer.optimalTiles].sort((a,b)=>a-b),expected.sort((a,b)=>a-b));
+    for(const tile of expected){
+      const submitted=submitAcademyAnswer(ref(s.questionId),tile,{
+        timestamp:at,durationMs:250,attemptId:'r7-opt-'+s.questionId+'-'+tile});
+      assert.equal(submitted.record.schemaVersion,3);
+      assert.equal(submitted.record.grade,'perfect');
+      assert.equal(submitted.record.score,1);
+      assert.equal(submitted.recordRef.kind,'legacy-v3');
+    }
+  }
+});
+
+test('R7 read-only audit exposes no hidden answer keys or training records',()=>{
+  const dump=JSON.stringify(report);
+  for(const forbidden of ['"answerKey"','"chosen"','"exerciseSnapshot"','"wall"',
+    '"replacementWall"','"sourceViewRef"','"recordRef"'])
+    assert.ok(!dump.includes(forbidden),forbidden);
+  assert.deepEqual(listQuestionRefs(),BANK_SPEC.map(x=>ref(x.questionId)));
+  for(const r of listQuestionRefs()){
+    const publicQuestion=toPublicQuestion(r);
+    assert.equal(publicQuestion.status,'validated');
+    assert.ok(!Object.hasOwn(publicQuestion,'answerKey'));
+  }
+});
+
+test('R7 provenance: duplicate replay cannot become two scores; stale versions are rejected',()=>{
+  const ex=getCanonicalExercise('academy-q-001');
+  const choice=ex.answer.optimalTiles[0];
+  const options={timestamp:at,durationMs:1700,attemptId:'r7-idempotent-1'};
+  const a=submitAcademyAnswer(ref('academy-q-001'),choice,options);
+  const deduped=validateAcademyProvenanceBatch(
+    [clone(a.provenance),clone(a.provenance)],[clone(a.record),clone(a.record)]);
+  assert.equal(deduped.length,1);
+  assert.throws(()=>validateAcademyProvenanceBatch(
+    [a.provenance],[{...clone(a.record),id:'wrong'}]));
+  assert.throws(()=>submitAcademyAnswer(
+    {questionId:'academy-q-001',questionVersion:'stale'},choice,options),/版本/);
+});
+
+test('R7 refresh/retry: durable archive:v3 is authoritative and score evidence stays single',()=>{
+  const storage=memory();
+  const facade=createMasterAcademyFacade(storage);
+  const questionRef=facade.getQuestionRefs()[0];
+  const answer=getCanonicalExercise(questionRef.questionId).answer.optimalTiles[0];
+  const options={timestamp:at,durationMs:1200,attemptId:'r7-retry-same',
+    asOf:'2026-11-21T09:00:00.000Z'};
+  const first=facade.submitStructuralAnswer(questionRef,answer,options);
+  assert.equal(first.durable,true);
+  assert.equal(first.derivedFresh,true);
+  const original=storage.getItem(ARCHIVE_STORAGE_KEY);
+  const sidecar=storage.getItem(ACADEMY_STORAGE_KEY);
+  const refreshed=createMasterAcademyFacade(storage);
+  const repeated=refreshed.submitStructuralAnswer(questionRef,answer,options);
+  assert.equal(repeated.durable,true);
+  assert.equal(storage.getItem(ARCHIVE_STORAGE_KEY),original);
+  assert.equal(JSON.parse(original).records.length,1);
+  assert.equal(JSON.parse(sidecar).provenanceLinks.length,1);
+  const rebuilt=refreshed.getDashboard({asOf:options.asOf});
+  assert.equal(rebuilt.profile.calibrationStatus,'uncalibrated');
+  assert.equal(rebuilt.reviewPlan.items.filter(x=>x.questionId===questionRef.questionId).length,1);
+  assert.equal(rebuilt.profile.skills.find(x=>x.tagId==='efficiency.shanten').attempts,1);
+  assert.equal(createMasterAcademyFacade(storage).getProvenanceLinks().length,1);
+});
