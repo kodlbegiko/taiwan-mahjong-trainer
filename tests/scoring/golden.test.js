@@ -102,7 +102,7 @@ assert.throws(()=>score(fixture({concealed:[3,4,5]})),/count/);
 assert.throws(()=>score(fixture({flowers:[f('season-spring'),f('season-spring')],seatWindType:27})),/duplicate flower/);
 assert.throws(()=>score(fixture({specialWin:'rob-kong'})),ScoringCapabilityError);
 assert.throws(()=>settle(fixture({liability:{payerSeat:2}})),ScoringCapabilityError);
-assert.throws(()=>score(fixture({melds:[{kind:'kong',open:true,tileIds:[1,2,3,4]}]})),/meld|count/);
+assert.throws(()=>score(fixture({melds:[{kind:'kong',open:true,tileIds:[1,2,3,4]}]})),/triplet|meld|count/);
 });
 test('S10 wind/flower seat evidence cannot be assumed from dealer',()=>{
 const e=fixture({via:'self-draw',sourceSeat:1,concealed:dragons,
