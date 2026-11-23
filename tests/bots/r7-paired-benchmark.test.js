@@ -91,6 +91,7 @@ function runMatch(seed,targetSeat,contender){
     seed:'r7-compare-independent-seat-'+seat,
   }));
   let invalid=0,decisions=0,decisionMs=0,submitted=0;
+  let targetDecisions=0,targetDecisionMs=0;
   while(state.round.phase!=='settled' && submitted<MAX_ACTIONS){
     const seat=state.round.phase==='claim_window'
       ? listPendingClaimResponders(state)[0] : state.round.currentSeat;
@@ -104,8 +105,10 @@ function runMatch(seed,targetSeat,contender){
     }else actionId=legacyIntermediateAction(bots[seat],view);
     // Time decision policy only; the contender's extra validation belongs to
     // the legality gate, not a one-sided addition to its latency metric.
-    decisionMs+=performance.now()-start;
+    const elapsed=performance.now()-start;
+    decisionMs+=elapsed;
     decisions++;
+    if(seat===targetSeat){targetDecisionMs+=elapsed;targetDecisions++;}
     if(proposed!==null)validateBotDecision(bots[seat],view,proposed);
     const offered=view.legalActions.find(a=>a.actionId===actionId);
     if(!offered){invalid++;break;}
@@ -129,7 +132,7 @@ function runMatch(seed,targetSeat,contender){
     drew:result.reason==='exhaustive-draw',
     dealIn:result.reason==='win'&&result.via==='discard'&&
       result.sourceSeat===targetSeat&&result.winnerSeat!==targetSeat,
-    invalid,decisions,submitted,decisionMs,
+    invalid,decisions,submitted,decisionMs,targetDecisions,targetDecisionMs,
     replayMatched:true,
   };
 }
@@ -137,6 +140,8 @@ function summary(rows){
   const total=rows.length;
   const ms=rows.reduce((n,r)=>n+r.decisionMs,0);
   const decisions=rows.reduce((n,r)=>n+r.decisions,0);
+  const targetDecisions=rows.reduce((n,r)=>n+r.targetDecisions,0);
+  const targetMs=rows.reduce((n,r)=>n+r.targetDecisionMs,0);
   return {
     games:total,wins:rows.filter(r=>r.won).length,
     winRate:rows.filter(r=>r.won).length/total,
@@ -148,6 +153,9 @@ function summary(rows){
     actions:rows.reduce((n,r)=>n+r.submitted,0),
     decisions,
     avgDecisionMs:Number((ms/decisions).toFixed(3)),
+    targetDecisions,
+    avgTargetDecisionMs:targetDecisions?
+      Number((targetMs/targetDecisions).toFixed(3)):null,
     replayMatches:rows.filter(r=>r.replayMatched).length,
   };
 }
@@ -167,6 +175,11 @@ test('R7 paired 4-seat baseline vs public-only contender; emit measured outcomes
       contenderLevel,profile:REF,scoring:'tw16-minimal-tai-v1 EXPERIMENTAL',
       seeds,seats:[0,1,2,3],opponents:'three fixed pre-R7 Intermediate',
       pairedGames:before.length,baseline,candidate,
+      byTargetSeat:[0,1,2,3].map(seat=>({
+        seat,
+        baseline:summary(before.filter(x=>x.targetSeat===seat)),
+        candidate:summary(after.filter(x=>x.targetSeat===seat)),
+      })),
       delta:{winRate:Number((candidate.winRate-baseline.winRate).toFixed(4)),
         dealInRate:Number((candidate.dealInRate-baseline.dealInRate).toFixed(4)),
         drawRate:Number((candidate.drawRate-baseline.drawRate).toFixed(4))},
@@ -180,4 +193,6 @@ test('R7 paired 4-seat baseline vs public-only contender; emit measured outcomes
     assert.equal(candidate.replayMatches,after.length);
     assert.ok(Number.isFinite(candidate.avgDecisionMs));
     assert.ok(Number.isFinite(baseline.avgDecisionMs));
+    assert.ok(Number.isFinite(candidate.avgTargetDecisionMs));
+    assert.ok(Number.isFinite(baseline.avgTargetDecisionMs));
 });
