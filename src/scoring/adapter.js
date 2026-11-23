@@ -23,7 +23,8 @@ export function evidenceFromSettledRulesState(state,{seatWindType,prevailingWind
     settle[0]?.payload?.reason!=='win'||settle[0].seq!==win[0].seq+1||
     !Array.isArray(settle[0].payload.delta)||
     !Array.isArray(state.round.scores)||
-    !sameIds(settle[0].payload.delta,state.round.scores))
+    settle[0]!==events.at(-1)||
+    !settle[0].payload.delta.every((n,i)=>n===state.round.scores[i]))
     throw new RangeError('Missing canonical public win/settle event linkage');
   const player=state.players?.[r.winnerSeat];
   if(!player||!Array.isArray(player.concealed)||!Array.isArray(player.melds)||
