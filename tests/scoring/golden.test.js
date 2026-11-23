@@ -292,3 +292,25 @@ for(let seat=0;seat<4;seat++)
 assert.equal(shifted.playerTransferDeltas[(seat+1)%4],l.playerTransferDeltas[seat]);
 }
 });
+
+test('S23 見花見字 no honor/no flower award is opt-in and not assumed for default',()=>{
+const e=fixture({concealed:[3,4,5,9,10,11,12,13,14,18,19,20,23],
+winningTile:23});
+const normal=scoreWinningHand(p,e);
+const alternative=scoreWinningHand(see,e);
+assert.ok(!normal.breakdown.some(x=>x.code==='no-honors-no-flowers'));
+const special=alternative.breakdown.find(x=>x.code==='no-honors-no-flowers');
+assert.ok(special);assert.equal(special.tai,2);
+assert.equal(alternative.tai,normal.tai+2);
+const withFlower={...e,flowers:[f('season-spring')]};
+assert.ok(!scoreWinningHand(see,withFlower).breakdown.some(x=>x.code==='no-honors-no-flowers'));
+});
+test('S24 unsupported scoring evidence flags are not silently discarded',()=>{
+for(const field of ['waitShape','firstTurnWin','readyDeclaration',
+'liabilityPolicy','winReason']){
+assert.throws(()=>score(fixture({[field]:'requires Rules event evidence'})),
+ScoringCapabilityError);
+}
+assert.throws(()=>score(fixture({via:'self-draw',sourceSeat:1,
+concealed:dragons,winningTile:27,melds:[]})),/winningTile/);
+});
