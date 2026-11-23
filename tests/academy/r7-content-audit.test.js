@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { LESSONS, listQuestionRefs, submitAcademyAnswer,
   validateAcademyProvenanceBatch, validateAcademyProvenance,
   toPublicQuestion } from '../../src/academy/index.js';
-import { auditAcademyContent, ACADEMY_CONTENT_AUDIT_VERSION } from '../../src/academy/content-audit.js';
+import { auditAcademyContent, ACADEMY_CONTENT_AUDIT_VERSION,
+  validateCurriculumQuestionOwnership } from '../../src/academy/content-audit.js';
 import { UNPUBLISHED_LESSON_GUIDES, LESSON_GUIDE_VERSION,
   getUnpublishedLessonGuide, validateUnpublishedLessonGuides } from '../../src/academy/unpublished-guides.js';
 import { readFileSync } from 'node:fs';
@@ -237,4 +238,17 @@ test('R7 immutable curriculum: a lesson-version change cannot relabel past v3 ac
   const exact=validateAcademyProvenanceBatch([oldLink,clone(oldLink)],[answer.record]);
   assert.equal(exact.length,1);
   assert.equal(JSON.stringify(answer.record),unchangedRecord,'Old v3 attempt must not be migrated in place');
+});
+
+test('R7 ownership: each immutable question version is assigned once to its true lesson',()=>{
+  assert.equal(validateCurriculumQuestionOwnership(),true);
+  const badLesson=LESSONS.map(clone);
+  badLesson[0].questionRefs[0]=clone(badLesson[1].questionRefs[0]);
+  assert.throws(()=>validateCurriculumQuestionOwnership(badLesson,BANK_SPEC),/wrong lesson/);
+  const duplicate=LESSONS.map(clone);
+  duplicate[0].questionRefs.push(clone(duplicate[0].questionRefs[0]));
+  assert.throws(()=>validateCurriculumQuestionOwnership(duplicate,BANK_SPEC),/more than once/);
+  const missing=LESSONS.map(clone);
+  missing[0].questionRefs.pop();
+  assert.throws(()=>validateCurriculumQuestionOwnership(missing,BANK_SPEC),/exactly one lesson/);
 });
