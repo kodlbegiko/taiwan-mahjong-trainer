@@ -14,3 +14,4 @@ export {
   resolveAcademyProvenance,
 } from './provenance.js';
 
+export { ACADEMY_CONTENT_AUDIT_VERSION, auditAcademyContent } from './content-audit.js';
