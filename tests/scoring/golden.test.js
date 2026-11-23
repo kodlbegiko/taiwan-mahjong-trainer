@@ -314,3 +314,16 @@ ScoringCapabilityError);
 assert.throws(()=>score(fixture({via:'self-draw',sourceSeat:1,
 concealed:dragons,winningTile:27,melds:[]})),/winningTile/);
 });
+
+test('S25 見花見字 retains two tai for a complete flower family, plus each flower',()=>{
+const withFamily=fixture({via:'self-draw',sourceSeat:1,concealed:dragons,
+winningTile:undefined,melds:[],flowers:[
+f('season-spring'),f('season-summer'),f('season-autumn'),f('season-winter')]});
+const normal=scoreWinningHand(p,{...withFamily,seatWindType:27});
+const alternative=scoreWinningHand(see,withFamily);
+assert.equal(normal.breakdown.find(x=>x.code==='flower-set:0')?.tai,2);
+assert.equal(alternative.breakdown.find(x=>x.code==='flower-set:0')?.tai,2);
+assert.equal(alternative.breakdown.filter(x=>x.code.startsWith('flower:')).length,4);
+assert.equal(alternative.breakdown.filter(x=>x.code.startsWith('flower:')).reduce((n,x)=>n+x.tai,0),4);
+assert.ok(!alternative.breakdown.some(x=>x.code.startsWith('correct-flower:')));
+});
