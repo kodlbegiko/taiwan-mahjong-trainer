@@ -30,7 +30,39 @@ def open_game(page):
     page.locator('#full-table-root [data-start-new]').click()
     page.wait_for_selector('.table-hand', timeout=25000)
 
-def make_human_decision(page):
+def probe_inline_confirmation(page, folder):
+    """Negative tests use public DOM clicks; no GameState/Rules fixtures."""
+    initial_revision=page.locator('.table-version').inner_text()
+    option=page.locator('.table-action-buttons [data-submit-action]:enabled').first
+    option.click()
+    require(page.locator('[data-action-confirmation]').count()==1,
+            'Legal declaration must open an in-page confirmation')
+    require(page.locator('.table-version').inner_text()==initial_revision,
+            'Opening a declaration confirmation mutated Rules revision')
+    require(page.locator('[data-confirm-action]').is_focused(),
+            'Keyboard focus must move to the explicit confirmation')
+    page.screenshot(path=str(folder/'table-390-r7-declaration-confirm.png'),full_page=True)
+    page.locator('[data-cancel-action]').click()
+    require(page.locator('[data-action-confirmation]').count()==0,
+            'Cancel left a pending confirmation visible')
+    require(page.locator('.table-version').inner_text()==initial_revision,
+            'Cancelled declaration committed a Rules event')
+    # Exercise rejection of a tampered DOM token, not a fabricated GameState.
+    page.locator('.table-action-buttons [data-submit-action]:enabled').first.click()
+    require(page.locator('[data-confirm-action]').count()==1,
+            'Retry did not restore the same legal declaration')
+    page.locator('[data-confirm-action]').evaluate(
+        "(el) => el.dataset.confirmAction='__r7_invalid_action_id__'")
+    page.locator('[data-confirm-action]').click()
+    require('確認動作已過期' in page.locator('[role="alert"]').last.inner_text(),
+            'Forged DOM confirmation was not refused')
+    require(page.locator('.table-version').inner_text()==initial_revision,
+            'Forged confirmation mutated Rules revision')
+    require(page.locator('[data-action-confirmation]').count()==0,
+            'Invalid confirmation left a replayable pending token')
+    # The next ordinary UI action is the legitimate retry.
+
+def make_human_decision(page, coverage, folder):
     # Only click currently issued UI LegalAction controls. Never fabricate IDs.
     if page.locator('.table-round-summary').count():
         return 'settled'
@@ -40,12 +72,19 @@ def make_human_decision(page):
         return 'continue-bots'
     options=page.locator('.table-action-buttons [data-submit-action]:enabled')
     if options.count():
+        if not coverage['declaration_negative_paths']:
+            probe_inline_confirmation(page,folder)
+            coverage['declaration_negative_paths']=True
+            options=page.locator('.table-action-buttons [data-submit-action]:enabled')
         labels=options.all_text_contents()
         preference=['胡牌','補花','摸牌','放棄宣告','明槓','暗槓','加槓','碰','吃']
         chosen=next((i for word in preference for i,label in enumerate(labels) if word in label),0)
         selected=options.nth(chosen)
         label=labels[chosen]
         selected.click()
+        require(page.locator('[data-action-confirmation]').count()==1,
+                'Legal non-discard action must require an in-page confirmation')
+        page.locator('[data-confirm-action]').click()
         return label
     tile=page.locator('.table-hand button[data-pick-action]:enabled')
     if tile.count():
@@ -57,19 +96,40 @@ def make_human_decision(page):
     return 'waiting'
 
 def full_round(page, folder):
-    page.on('dialog', lambda dialog: dialog.accept())
+    native_dialogs=[]
+    def on_unexpected_dialog(dialog):
+        native_dialogs.append(dialog.message)
+        dialog.dismiss()
+    page.on('dialog', on_unexpected_dialog)
     open_game(page)
+    original_revision=page.locator('.table-version').inner_text()
+    page.locator('.table-header-tools [data-start-new]').click()
+    require(page.locator('[data-restart-confirmation]').count()==1,
+            'Restart must require an in-page confirmation')
+    require(page.locator('.table-version').inner_text()==original_revision,
+            'Opening restart confirmation mutated state')
+    page.locator('[data-cancel-new]').click()
+    require(page.locator('.table-version').inner_text()==original_revision,
+            'Cancelling restart mutated the ongoing match')
+    page.locator('[data-show-replay]').click()
+    page.locator('#full-table-root [role="alert"]').wait_for(timeout=10000)
+    require('只支援已結束' in page.locator('#full-table-root [role="alert"]').last.inner_text(),
+            'Pre-settlement Replay should report an explicit guarded refusal')
+    page.locator('[data-return-table]').click()
+    require(page.locator('.table-version').inner_text()==original_revision,
+            'Replay refusal / recovery modified the live Rules revision')
     require('EXPERIMENTAL' in page.locator('#full-table-root').inner_text(),
             'experimental warning missing')
     require(page.locator('.table-opponent .table-hand').count()==0,
             'opponent concealed leaked')
     page.screenshot(path=str(folder/'table-390-real-r3.png'),full_page=True)
     history=[]
+    coverage={'declaration_negative_paths':False}
     for step in range(MAX_HUMAN_DECISIONS):
         page.wait_for_timeout(100)
         if page.locator('.table-round-summary').count():
             break
-        label=make_human_decision(page)
+        label=make_human_decision(page,coverage,folder)
         history.append(label)
         # Debounce: subsequent actions need a fresh Rules revision.
         page.wait_for_timeout(80)
@@ -82,6 +142,10 @@ def full_round(page, folder):
                                  page.locator('[role="alert"]').last.inner_text())
     else:
         raise AssertionError('No real terminal outcome after 320 UI decision steps: '+str(history[-20:]))
+    require(coverage['declaration_negative_paths'],
+            'No real flower/claim declaration exercised cancellation, refusal and retry')
+    require(not native_dialogs,
+            'Native browser dialog appeared in full-match table UI: '+str(native_dialogs))
     result=page.locator('.table-round-summary').inner_text()
     require('tw16-minimal-tai-v1' in result,'experimental scoring policy missing')
     require('四家分數變化' in result,'authoritative zero-sum result missing')
@@ -243,7 +307,11 @@ def run(folder):
                 page.on('pageerror',lambda e:errors.append(str(e)))
                 page.goto(url,wait_until='networkidle')
                 if width==390:
-                    history=full_round(page,folder)
+                    ctx.tracing.start(screenshots=True,snapshots=True,sources=True)
+                    try:
+                        history=full_round(page,folder)
+                    finally:
+                        ctx.tracing.stop(path=str(folder/'table-390-r7-full-round.trace.zip'))
                     daily_roundtrip(page,folder)
                     # One cold new tab after activation, with network disabled.
                     page.goto(url,wait_until='networkidle')
@@ -281,6 +349,8 @@ def run(folder):
     (folder/'real-r3-verification.txt').write_text(
         'R3 terminal round via real UI, Bots, Rules, settlement, Replay, Daily, offline, 34 SVG.\n'
         'Browser Chromium emulation only, NOT physical iPhone evidence.\n'
+        'R7: inline non-discard confirmation, cancel, tampered DOM token refusal, retry,\n'
+        'restart cancellation, nonterminal Replay error/recovery, trace ZIP.\n'
         'Human action histogram: '+str({x:history.count(x) for x in set(history)}),
         encoding='utf-8')
 

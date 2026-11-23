@@ -66,6 +66,23 @@ test('fixture-only replacement PlayerView separates 17 physical tiles from zero 
   assert.equal((html.match(/data-pick-action=/g)??[]).length,0);
   assert.equal((html.match(/data-submit-action=/g)??[]).length,1);
   assert.ok(html.includes('補花'));
+  const pending=TableView(copy,{confirmation:copy.view.legalActions[0]});
+  assert.ok(pending.includes('data-action-confirmation'));
+  assert.ok(pending.includes('data-confirm-action="fixture-issued-by-rules-only"'));
+  assert.ok(pending.includes('data-cancel-action'));
+  const forged=TableView(copy,{confirmation:{actionId:'not-a-rules-action'}});
+  assert.ok(!forged.includes('data-action-confirmation'));
+  assert.ok(!forged.includes('data-confirm-action='));
+});
+test('restarting a real sandbox round requires an explicit cancellable in-page prompt', () => {
+  const session=createSandboxSession({storage:memoryStorage()});
+  const p=firstProfile();
+  const start=session.start({profileId:p.profileId,ruleVersion:p.ruleVersion});
+  const html=TableView(start,{restartPending:true});
+  assert.ok(html.includes('data-restart-confirmation'));
+  assert.ok(html.includes('data-confirm-new'));
+  assert.ok(html.includes('data-cancel-new'));
+  assert.equal(session.snapshot().view.asOfEventSeq,start.view.asOfEventSeq);
 });
 
 test('the first discard must be confirmed; stale/repeated/forged actions are rejected', () => {
