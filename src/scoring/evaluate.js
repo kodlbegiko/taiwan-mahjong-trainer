@@ -62,7 +62,8 @@ function validateEvidence(p,e){
     'explicit dealerStreak count (never inferred from handIndex)');
   if(e.dealerStreak>0)
     assert(e.streakEvidence&&Array.isArray(e.streakEvidence.roundRefs)&&
-      e.streakEvidence.roundRefs.length>=e.dealerStreak&&
+      e.streakEvidence.roundRefs.length===e.dealerStreak&&
+      new Set(e.streakEvidence.roundRefs).size===e.dealerStreak&&
       e.streakEvidence.roundRefs.every(x=>typeof x==='string'&&x.length>0),
       'auditable prior-round dealer streak references');
   assert(Array.isArray(e.concealed)&&Array.isArray(e.melds)&&e.melds.length<=5,'hand inventory');
@@ -138,7 +139,8 @@ export function scoreWinningHand(profile,evidence){
         if(honors)add(items,'mixed-suit','mixedSuit','one suited family plus honors');
         else add(items,'pure-suit','pureSuit','one suited family without honors');
       }
-      if(all.every(g=>g.kind!=='sequence'))
+      if(all.every(g=>g.kind!=='sequence')&&
+        !(suits.size===0&&profile.variants.allHonorsSuppressAllPongs))
         add(items,'all-pongs','allPongs','five triplets/kongs and one pair');
       const tripletTypes=all.filter(g=>g.kind!=='sequence').map(g=>g.type);
       const dragonCount=tripletTypes.filter(t=>t>=31).length;
