@@ -1,10 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { auditAcademyContent, ACADEMY_CONTENT_AUDIT_VERSION,
-  LESSONS, listQuestionRefs, submitAcademyAnswer,
-  validateAcademyProvenanceBatch, toPublicQuestion,
-  UNPUBLISHED_LESSON_GUIDES, LESSON_GUIDE_VERSION,
-  getUnpublishedLessonGuide, validateUnpublishedLessonGuides } from '../../src/academy/index.js';
+import { LESSONS, listQuestionRefs, submitAcademyAnswer,
+  validateAcademyProvenanceBatch, toPublicQuestion } from '../../src/academy/index.js';
+import { auditAcademyContent, ACADEMY_CONTENT_AUDIT_VERSION } from '../../src/academy/content-audit.js';
+import { UNPUBLISHED_LESSON_GUIDES, LESSON_GUIDE_VERSION,
+  getUnpublishedLessonGuide, validateUnpublishedLessonGuides } from '../../src/academy/unpublished-guides.js';
+import { readFileSync } from 'node:fs';
 import { BANK_SPEC } from '../../src/academy/catalog.js';
 import { getCanonicalExercise } from '../../src/academy/question-internal.js';
 import { createMasterAcademyFacade } from '../../src/integration/master-academy-facade.js';
@@ -197,4 +198,14 @@ test('R7 wrong-answer review: real canonical score leads to available review, no
   assert.ok(dashboard.recommendation.dueQuestions.some(q=>q.questionId===spec.questionId));
   assert.equal(JSON.parse(storage.getItem(ARCHIVE_STORAGE_KEY)).records.length,1);
   assert.equal(createMasterAcademyFacade(storage).getProvenanceLinks().length,1);
+});
+
+test('R7 offline graph: Academy release entrypoint does not import QA-only modules missing from SW precache',()=>{
+  const publicEntry=readFileSync(new URL('../../src/academy/index.js',import.meta.url),'utf8');
+  const sw=readFileSync(new URL('../../sw.js',import.meta.url),'utf8');
+  for(const moduleName of ['content-audit.js','unpublished-guides.js']){
+    assert.ok(!publicEntry.includes(moduleName),moduleName+' is not a runtime dependency');
+    assert.ok(!sw.includes("'./src/academy/"+moduleName+"'"),
+      moduleName+' should remain a standalone QA-only module');
+  }
 });
