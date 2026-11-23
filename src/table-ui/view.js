@@ -92,9 +92,11 @@ function actionName(action) {
   const physical=action.kind==='chi'&&ids.length?' ['+ids.join(', ')+']':'';
   return kind+(action.kind!=='discard'&&extra.length?' · '+extra.join('、'):'')+physical;
 }
-export function ActionBar(legalActions, selectedId, busy) {
+export function ActionBar(legalActions, selectedId, busy, confirmation=null) {
   const chosen = legalActions.find(a => a.kind === 'discard' && a.actionId === selectedId);
   const declarationActions = legalActions.filter(a => a.kind !== 'discard');
+  const pending = declarationActions.find(a => a.actionId===confirmation?.actionId &&
+    a.actorSeat===confirmation?.actorSeat && a.expectedRevision===confirmation?.expectedRevision);
   return '<section class="table-actions" aria-label="合法動作"><div class="table-actions-heading">' +
     '<h3>可操作動作</h3><span>僅顯示 Rules Engine 回傳的 LegalAction</span></div>' +
     (chosen ? '<div class="table-selected"><span>已選：' + escapeHtml(actionName(chosen)) +
@@ -106,6 +108,12 @@ export function ActionBar(legalActions, selectedId, busy) {
       '<button type="button" class="secondary" data-submit-action="' +
       escapeHtml(a.actionId) + '" ' + (busy ? 'disabled' : '') +
       '>' + escapeHtml(actionName(a)) + '</button>').join('') + '</div>' +
+    (pending?'<div class="table-selected table-confirmation" data-action-confirmation role="group" '+
+      'aria-label="正式動作確認"><p>確定執行合法動作：'+escapeHtml(actionName(pending))+
+      '？宣告後無法撤銷。</p><button type="button" class="primary" data-confirm-action="'+
+      escapeHtml(pending.actionId)+'" '+(busy?'disabled':'')+'>確認宣告</button>'+
+      '<button type="button" class="secondary" data-cancel-action '+(busy?'disabled':'')+
+      '>取消</button></div>':'') +
     (!declarationActions.length && !chosen ? '<p class="table-muted">目前無其他合法宣告，未提供的吃／碰／槓／胡／過操作一律不顯示。</p>' : '') +
     '</section>';
 }
@@ -115,7 +123,8 @@ function lastEvent(events) {
   const prefix = e.actorSeat === undefined ? '牌局' : SEATS[e.actorSeat];
   return prefix + ' · ' + (e.type === 'deal' ? '配牌' : (ACTIONS[e.type] ?? e.type)) + ' · 事件 ' + e.seq;
 }
-export function TableView(snapshot,{selection=null,busy=false,error='',botStatus=''}={}) {
+export function TableView(snapshot,{selection=null,busy=false,error='',botStatus='',
+  confirmation=null,restartPending=false}={}) {
   if(!snapshot)return '';
   const {view,profile,wallRemaining,botConnected,replayConnected,storageWarning,replayWarning}=snapshot;
   const opponents=new Map(view.opponents.map(p=>[p.seat,p]));
@@ -131,6 +140,10 @@ export function TableView(snapshot,{selection=null,busy=false,error='',botStatus
     '<p>Rules Engine 決定牌局、宣告與結算；此規則與台數政策均未取得完整台灣通用驗證。</p></div>'+
     '<div class="table-header-tools"><span class="table-version">Revision '+
     view.asOfEventSeq+'</span><button type="button" class="secondary" data-start-new>重新開局</button></div></header>'+
+    (restartPending?'<div class="table-selected table-confirmation" data-restart-confirmation '+
+      'role="group" aria-label="重新開局確認"><p>確定重新開局？目前對局會被取代。</p>'+
+      '<button type="button" class="primary" data-confirm-new>確定重新開局</button>'+
+      '<button type="button" class="secondary" data-cancel-new>取消</button></div>':'')+
     '<div class="table-facts"><span>規則：'+escapeHtml(profile.profileId)+
     '</span><span>階段：'+escapeHtml(view.round.phase)+
     '</span><span>莊家：'+SEATS[view.round.dealerSeat]+
@@ -154,7 +167,7 @@ export function TableView(snapshot,{selection=null,busy=false,error='',botStatus
     OpponentSeat(opponents.get(1),view.round.currentSeat,view.round.dealerSeat)+'</div>'+
     PlayerHand(view.self,actions,selection)+
     (ended?'<section class="table-actions"><h3>正式 Rules 已結算本局</h3></section>':
-      humanCanAct?ActionBar(actions,selection,busy||snapshot.paused):
+      humanCanAct?ActionBar(actions,selection,busy||snapshot.paused,confirmation):
         '<section class="table-actions" aria-label="等待其他玩家"><h3>'+
         (botConnected?'三名 Bot 自動執行中':'Bot API 尚未連接')+'</h3><p>'+
         (botConnected?'請等待正式 Controller 的合法回合與宣告，不會跳過關鍵 Claim。':

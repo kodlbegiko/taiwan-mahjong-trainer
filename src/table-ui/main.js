@@ -13,6 +13,7 @@ let session=null, daily=null, fullMode=false, selection=null;
 let busy=false,lastError='',activePage='academy',timeline=null,replayIndex=0;
 let replayFrame=null,replayBusy=false,botStatus='',storage=null;
 let dailyBoot='idle';
+let pendingAction=null,restartPending=false;
 const forceSandbox=new URLSearchParams(window.location.search).get('table')==='sandbox';
 
 
@@ -77,7 +78,7 @@ function draw() {
   }
   const snapshot=session?.snapshot();
   root.innerHTML=snapshot?TableView(snapshot,{selection,busy,error:lastError,
-    botStatus}):renderEmpty();
+    botStatus,confirmation:pendingAction,restartPending}):renderEmpty();
 }
 async function driveBots() {
   if(!session?.snapshot()||busy===false) return;
@@ -98,32 +99,61 @@ async function driveBots() {
 }
 async function startNew() {
   if(busy)return;
-  if(session.snapshot()&&!window.confirm('確定重新開局？目前對局會被取代。'))return;
   busy=true;
   try {
     const selected=root.querySelector('#table-profile')?.value??'';
-    const profile=profilesList().find(p=>p.profileId+'@'+p.ruleVersion===selected)??profilesList()[0];
+    const current=session.snapshot()?.profile;
+    const available=profilesList();
+    const profile=available.find(p=>p.profileId+'@'+p.ruleVersion===selected)??
+      available.find(p=>p.profileId===current?.profileId&&p.ruleVersion===current?.ruleVersion)??
+      available[0];
     if(!profile)throw new Error('沒有已註冊且可用的四人 RuleProfile');
     session.start({profileId:profile.profileId,ruleVersion:profile.ruleVersion});
-    selection=null;lastError='';botStatus='';timeline=null;replayFrame=null;
+    selection=null;pendingAction=null;restartPending=false;
+    lastError='';botStatus='';timeline=null;replayFrame=null;
     activate('play',{focus:false});
     await driveBots();
   } catch(error) {
     lastError='建立對局失敗：'+error.message;
   } finally {busy=false;draw();}
 }
-async function submit(actionId) {
-  if(busy)return;
-  const previous=session.snapshot();
+function stageAction(actionId) {
+  const previous=session?.snapshot();
   const action=previous?.view?.legalActions?.find(a=>a.actionId===actionId);
   if(!action||action.actorSeat!==previous.view.audienceSeat||
       action.expectedRevision!==previous.view.asOfEventSeq){
-    lastError='原始動作已過期，已取消選擇。';selection=null;draw();return;
+    pendingAction=null;selection=null;
+    lastError='原始動作已過期或不合法，請重新選擇。';draw();return;
   }
-  if(action.kind!=='discard' &&
-      !window.confirm('確定執行 Rules 合法動作：'+action.kind+
-        '？宣告送出後無法撤銷。'))return;
-  busy=true;
+  if(action.kind==='discard'){
+    pendingAction=null;
+    void submit(actionId);
+    return;
+  }
+  // Use an in-page, keyboard-accessible confirmation instead of window.confirm.
+  // No Rules action is submitted by opening or cancelling this panel.
+  pendingAction={actionId:action.actionId,actorSeat:action.actorSeat,
+    expectedRevision:action.expectedRevision,kind:action.kind};
+  restartPending=false;selection=null;lastError='';
+  draw();
+  root.querySelector('[data-confirm-action]')?.focus({preventScroll:true});
+}
+async function submit(actionId) {
+  if(busy)return;
+  const previous=session?.snapshot();
+  const action=previous?.view?.legalActions?.find(a=>a.actionId===actionId);
+  const valid=action&&action.actorSeat===previous.view.audienceSeat&&
+    action.expectedRevision===previous.view.asOfEventSeq;
+  const confirmed=action?.kind==='discard'||(pendingAction?.actionId===actionId&&
+    pendingAction?.actorSeat===action?.actorSeat&&
+    pendingAction?.expectedRevision===action?.expectedRevision&&
+    pendingAction?.kind===action?.kind);
+  if(!valid||!confirmed){
+    lastError='原始動作已過期或尚未確認，已取消選擇。';
+    selection=null;pendingAction=null;draw();return;
+  }
+  // Synchronously prevent duplicate submission before awaiting Controller/Bots.
+  busy=true;pendingAction=null;restartPending=false;
   try {
     await session.submit({actionId:action.actionId,actorSeat:action.actorSeat,
       expectedRevision:action.expectedRevision});
@@ -220,9 +250,33 @@ function onClick(event) {
     return;
   }
   if(busy)return;
+  if(button.hasAttribute('data-confirm-new')){
+    if(restartPending){restartPending=false;void startNew();}
+    return;
+  }
+  if(button.hasAttribute('data-cancel-new')){
+    restartPending=false;draw();return;
+  }
+  if(button.hasAttribute('data-cancel-action')){
+    pendingAction=null;lastError='';draw();return;
+  }
+  if(button.hasAttribute('data-confirm-action')){
+    const actionId=button.dataset.confirmAction;
+    if(actionId!==pendingAction?.actionId){
+      pendingAction=null;selection=null;
+      lastError='確認動作已過期，請重新選擇。';draw();return;
+    }
+    return void submit(actionId);
+  }
   if(button.hasAttribute('data-return-academy'))return activate('academy');
   if(button.hasAttribute('data-return-table'))return activate('play');
-  if(button.hasAttribute('data-start-new'))return void startNew();
+  if(button.hasAttribute('data-start-new')){
+    if(session?.snapshot()){
+      pendingAction=null;restartPending=true;lastError='';draw();
+      root.querySelector('[data-confirm-new]')?.focus({preventScroll:true});
+    }else void startNew();
+    return;
+  }
   if(button.hasAttribute('data-show-replay'))return void openReplay();
   for(const kind of ['start','resume','submit','complete','abort','retry'])
     if(button.hasAttribute('data-daily-'+kind))return void dailyAction(kind);
@@ -232,6 +286,7 @@ function onClick(event) {
     });return;
   }
   if(button.hasAttribute('data-pick-action')){
+    pendingAction=null;restartPending=false;
     const actionId=button.dataset.pickAction;
     const view=session.snapshot()?.view;
     if(!view?.legalActions.some(a=>a.kind==='discard'&&
@@ -243,7 +298,7 @@ function onClick(event) {
     return;
   }
   if(button.hasAttribute('data-clear-selection')){selection=null;draw();return;}
-  if(button.hasAttribute('data-submit-action'))return void submit(button.dataset.submitAction);
+  if(button.hasAttribute('data-submit-action'))return stageAction(button.dataset.submitAction);
   if(button.hasAttribute('data-replay-first'))return void loadReplayFrame(0);
   if(button.hasAttribute('data-replay-prev'))return void loadReplayFrame(Math.max(0,replayIndex-1));
   if(button.hasAttribute('data-replay-next')){
