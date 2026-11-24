@@ -192,6 +192,30 @@ export function createReplayService({storage=null,settlementRuntime}={}) {
   function listReplays() {
     return indexFrom(store).map(id=>publicManifest(readArchive(store,id,settlementRuntime)));
   }
+  // Opt-in compatibility inventory for hosts that must keep older readable
+  // history visible while a newer/retired policy is unavailable. The original
+  // listReplays() remains strict and all actual reads still verify the archive.
+  function listReplayAvailability() {
+    const compatibilityCodes=new Set([
+      'UNKNOWN_RULE_PROFILE','UNSUPPORTED_SCORING_PROFILE',
+      'UNSUPPORTED_PUBLIC_EVENT_CONTRACT','SCORING_RUNTIME_REQUIRED',
+    ]);
+    return indexFrom(store).map(replayId=>{
+      try {
+        const manifest=publicManifest(readArchive(store,replayId,settlementRuntime));
+        return {replayId,status:'verified',manifest};
+      } catch(error) {
+        if(!(error instanceof ReplayError))throw error;
+        const code=error.code;
+        // Never expose raw error messages/causes, unverified archive metadata,
+        // or fabricate a manifest. Storage/unknown systemic failures propagate.
+        if(compatibilityCodes.has(code))return {replayId,status:'incompatible',code};
+        if(code==='CORRUPT_REPLAY'||code==='REPLAY_NOT_FOUND')
+          return {replayId,status:'unavailable',code};
+        throw error;
+      }
+    });
+  }
   function loadReplay(replayId) { return publicManifest(readArchive(store,replayId,settlementRuntime)); }
   function getReplayFrame(replayId,eventSeq,{viewerSeat,perspective='player-at-time'}={}) {
     const archive=readArchive(store,replayId,settlementRuntime);
@@ -358,6 +382,6 @@ export function createReplayService({storage=null,settlementRuntime}={}) {
       source:{replayId,eventSeq}});
   }
   return Object.freeze({apiVersion:REPLAY_API_VERSION,saveReplay,recoverReplay,
-    listReplays,loadReplay,getReplayFrame,listReplayFrameBoundaries,getPlayerDecision,getDecisionAnalysis,
+    listReplays,listReplayAvailability,loadReplay,getReplayFrame,listReplayFrameBoundaries,getPlayerDecision,getDecisionAnalysis,
     listCoachingFindings,createReviewQuestion});
 }
