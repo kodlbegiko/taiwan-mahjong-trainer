@@ -1,0 +1,473 @@
+{
+  "schemaVersion": 1,
+  "kind": "tw16-phase3-r72-release-candidate-audit",
+  "asOf": "2026-11-24",
+  "timeZone": "Asia/Taipei",
+  "pr": 53,
+  "branch": "integration/mahjong-r7-release-audit",
+  "applicationSha": "793bbb1caeef79b94e0bb29bf2ea66b3f7c43f4d",
+  "previousApplicationSha": "1b73e7565411ac2df9d93652c21f217c5fdf5d0d",
+  "mainSha": "25870862b6499f7e699967aa76429ae5dcfc5db4",
+  "baseSha": "a29bebfc01e05c05450b964a41ce34cbecf40365",
+  "sourcePinMatrix": [
+    {
+      "pr": 51,
+      "module": "Rules",
+      "sha": "ff27c52526acfdf5fb905b4dd72a229289b8d734",
+      "ci": {
+        "pass": 3,
+        "fail": 0,
+        "pending": 0
+      },
+      "handoff": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/51#issuecomment-7121874381"
+    },
+    {
+      "pr": 52,
+      "module": "Scoring",
+      "sha": "1b27d5b9cf0c6e3bb7aff894288adfbf309c1b48",
+      "ci": {
+        "pass": 0,
+        "fail": 0,
+        "pending": 1
+      },
+      "handoff": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/52#issuecomment-7121874927"
+    },
+    {
+      "pr": 48,
+      "module": "Bot",
+      "sha": "2c98f31e51f5cd5d2f208d95210559976fc7854f",
+      "ci": {
+        "pass": 1,
+        "fail": 0,
+        "pending": 2
+      },
+      "handoff": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/48#issuecomment-7121876697"
+    },
+    {
+      "pr": 46,
+      "module": "Replay",
+      "sha": "deb0bfaafa1a50ad7b112aa3e53078a98b14d195",
+      "ci": {
+        "pass": 1,
+        "fail": 1,
+        "pending": 0
+      },
+      "handoff": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/46#issuecomment-7121875501"
+    },
+    {
+      "pr": 49,
+      "module": "Table UI",
+      "sha": "d471f020d673de0e8916ae44b83b8d4a1db0aa04",
+      "ci": {
+        "pass": 3,
+        "fail": 0,
+        "pending": 1
+      },
+      "handoff": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/49#issuecomment-7121877886"
+    },
+    {
+      "pr": 47,
+      "module": "Academy",
+      "sha": "0994b657868233ece711cb4403c0248ce260976f",
+      "ci": {
+        "pass": 0,
+        "fail": 0,
+        "pending": 2
+      },
+      "handoff": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/47#issuecomment-7121876142"
+    },
+    {
+      "pr": 50,
+      "module": "PWA",
+      "sha": "d02eb508a0c302997f5e10a4eaf01c85bf0e6fb7",
+      "ci": {
+        "pass": 5,
+        "fail": 2,
+        "pending": 3
+      },
+      "handoff": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/50#issuecomment-7121877307"
+    }
+  ],
+  "ci": {
+    "previous": [
+      {
+        "id": 45322717110,
+        "name": "Phase 3 Table UI — sandbox legal actions, Chromium and offline",
+        "status": "in_progress",
+        "conclusion": null,
+        "url": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/45322717110"
+      },
+      {
+        "id": 45322717326,
+        "name": "Verify",
+        "status": "completed",
+        "conclusion": "failure",
+        "url": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/45322717326"
+      },
+      {
+        "id": 45322717200,
+        "name": "V0.2 Realistic Tile Faces — Integration QA",
+        "status": "completed",
+        "conclusion": "failure",
+        "url": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/45322717200"
+      },
+      {
+        "id": 45322717480,
+        "name": "Phase 3 Real Full-Match Acceptance — experimental R3",
+        "status": "completed",
+        "conclusion": "failure",
+        "url": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/45322717480"
+      },
+      {
+        "id": 45322717501,
+        "name": "Master Academy UI — canonical v3 and Chromium",
+        "status": "in_progress",
+        "conclusion": null,
+        "url": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/45322717501"
+      },
+      {
+        "id": 45322717247,
+        "name": "V0.2 Independent UI Release Gates",
+        "status": "completed",
+        "conclusion": "failure",
+        "url": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/45322717247"
+      },
+      {
+        "id": 45322717181,
+        "name": "V0.2 Browser UI & PWA",
+        "status": "completed",
+        "conclusion": "failure",
+        "url": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/45322717181"
+      },
+      {
+        "id": 45322717106,
+        "name": "Master Academy combined — real E2E & provenance gates",
+        "status": "completed",
+        "conclusion": "failure",
+        "url": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/45322717106"
+      },
+      {
+        "id": 45322717384,
+        "name": "R7 Runtime Precache Contract",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/45322717384"
+      },
+      {
+        "id": 45322717427,
+        "name": "R7 Mobile PWA Accessibility Regression",
+        "status": "in_progress",
+        "conclusion": null,
+        "url": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/45322717427"
+      }
+    ],
+    "current": [
+      {
+        "id": 45324631534,
+        "name": "R7 Runtime Precache Contract",
+        "status": "queued",
+        "conclusion": null,
+        "url": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/45324631534"
+      },
+      {
+        "id": 45324631686,
+        "name": "V0.2 Browser UI & PWA",
+        "status": "queued",
+        "conclusion": null,
+        "url": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/45324631686"
+      },
+      {
+        "id": 45324631568,
+        "name": "Master Academy combined — real E2E & provenance gates",
+        "status": "queued",
+        "conclusion": null,
+        "url": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/45324631568"
+      },
+      {
+        "id": 45324631545,
+        "name": "V0.2 Realistic Tile Faces — Integration QA",
+        "status": "in_progress",
+        "conclusion": null,
+        "url": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/45324631545"
+      },
+      {
+        "id": 45324631412,
+        "name": "Master Academy UI — canonical v3 and Chromium",
+        "status": "queued",
+        "conclusion": null,
+        "url": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/45324631412"
+      },
+      {
+        "id": 45324631455,
+        "name": "R7 Mobile PWA Accessibility Regression",
+        "status": "queued",
+        "conclusion": null,
+        "url": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/45324631455"
+      },
+      {
+        "id": 45324631398,
+        "name": "Phase 3 Table UI — sandbox legal actions, Chromium and offline",
+        "status": "queued",
+        "conclusion": null,
+        "url": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/45324631398"
+      },
+      {
+        "id": 45324631507,
+        "name": "V0.2 Independent UI Release Gates",
+        "status": "queued",
+        "conclusion": null,
+        "url": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/45324631507"
+      },
+      {
+        "id": 45324631410,
+        "name": "Verify",
+        "status": "queued",
+        "conclusion": null,
+        "url": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/45324631410"
+      }
+    ],
+    "requiredWorkflowCount": 10,
+    "missingCurrent": [
+      "Phase 3 Real Full-Match Acceptance — experimental R3"
+    ],
+    "currentTestTotals": null
+  },
+  "previousEvidence": {
+    "verify": {
+      "run": 45322717326,
+      "job": 138204830745,
+      "tests": 466,
+      "pass": 463,
+      "fail": 2,
+      "skip": 1,
+      "skipReason": "MAHJONG_STRESS opt-in"
+    },
+    "r5": {
+      "settled": 100,
+      "wins": 89,
+      "draws": 11,
+      "replayMatches": 100,
+      "illegal": 0,
+      "stalls": 0,
+      "avgMs": 8.237,
+      "p95Ms": 12.89
+    },
+    "oracle": {
+      "requiredMixed10000": "PASS",
+      "uniform10000": "PASS",
+      "integration10000": "PASS",
+      "optionalStress": "SKIP"
+    },
+    "benchmark": {
+      "games": 224,
+      "pairedTrials": 112,
+      "replayMatches": 224,
+      "invalidActions": 0,
+      "levels": [
+        {
+          "level": "Intermediate",
+          "pairs": 80,
+          "baseline": {
+            "wins": 20,
+            "dealIns": 18,
+            "replays": 80,
+            "targetAvgMs": 6.338
+          },
+          "candidate": {
+            "wins": 21,
+            "dealIns": 16,
+            "replays": 80,
+            "targetAvgMs": 7.52
+          }
+        },
+        {
+          "level": "Beginner",
+          "pairs": 16,
+          "baseline": {
+            "wins": 4,
+            "dealIns": 3,
+            "replays": 16,
+            "targetAvgMs": 6.077
+          },
+          "candidate": {
+            "wins": 3,
+            "dealIns": 4,
+            "replays": 16,
+            "targetAvgMs": 5.991
+          }
+        },
+        {
+          "level": "Advanced",
+          "pairs": 16,
+          "baseline": {
+            "wins": 4,
+            "dealIns": 3,
+            "replays": 16,
+            "targetAvgMs": 4.929
+          },
+          "candidate": {
+            "wins": 2,
+            "dealIns": 3,
+            "replays": 16,
+            "targetAvgMs": 5.645
+          }
+        }
+      ]
+    },
+    "strictR7": {
+      "tests": 67,
+      "pass": 66,
+      "fail": 1,
+      "skip": 0,
+      "run": 45322717480,
+      "job": 138204831716
+    },
+    "localChromium": {
+      "status": "PASS",
+      "artifactId": 14888732622,
+      "run": 45322717480,
+      "job": 138204831477,
+      "screenshots": 8,
+      "trace": true,
+      "dailyRecordReadback": true,
+      "physical": false
+    },
+    "academyBrowser": {
+      "status": "PASS",
+      "run": 45322717106,
+      "job": 138204830473,
+      "artifactId": 14889511073
+    }
+  },
+  "pwaPeerEvidence": {
+    "sourceSha": "d02eb508a0c302997f5e10a4eaf01c85bf0e6fb7",
+    "sourceRun": 45320960514,
+    "sourceArtifact": 14888870371,
+    "composedSha": "207bf5c42140c8f659435b4ca8c7804d2f5370cd",
+    "composedRun": 45320961093,
+    "composedArtifact": 14889466622,
+    "viewports": "PASS_6_PLUS_LANDSCAPE",
+    "coldOffline": "PASS",
+    "missingAndUnlistedModule": "PASS",
+    "brokenUpdateRollback": "FAIL",
+    "physical": "NOT_RUN"
+  },
+  "cache": {
+    "sourceModules": 75,
+    "qaOnly": 3,
+    "precacheModules": 72,
+    "entries": 118,
+    "astCurrent": "NOT_RUN"
+  },
+  "staging": {
+    "id": "dpl_FyT772DYh8myGFcGqEi72ZnhnjH7",
+    "url": "https://taiwan-mahjong-phase3-r5-experimental-iotn3v964-sign2.vercel.app/",
+    "sha": "793bbb1caeef79b94e0bb29bf2ea66b3f7c43f4d",
+    "state": "READY",
+    "target": "preview",
+    "servedByteParity": "NOT_RUN",
+    "browser": {
+      "run": "https://agent.tinyfish.ai/runs/5d15e9ed-859e-4b72-bfaf-537487278646",
+      "status": "PARTIAL",
+      "durationSeconds": 198,
+      "steps": 29,
+      "beginnerStarted": true,
+      "flowersReplaced": 2,
+      "drawDiscardPassConfirmed": true,
+      "nonterminalReplayRejected": true,
+      "lastPhase": "claim_window",
+      "lastObservedEventApprox": 37,
+      "terminal": "NOT_OBSERVED",
+      "intermediate": "NOT_RUN",
+      "advanced": "NOT_RUN",
+      "daily": "NOT_RUN",
+      "offline": "NOT_RUN",
+      "screenshots": "NOT_AVAILABLE",
+      "trace": "NOT_AVAILABLE"
+    }
+  },
+  "issues": [
+    {
+      "id": "R7-001",
+      "status": "PASS_PREVIOUS_SHA",
+      "detail": "Signed zero S08 and additional zero/tamper tests pass on 1b73e756 Verify; candidate regression pending."
+    },
+    {
+      "id": "R7-002",
+      "status": "PASS_PREVIOUS_SHA",
+      "detail": "Integrated local Chromium full-round offline and Replay passed on 1b73e756; runtime graph workflow passed. Current SHA pending; source #46 standalone offline remains FAIL."
+    },
+    {
+      "id": "R7-003",
+      "status": "PASS_SOURCE_ONLY",
+      "detail": "Source #50 d02eb508 and separately composed candidate pass all six portrait/desktop widths plus landscape; 375px focus gate passed. Current integrated SHA pending."
+    },
+    {
+      "id": "R7-004",
+      "status": "BLOCKED",
+      "detail": "R7 Rules robbery, Bot projection, minimal-liability Replay and Scoring golden tests passed separately within prior integration suite; comparison caller failed. R7.2 passes negotiated version to test, retains missing/unknown rejection. Rules still uses minimal-tai settlement; authoritative versioned scorer pair and replay migration not implemented."
+    },
+    {
+      "id": "R7-005",
+      "status": "PARTIAL",
+      "detail": "224 actual paired games on prior SHA, 224 replay matches, 0 invalid actions; difficulty option wired, public Beginner opened. Intermediate/Advanced browser terminal NOT_RUN. Advanced strength not established."
+    },
+    {
+      "id": "R7-006",
+      "status": "BLOCKED",
+      "detail": "12 published / 8 validated, 100 canonical v3 questions; 27 draft review assessments, 11 review bundles, formal scored tag coverage 10/20. No formal scenario scorer or record authority migration."
+    },
+    {
+      "id": "R7-007",
+      "status": "PASS_PREVIOUS_SHA",
+      "detail": "Prior integrated Chromium full round passed confirmation, cancel/retry, duplicate and expired token, restored result, no native dialogs. Current public browser observed legal confirmation only; full candidate regression pending."
+    },
+    {
+      "id": "R7-008",
+      "status": "FIX_COMMITTED_NOT_RUN",
+      "detail": "QA-only cache policy conflict caused Verify test 33 failure. Explicitly exclude three draft Academy modules, keep original test and extend it, add runtime import negative probe."
+    },
+    {
+      "id": "R7-009",
+      "status": "FIX_COMMITTED_NOT_RUN",
+      "detail": "Replay comparison test 278 failed unnegotiated public event contract. Test obtains Rules-owned capability; missing/unknown version negative tests added. Scoring fail-closed unchanged."
+    },
+    {
+      "id": "R7-010",
+      "status": "FAIL_SOURCE_AND_PEER_COMPOSITION",
+      "detail": "Source #50 and separately pinned combined candidate fail tests/pwa/mobile-update-gates.py:115 on broken update cache rollback. Actual viewport, cold offline and missing/unlisted module checks passed. Independent issue, exact root cause unverified. Handoff to PWA owner."
+    }
+  ],
+  "gates": {
+    "sourcePins": "PASS",
+    "codeFixCommit": "PASS",
+    "previousVerify": "FAIL",
+    "currentNpmCheck": "NOT_RUN",
+    "currentR5Strict100": "NOT_RUN",
+    "currentOracleA": "NOT_RUN",
+    "currentOracleB": "NOT_RUN",
+    "currentStrictR7": "NOT_RUN",
+    "current224Benchmark": "NOT_RUN",
+    "currentTenWorkflows": "BLOCKED",
+    "previousLocalChromium": "PASS",
+    "currentPublicStart": "PASS",
+    "currentPublicTerminal": "NOT_OBSERVED",
+    "currentPublicReplayDailyOffline": "NOT_RUN",
+    "currentPublicAssetParity": "NOT_RUN",
+    "pwaRollback": "BLOCKED",
+    "currentMobileViewports": "NOT_RUN",
+    "physicalDevices": "NOT_RUN",
+    "authoritativeScoring": "BLOCKED",
+    "fullRules": "BLOCKED",
+    "fullAcademy": "BLOCKED",
+    "formalReview": "BLOCKED"
+  },
+  "decisions": {
+    "EXPERIMENTAL_PREVIEW_GO": false,
+    "RELEASE_CANDIDATE_GO": false,
+    "FULL_RULES_VERIFIED": false,
+    "FULL_ACADEMY_VERIFIED": false,
+    "FORMAL_RELEASE_GO": false
+  },
+  "limitations": "Current application CI is unfinished. Public browser reached only active game; no new terminal evidence. Git and Vercel host DNS unavailable in local container; GitHub Actions and Vercel metadata and remote browser used. No production, paid plan or main changes. Documentation-only record not a new tested application."
+}
