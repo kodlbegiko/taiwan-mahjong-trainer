@@ -46,7 +46,7 @@ const name={
   smallDragons:'小三元',bigDragons:'大三元',smallWinds:'小四喜',bigWinds:'大四喜',
   concealedTriplets:'暗刻',openKong:'明槓',concealedKong:'暗槓',
   noHonorsNoFlowers:'無字無花',robAddedKong:'搶槓胡',
-  pinghu:'平胡',allExposed:'全求人',
+  pinghu:'平胡',allExposed:'全求人',kongBloom:'槓上開花',seaBottom:'海底撈月',
 };
 function validateEvidence(p,e){
   validateScoringProfile(p);
@@ -59,6 +59,16 @@ function validateEvidence(p,e){
   for(const field of ['waitShape','firstTurnWin','readyDeclaration',
     'liabilityPolicy','winReason']){
     if(e[field]!==undefined)throw new ScoringCapabilityError(field);
+  }
+  if(e.specialDraw!==undefined){
+    const x=e.specialDraw;
+    assert(e.via==='self-draw'&&x&&typeof x==='object'&&
+      ['kong-bloom','sea-bottom'].includes(x.kind)&&
+      typeof x.drawEventId==='string'&&x.drawEventId.length>0&&
+      typeof x.sourceEventId==='string'&&x.sourceEventId.length>0,
+      'special self-draw requires Rules host event evidence');
+    if(e.robAddedKong!==undefined)
+      assert(false,'rob-added-kong and self-draw replacement are exclusive');
   }
   if(e.robAddedKong!==undefined){
     const marker=e.robAddedKong;
@@ -147,6 +157,12 @@ export function scoreWinningHand(profile,evidence){
     assert(roles.length>0,'winning tile has no legal decomposition role');
     for(const role of roles){
       const items=[];
+      if(evidence.specialDraw?.kind==='kong-bloom')
+        add(items,'kong-bloom','kongBloom','last replacement '+evidence.specialDraw.drawEventId+
+          ' from '+evidence.specialDraw.sourceEventId);
+      if(evidence.specialDraw?.kind==='sea-bottom')
+        add(items,'sea-bottom','seaBottom','last available live draw '+
+          evidence.specialDraw.drawEventId);
       if(evidence.robAddedKong)
         add(items,'rob-added-kong','robAddedKong',
           'public kong_proposed '+evidence.robAddedKong.proposalEventId+
@@ -260,7 +276,7 @@ export function scoreWinningHand(profile,evidence){
     decomposition:best.decomposition,via:evidence.via,
     winnerSeat:evidence.winnerSeat,sourceSeat:evidence.sourceSeat,
     ruleRef:{...evidence.ruleRef},excludedCapabilities:[
-      'special-wins','unverified-wait-shapes-except-pinghu','bao-pai','multi-winner',
+      'flower-only-wins','unverified-wait-shapes-except-pinghu','bao-pai','multi-winner',
       'declared-ready','heaven-earth-wins'],
     sourceRefs:[...profile.sourceRefs]};
 }
