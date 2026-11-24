@@ -9,7 +9,7 @@ const sameIds=(a,b)=>Array.isArray(a)&&Array.isArray(b)&&
   a.length===b.length&&[...a].sort().every((id,i)=>id===[...b].sort()[i]);
 const WIND_TYPES={east:27,south:28,west:29,north:30};
 export function evidenceFromSettledRulesState(state,{seatWindType,prevailingWindType,
-  dealerStreak,streakEvidence}={}){
+  dealerStreak,streakEvidence,publicEventContractVersion}={}){
   if(!state||state.round?.phase!=='settled'||state.extensions?.tw16?.result?.reason!=='win')
     throw new RangeError('Requires an authoritative settled Rules snapshot');
   const r=state.extensions.tw16.result,events=state.events;
@@ -55,6 +55,8 @@ export function evidenceFromSettledRulesState(state,{seatWindType,prevailingWind
   // matching terminal win/settle markers authorize one robber, one payer.
   let robAddedKong;
   if(r.robAddedKong!==undefined){
+    if(publicEventContractVersion!=='tw16-rob-added-kong-public/1.0.0')
+      throw new ScoringCapabilityError('unnegotiated-r7-public-event-contract');
     const marker=r.robAddedKong;
     const equalMarker=x=>x&&typeof x==='object'&&
       Object.keys(x).length===3&&
