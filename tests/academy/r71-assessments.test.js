@@ -131,3 +131,22 @@ test('R7.1: independent practice is not a second score store or legacy-v3 record
   assert.equal(VERIFIED_SCENARIO_SCORER_COUNT,0,'Do not register pending experimental scorer');
   assert.equal(auditAcademyContent().curriculum.fullyAssessedObjectives,10);
 });
+
+/** Noncryptographic deterministic regression fingerprints, NOT authenticated
+ * evidence or a substitute for replay. Observed from the actual 19-module
+ * isolated execution at d411cf6. Changes require a versioned fixture review. */
+test('R7.1: freeze all 27 version-1 public snapshots and all 222 scoring outputs',()=>{
+  const pins=[["tile-label","1f95c210"],["meld-class","434c66d5"],["hand-shape","e592c146"],["winning-draw","986708d3"],["shanten","b80c7f38"],["ukeire","cfe1284d"],["discard","964398e4"],["wait-count","90b69b0d"],["structure-change","114896f8"],["open-efficiency","9d8a339a"],["one-turn","2103b194"],["tie","1ad3f686"],["visible","2d1b51b3"],["chi","71908056"],["pong","9cc28d4a"],["kong","8fdd817e"],["concealed-kong","ef1f11f7"],["risk","3a35c93c"],["public-river-policy","24f252a5"],["tai","e516b6c0"],["tradeoff","2d90c254"],["constrained-tradeoff","9f153f28"],["speed","dbe6b610"],["near-tie-metric","8892c3d7"],["evidence","45c0caeb"],["evidence-shanten","ccd116eb"],["synthesis","5fde1277"]];
+  assert.deepEqual(R71_QUESTION_REFS.map(r=>r.questionId),pins.map(([id])=>'academy-r71-'+id));
+  let choices=0;
+  for(const [id,pin] of pins){
+    const r=ref(id),question=getR71Question(r);
+    const grades=question.options.map(o=>gradeR71Question(r,o.id));
+    choices+=grades.length;
+    const snapshot=JSON.stringify({question,grades});
+    let hash=2166136261;
+    for(let i=0;i<snapshot.length;i++)hash=Math.imul(hash^snapshot.charCodeAt(i),16777619)>>>0;
+    assert.equal(hash.toString(16).padStart(8,'0'),pin,'Versioned snapshot changed: '+id);
+  }
+  assert.equal(choices,222);
+});
