@@ -13,6 +13,8 @@ on:
       - 'public/manifest.webmanifest'
       - 'tests/browser/mobile-pwa-a11y-gates.py'
       - 'tests/pwa/mobile-update-gates.py'
+      - 'tests/pwa/sw-transaction.test.js'
+      - 'tests/browser/_release_site.py'
       - 'docs/quality/R7_MOBILE_PWA_A11Y.md'
       - 'scripts/runtime-precache.mjs'
       - '.github/workflows/r7-runtime-precache.yml'
@@ -38,23 +40,29 @@ jobs:
           git fetch origin integration/mahjong-full-game
           owner_head=HEAD
           if [[ "${{ github.head_ref }}" == 'integration/mahjong-r7-release-audit' ]]; then
-            owner_head=d02eb508a0c302997f5e10a4eaf01c85bf0e6fb7
-            git merge-base --is-ancestor "$owner_head" HEAD
+            owner_head=4dbe74a379c924744048e167dd8791265beaced8
+            git fetch --no-tags origin "$owner_head"
+            git merge-base --is-ancestor d02eb508a0c302997f5e10a4eaf01c85bf0e6fb7 "$owner_head"
+            for file in tests/browser/_release_site.py tests/pwa/mobile-update-gates.py tests/pwa/sw-transaction.test.js; do
+              git diff --exit-code "$owner_head" HEAD -- "$file"
+            done
             echo "PWA_SOURCE_SHA=$owner_head" >> "$GITHUB_STEP_SUMMARY"
           fi
           while IFS= read -r file; do
             case "$file" in
-              index.html|style.css|sw.js|public/manifest.webmanifest|src/table-ui/table.css|src/table-ui/view.js|src/table-ui/a11y.js|tests/browser/mobile-pwa-a11y-gates.py|tests/pwa/mobile-update-gates.py|docs/quality/R7_MOBILE_PWA_A11Y.md|.github/workflows/r7-mobile-pwa-a11y.yml|scripts/runtime-precache.mjs|.github/workflows/r7-runtime-precache.yml) ;;
+              index.html|style.css|sw.js|public/manifest.webmanifest|src/table-ui/table.css|src/table-ui/view.js|src/table-ui/a11y.js|tests/browser/mobile-pwa-a11y-gates.py|tests/pwa/mobile-update-gates.py|tests/pwa/sw-transaction.test.js|tests/browser/_release_site.py|docs/quality/R7_MOBILE_PWA_A11Y.md|.github/workflows/r7-mobile-pwa-a11y.yml|scripts/runtime-precache.mjs|.github/workflows/r7-runtime-precache.yml) ;;
               *) echo "::error::Out-of-scope file changed: $file"; exit 1 ;;
             esac
           done < <(git diff --name-only origin/integration/mahjong-full-game..."$owner_head")
       - name: Fast SVG and Service Worker compatibility contract
         run: node --test tests/tile-assets-integrity.test.js
+      - name: R7-010 deterministic transaction fault injection
+        run: node --test tests/pwa/sw-transaction.test.js
       - name: Run existing Node and compatibility regressions
         run: npm run check
   browser-pwa:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
         with:
@@ -75,7 +83,7 @@ jobs:
         run: python tests/browser/mobile-pwa-a11y-gates.py --evidence r7-mobile-evidence
       - name: Cold offline, broken update rollback and explicit upgrade
         if: always()
-        run: python tests/pwa/mobile-update-gates.py --evidence r7-mobile-evidence
+        run: PHASE3_REQUIRE_SINGLE_WINNER=1 python tests/pwa/mobile-update-gates.py --with-game-history --evidence r7-mobile-evidence
       - name: Upload PASS/FAIL evidence and screenshots (not real-device certification)
         if: always()
         uses: actions/upload-artifact@v4
