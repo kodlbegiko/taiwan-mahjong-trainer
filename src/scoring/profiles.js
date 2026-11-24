@@ -11,7 +11,7 @@ function freeze(x){if(x&&typeof x==='object'){Object.values(x).forEach(freeze);O
 const tai={
   concealed:1,selfDraw:1,concealedSelfDraw:3,
   roundWind:1,seatWind:1,dragon:1,correctFlower:1,flowerSet:2,
-  allPongs:4,mixedSuit:4,pureSuit:8,allHonors:8,
+  allPongs:4,allExposed:2,pinghu:2,mixedSuit:4,pureSuit:8,allHonors:8,
   smallDragons:4,bigDragons:8,smallWinds:8,bigWinds:16,
   concealedTriplets:{3:2,4:5,5:8},
   openKong:0,concealedKong:0,noHonorsNoFlowers:0,robAddedKong:1,dealer:1,dealerStreakEach:2,
@@ -32,14 +32,16 @@ const base={
   settlement:{discard:'discarder-only',selfDraw:'all-other-three',liability:'unsupported',
     fee:{mode:'none',points:0}},
   variants:{wind:'round-and-seat',flower:'correct-and-sets',kong:'none',
-    flowerSetsReplaceCorrect:true,smallWindRetainsWind:true,allHonorsSuppressAllPongs:true},
+    flowerSetsReplaceCorrect:true,smallWindRetainsWind:true,
+    allHonorsSuppressAllPongs:true,pinghuSuppressNoHonorsNoFlowers:true},
   tai,
 };
 const SEE=clone(base);
 SEE.profileId='tw16-gametower-see-flower-wind';
 SEE.claim='Gametower 見花見字 optional platform switch, not the standard mode';
 SEE.variants={wind:'all',flower:'each',kong:'each',flowerSetsReplaceCorrect:false,
-  smallWindRetainsWind:true,allHonorsSuppressAllPongs:true};
+  smallWindRetainsWind:true,allHonorsSuppressAllPongs:true,
+  pinghuSuppressNoHonorsNoFlowers:true};
 SEE.tai.noHonorsNoFlowers=2;
 SEE.tai.openKong=1;
 SEE.tai.concealedKong=2;
@@ -75,7 +77,8 @@ export function validateScoringProfile(p){
     !['none','each'].includes(v.kong)||
     typeof v.flowerSetsReplaceCorrect!=='boolean'||
     typeof v.smallWindRetainsWind!=='boolean'||
-    typeof v.allHonorsSuppressAllPongs!=='boolean')
+    typeof v.allHonorsSuppressAllPongs!=='boolean'||
+    typeof v.pinghuSuppressNoHonorsNoFlowers!=='boolean')
     throw new RangeError('Unsupported scoring variants');
   if(!isObject(p.tai)||keys.some(k=>!Object.hasOwn(p.tai,k))||
     Object.keys(p.tai).some(k=>!keys.includes(k))||
