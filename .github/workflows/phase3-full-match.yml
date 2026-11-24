@@ -13,6 +13,7 @@ on:
       - 'tests/replay/**'
       - 'tests/integration/**'
       - 'tests/browser/full-table-ui-r3-gates.py'
+      - 'tests/browser/r7-public-https-gates.py'
       - 'sw.js'
       - 'index.html'
       - '.github/workflows/phase3-full-match.yml'
@@ -87,5 +88,43 @@ jobs:
         with:
           name: phase3-real-r3-match-evidence
           path: tw16-r3-full-match-evidence
+          if-no-files-found: warn
+          retention-days: 14
+
+  r7-public-https:
+    name: R7 public HTTPS / genuine UI match / settlement / Replay
+    if: github.event_name == 'pull_request' && github.head_ref == 'fix/r7-live-table-ux'
+    needs: [r3-chromium]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install 'playwright==1.56.0'
+      - name: Record exact test SHA and public deployment source
+        run: |
+          echo "TESTED_SOURCE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
+          echo "PUBLIC_DEPLOYMENT_SOURCE_SHA=ad32cbc6d44b48670de5af819cd29d203222e266" >> "$GITHUB_STEP_SUMMARY"
+          echo "PUBLIC_DEPLOYMENT_URL=https://taiwan-mahjong-phase3-r5-experimental-56c7mdzfc-sign2.vercel.app/" >> "$GITHUB_STEP_SUMMARY"
+          google-chrome --version
+      - name: Public Vercel HTTPS — real human plus three Bots
+        env:
+          DEPLOYMENT_SOURCE_SHA: ad32cbc6d44b48670de5af819cd29d203222e266
+          R7_PUBLIC_URL: https://taiwan-mahjong-phase3-r5-experimental-56c7mdzfc-sign2.vercel.app/
+        run: |
+          python tests/browser/r7-public-https-gates.py \
+            --url "$R7_PUBLIC_URL" --screenshots r7-public-https-evidence \
+            --max-matches 4 --source-sha "$(git rev-parse HEAD)" \
+            --deployment-sha "$DEPLOYMENT_SOURCE_SHA"
+      - name: Preserve public-origin screenshot and trace evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: r7-real-public-https-evidence
+          path: r7-public-https-evidence
           if-no-files-found: warn
           retention-days: 14
