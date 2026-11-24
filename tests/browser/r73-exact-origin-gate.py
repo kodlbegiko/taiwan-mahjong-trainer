@@ -100,7 +100,7 @@ def run(args):
     if public:
         require(urlsplit(args.url).scheme=='https','Real HTTPS required')
         require(args.deployment_sha,'Exact deployment SHA required')
-        if args.seeds:
+        if args.seeds or args.plans:
             require(args.deployment_sha!='793bbb1caeef79b94e0bb29bf2ea66b3f7c43f4d',
                     'R7.2 deployed UI has no seed field; select a new approved SHA')
     report={'gate':'r73-exact-origin','release':False,'mode':'public-https' if public else 'local-seeded',
@@ -109,8 +109,13 @@ def run(args):
       'deploymentSourceSHA':args.deployment_sha if public else None,'matches':[],'assetSHA256':{},
       'physicalDevice':'NOT_RUN','errors':[]}
     levels=['Beginner','Intermediate','Advanced']
+    require(not (args.seeds and args.plans),'Choose seeds or exact plans, not both')
+    scripted=json.loads(Path(args.plans).read_text(encoding='utf-8')) if args.plans else None
+    if scripted:
+        require(scripted['sourceSHA']==report['testedSourceSHA'],'Discovery plan source mismatch')
     seeds=args.seeds.split(',') if args.seeds else []
-    plans=[(args.difficulty,s) for s in seeds] if seeds else [(levels[i%3],None) for i in range(args.max_matches)]
+    plans=[(p['difficulty'],p['seed'],p) for p in scripted['selected']] if scripted else ([(args.difficulty,s,None) for s in seeds] if seeds else [(levels[i%3],None,None) for i in range(args.max_matches)])
+    seeded=bool(seeds or scripted)
     require(len(plans)>=1,'No match plan')
     def save():
         report['outcomes']=sorted({a['outcome'] for a in report['matches']})
@@ -121,16 +126,18 @@ def run(args):
     save()
     cm=nullcontext((args.url,None)) if public else shared['served_site']()
     with cm as (base,_):
-        url=base+('?' if '?' not in base else '&')+'qa=seeded' if seeds else base
+        url=base+('?' if '?' not in base else '&')+'qa=seeded' if seeded else base
         report['origin']=url
         with sync_playwright() as pw:
             browser=pw.chromium.launch(channel='chrome',headless=True,args=['--no-sandbox'])
-            for idx,(difficulty,seed) in enumerate(plans):
+            for idx,(difficulty,seed,plan) in enumerate(plans):
                 match=dest/('%02d-%s-%s'%(idx+1,difficulty,seed or 'random'))
                 match.mkdir(exist_ok=True)
                 os.environ['PHASE3_BOT_DIFFICULTY']=difficulty
                 if seed: os.environ['PHASE3_FIXED_SEED']=seed
                 else: os.environ.pop('PHASE3_FIXED_SEED',None)
+                if plan: os.environ['PHASE3_ACTION_PLAN']=json.dumps(plan['actions'])
+                else: os.environ.pop('PHASE3_ACTION_PLAN',None)
                 ctx=browser.new_context(viewport={'width':390,'height':844},is_mobile=True,has_touch=True,
                                         device_scale_factor=2,service_workers='allow')
                 page=ctx.new_page();errors=[]
@@ -145,14 +152,20 @@ def run(args):
                     history=shared['full_round'](page,match)
                     page.locator('[data-table-nav="play"]').click()
                     result=settlement(page)
+                    if plan:
+                        for key in ('outcome','scoreDelta','eventCount'):
+                            require(result[key]==plan[key],'Browser outcome differs from real deterministic discovery: '+key)
                     require(not errors,'Page errors: '+repr(errors))
                     entry={**result,'difficulty':difficulty,'seed':seed,'humanActions':history,
                            'pageErrors':errors,'replayFrameCount':final_replay(page,result,match),
-                           'reload':'PASS','dailyOffline':'NOT_RUN'}
+                           'reload':'PASS','dailyOffline':'NOT_RUN',
+                           'exactPlanVerified':bool(plan),
+                           'humanActionKinds':sorted(set(a['kind'] for a in plan['actions'])) if plan else []}
                     report['matches'].append(entry);save()
                     if idx==0:
                         offline_roundtrip(ctx,page,url,result,shared,match)
                         entry['dailyOffline']='PASS';save()
+                    require(not errors,'Page errors during Replay or Daily: '+repr(errors))
                     print('R73_MATCH '+json.dumps(entry,ensure_ascii=False),flush=True)
                 except Exception as exc:
                     report['errors'].append({'difficulty':difficulty,'seed':seed,'error':str(exc)})
@@ -162,11 +175,11 @@ def run(args):
                     raise
                 finally:
                     ctx.tracing.stop(path=str(match/'trace.zip'));ctx.close()
-                if public and len(report['difficulties'])==3 and len(report['outcomes'])==2: break
+                if public and not seeded and len(report['difficulties'])==3 and len(report['outcomes'])==2: break
             browser.close()
     save()
     print('R73_ACCEPTANCE '+json.dumps(report,ensure_ascii=False),flush=True)
-    if public and not seeds: require(set(report['difficulties'])==set(levels),'Not all difficulties finished')
+    if public and not seeded: require(set(report['difficulties'])==set(levels),'Not all difficulties finished')
     require(len(report['matches'])>=1 and not report['errors'],'Incomplete real games')
 
 if __name__=='__main__':
@@ -178,4 +191,5 @@ if __name__=='__main__':
     parser.add_argument('--max-matches',type=int,default=6)
     parser.add_argument('--difficulty',choices=['Beginner','Intermediate','Advanced'],default='Beginner')
     parser.add_argument('--seeds')
+    parser.add_argument('--plans',help='Exact-source discovery JSON; actual UI must independently match every action')
     run(parser.parse_args())
