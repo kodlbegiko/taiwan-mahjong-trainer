@@ -1,7 +1,9 @@
 import {scoreWinningHand,ScoringCapabilityError} from './evaluate.js';
 import {SCORING_CONTRACT,validateScoringProfile} from './profiles.js';
-const valid=x=>Number.isSafeInteger(x);
-const addSafe=(a,b)=>{const n=a+b;if(!valid(n))throw new RangeError('Settlement integer overflow');return n;};
+// Canonicalize signed zero at the accounting boundary, never in expected test values.
+const canonical=x=>x===0?0:x;
+const valid=x=>Number.isSafeInteger(x)&&!Object.is(x,-0);
+const addSafe=(a,b)=>{const n=a+b;if(!valid(n))throw new RangeError('Settlement integer overflow');return canonical(n);};
 export function assertLedgerConservation(ledger){
   if(!ledger||!Array.isArray(ledger.playerDeltas)||ledger.playerDeltas.length!==4||
     !ledger.playerDeltas.every(valid)||!valid(ledger.houseDelta)||
@@ -57,7 +59,7 @@ function settle(profile,score,evidence){
     playerTransferDeltas[x.payeeSeat]=addSafe(playerTransferDeltas[x.payeeSeat],x.points);
   }
   const fees=profile.settlement.fee.mode==='none'?[]:
-    [0,1,2,3].map(seat=>({seat,points:profile.settlement.fee.points,
+    [0,1,2,3].map(seat=>({seat,points:canonical(profile.settlement.fee.points),
       reason:'independently-configured-table-fee'}));
   const playerDeltas=[...playerTransferDeltas];
   for(const fee of fees)playerDeltas[fee.seat]=addSafe(playerDeltas[fee.seat],-fee.points);
@@ -85,6 +87,6 @@ export function settleExhaustiveDraw(profile){
     reason:'exhaustive-draw',winnerSeat:null,sourceSeat:null,
     score:null,payments:[],playerTransferDeltas:[0,0,0,0],fees,
     houseDelta:fees.reduce((n,x)=>addSafe(n,x.points),0),
-    playerDeltas:[0,1,2,3].map(()=>-profile.settlement.fee.points)};
+    playerDeltas:[0,1,2,3].map(()=>canonical(-profile.settlement.fee.points))};
   assertLedgerConservation(result);return result;
 }
