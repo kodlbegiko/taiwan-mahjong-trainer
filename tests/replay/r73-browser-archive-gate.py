@@ -48,7 +48,7 @@ def copy_release(source, target):
 
 def ready(page, url):
     page.goto(url, wait_until='load')
-    page.evaluate('() => navigator.serviceWorker.ready.then(() => true)')
+    page.wait_for_function("async () => !!(await navigator.serviceWorker.getRegistration())?.active", timeout=30000)
     page.reload(wait_until='load')
     page.wait_for_function('navigator.serviceWorker.controller !== null', timeout=20000)
 
@@ -213,6 +213,7 @@ def run(engine, previous_tree=None):
         finally:
             browser.close()
     return {'engine':engine,'status':'PASS','cacheGeneration':generation,
+            'previousTreeProvided':previous_tree is not None,
             'runtimeByteParity':True,'cases':results,
             'scope':'isolated localhost module/storage gate; not public HTTPS or UI full match'}
 
