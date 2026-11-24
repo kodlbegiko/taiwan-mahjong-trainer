@@ -131,7 +131,7 @@ const cases=[
  ['l1-01','tile-label','tiles.identity','exact','牌河剛出現的 t:4:3 是哪一種牌？'],
  ['l1-02','meld-class','structure.melds','exact','本情境自己的已完成吃牌面子是哪一類？'],
  ['l1-03','hand-shape','structure.hand16','exact','這副已完成的封閉標準牌型有幾張暗牌？'],
- ['l1-04','winning-draw','waits.enumeration','exact','按五面子一將眼結構，這副手牌加上題示棄牌能否和牌？'],
+ ['l1-04','winning-draw','waits.enumeration','exact','按五面子一將眼結構，這副手牌加上題示六萬能否和牌？'],
  ['l2-01','shanten','efficiency.shanten','exact','目前 16 張暗牌的結構向聽數是多少？'],
  ['l2-02','ukeire','efficiency.ukeire','exact','依已知實體副本扣除後，改善向聽的總副本數是多少？'],
  ['l2-03','discard','efficiency.discard','exact','只比較最低向聽、再比較最多有效進張，哪個合法捨牌最佳？'],
@@ -140,7 +140,7 @@ const cases=[
  ['l3-02','open-efficiency','efficiency.discard','exact','已有一組公開刻子，按最低向聽與最多有效進張選擇捨牌。'],
  ['l3-03','one-turn','efficiency.ukeire','exact','在已知牌數下，一巡改善枚數代表什麼？'],
  ['l3-04','tie','efficiency.near-tie','exact','同向聽且同有效進張的合法棄牌如何給分？'],
- ['l4-01','visible','public.visible-count','exact','含自己暗牌及公開河牌／副露，題示牌種還有幾張未觀測副本？'],
+ ['l4-01','visible','public.visible-count','exact','含自己暗牌及公開河牌／副露，五萬還有幾張未觀測副本？'],
  ['l4-02','chi','strategy.open-meld','conditional','指定教學目標：執行一個合法吃牌，並非判斷吃牌是否最有利。'],
  ['l4-02','pong','strategy.open-meld','conditional','指定教學目標：執行一個合法碰牌。'],
  ['l4-02','kong','strategy.open-meld','conditional','指定教學目標：執行一個合法明槓。'],
@@ -168,7 +168,11 @@ function knownWait(f,kind){
   if(validateGameState(opened)!==true||!same(replayGame(opened),opened))throw new RangeError('Ready replay mismatch');
   return readPlayerView(createPlayerView(opened,1));
 }
-const choice3=(f,v,a,b,c,reason)=>textTask(f,v,[option('a',a),option('b',b),option('c',c)],['a'],reason);
+const choice3=(f,v,a,b,c,reason)=>{
+  const offset=[...f.key].reduce((sum,ch)=>sum+ch.charCodeAt(0),0)%3;
+  const options=[a,b,c].map((label,i)=>option(String((i+offset)%3),label)).sort((x,y)=>x.id.localeCompare(y.id));
+  return textTask(f,v,options,[String(offset)],reason);
+};
 function construct(f){
   let p,v,n;
   switch(f.key){
@@ -188,7 +192,7 @@ function construct(f){
     case 'winning-draw':
       p=knownWait(f,f.key);
       return textTask(f,p.view,[option('yes','可完成結構'),option('no','不能完成結構')],
-        [calculateShanten([...p.hand,5])===-1?'yes':'no'],'五組面子加上五萬作將眼，結構完整；不宣稱所有桌規均允許和牌。');
+        [calculateShanten([...p.hand,5])===-1?'yes':'no'],'五組面子加上六萬作將眼，結構完整；不宣稱所有桌規均允許和牌。');
     case 'shanten':
       p=knownWait(f,f.key);n=calculateShanten(p.hand);
       return numeric(f,p.view,n,[-1,0,1,2],'向聽 0 表示再加入一張可完成標準和牌結構。');
