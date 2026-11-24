@@ -1,7 +1,7 @@
 /* Offline-first, atomic shell for GitHub Pages root or /repo/ deployments.
  * IMPORTANT: change CACHE_VERSION whenever any precached file changes.
  * The install event only succeeds if the entire listed release is cached. */
-const CACHE_VERSION = 'tmt-v02-realistic-tiles-master-academy-phase3-r5-interception-20261120-r8';
+const CACHE_VERSION = 'tmt-master-academy-r73-exact-scenario-20261124-v1';
 const SHELL_CACHE = `tmt-shell-${CACHE_VERSION}`;
 const BASE = new URL('./', self.location.href);
 const SHELL = [
@@ -64,6 +64,7 @@ const SHELL = [
   './src/academy/records.js',
   './src/academy/registry.js',
   './src/academy/scenario-scorers.js',
+  './src/academy/scenario-bank-v1.js',
   './src/academy/provenance.js',
   './src/adaptive/index.js',
   './src/adaptive/core.js',
