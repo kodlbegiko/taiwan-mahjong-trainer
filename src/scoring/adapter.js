@@ -133,6 +133,8 @@ export function evidenceFromSettledRulesState(state,{seatWindType,prevailingWind
         state.extensions?.tw16?.lastDraw?.source==='live')
         specialDraw={kind:'sea-bottom',sourceEventId:last.eventId,
           drawEventId:last.eventId};
+      else if(last.type==='draw'&&!['live','tail'].includes(last.payload.source))
+        throw new ScoringCapabilityError('unsupported-winning-draw-source');
     }
   }
   const actualPrevailing=WIND_TYPES[state.round.prevailingWind];
