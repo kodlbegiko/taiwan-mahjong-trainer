@@ -317,3 +317,41 @@ export function getR71Coverage(){
         'independent-review-and-record-contract':'independent-review-scorer-contract-and-release-gates'};
   });
 }
+
+/** Versioned teaching material supplement; preserves Lesson@1.0.0 identity.
+ * Intended for a future instructor-reviewed lesson player, not new credits. */
+const lessonTeaching=[
+ ['l1-01','先依牌碼分出萬、筒、索、字牌，再以牌碼除以花色範圍辨識點數；實體副本編號不影響牌種。','先辨識一張公開棄牌，再練習轉換同牌種不同副本；不要把牌碼當點數。'],
+ ['l1-02','順子須同花色連續三張，刻子須三張同牌，將眼須兩張同牌。公開吃牌後可見固定順子。','先分辨完整組合與搭子；字牌不可組順子，將眼不能當面子。'],
+ ['l1-03','台灣十六張封閉標準形在和牌時包含五面子與一將眼；一般摸牌後十七張，未摸前十六張。','數有效面子與暗牌張數；槓以一個固定面子處理，不把多出的一張當普通暗牌。'],
+ ['l1-04','標準和牌是全手結構命題；某張牌完成一個搭子，不代表整手已和。','先核對十六張手牌，枚舉候選新牌，再檢查整體結構。'],
+ ['l2-01','向聽數表示到聽牌的結構距離；它不是摸牌時間或勝率。','用同一題的暗牌重算向聽，不用目測搭子數取代演算法。'],
+ ['l2-02','有效進張可改善向聽，剩餘副本依已知實體牌扣除。','同時分辨有效牌種數與總副本數；未知副本可能在任何未知區域。'],
+ ['l2-03','本版何切依最低向聽、同向聽最多有效進張排序。','只比較合法捨牌；相同兩項數值的候選全部正確。'],
+ ['l2-04','多面聽須枚舉整體和牌牌種，並扣除已經耗盡的副本。','比較牌種數與副本數，不把未觀測副本誤寫成壁牌。'],
+ ['l3-01','拆搭需以整副手牌的後續結構評估。公開固定面子後，暗牌的目標張數隨之改變。','先辨識固定面子，逐個比較合法捨牌後的向聽及有效進張，再說明犧牲哪種結構。'],
+ ['l3-02','公開面子會改變可用牌與暗牌結構；不同捨牌可能保留不同後續組合。','在真實公開刻子局面中重算合法捨牌，不套用封閉十七張的固定公式。'],
+ ['l3-03','一巡有效進張是當下可計算的改善副本，不是對未來牌山的預測。','說明已知副本、未知位置、改善指標及不能據此推導的機率。'],
+ ['l3-04','同向聽同進張者是本評分政策下的完全平手；實戰還有其他尚未建模因素。','先比較兩個指定指標，再保留全部同分答案。'],
+ ['l4-01','公開河牌、公開副露及自己暗牌都是已知實體牌；已領取的河牌不能再扣一次。','以實體 ID 去重，再求未觀測副本；不推斷未知副本位置。'],
+ ['l4-02','合法吃碰槓由指定桌規與當前回合決定，合法不等於有利。','在不同真實 claim window 選出指定宣告，並辨識公開副露與暗槓的差異。'],
+ ['l4-03','公開副露與牌河是觀測訊號，並非已校準放槍率。','練習辨識指定對手曾捨的牌種，但不稱為安全牌；保留未知風險。'],
+ ['l4-04','牌效、台數、和牌機率和支付政策是不同變量。','缺少指定計台與效用模型時，選擇保留不確定性，不用牌效推論唯一最高期望收益。'],
+ ['l5-01','把精確的牌效與條件化的攻守政策分開。','按題目明示排序做決策，解釋何處是假設、何處是客觀計算；不要宣稱為普遍最優。'],
+ ['l5-02','速度與答題正確率是不同訊號，重複題目也可能有記憶效應。','先正確重算牌效及平手，再理解計時為何不能直接認證能力。'],
+ ['l5-03','有效理由應可由原題版本、公開視角與明確結構指標重播。','先提交可核對的向聽數，再區分理由與不可驗證的對手推測。'],
+ ['l5-04','綜合判斷應先檢查合法動作，再分列結構、模型假設和未知因素。','對副露與槓牌局面說明哪些能判分、哪些需要外部計分或風險證據。']
+];
+export const R71_LESSON_PLAN_VERSION='academy-r71-lesson-plan/1.0.0';
+export function getR71LessonPlan(lessonId){
+  const lesson=LESSONS.find(l=>l.lessonId===lessonId);
+  const row=lessonTeaching.find(([id])=>'academy-'+id===lessonId);
+  if(!lesson||!row)throw new RangeError('Unknown R7.1 lesson');
+  return {...V,lessonRef:{lessonId,lessonVersion:lesson.lessonVersion},
+    supplementVersion:R71_LESSON_PLAN_VERSION,status:lesson.status,
+    publicationStatus:'instructor-review',officialCredit:false,
+    objectives:clone(lesson.objectives),prerequisiteLessonIds:[...lesson.prerequisiteLessonIds],
+    teachingZhTW:row[1],practiceZhTW:row[2],
+    questionRefs:listR71QuestionRefs({lessonId}),
+    completionPolicy:'no-official-credit-until-independent-review-and-record-contract'};
+}
