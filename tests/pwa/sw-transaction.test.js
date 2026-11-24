@@ -83,3 +83,20 @@ test('retired worker cache miss cannot recreate a deleted cache',async()=>{
   h.handlers.get('fetch')({request:{method:'GET',url:base+'index.html',mode:'navigate'},respondWith:p=>{result=p;}});
   assert.equal((await result).type,'error');assert.equal(h.stores.has(candidate),false);
 });
+
+test('release status attests only its own complete cache, never recreates missing cache',async()=>{
+  const h=harness(),replies=[];
+  const status=()=>h.dispatch('message',{data:{type:'GET_RELEASE_STATUS'},ports:[{postMessage:x=>replies.push(x)}]});
+  await status();
+  assert.equal(replies.at(-1).complete,false);assert.equal(h.stores.has(candidate),false);
+  await h.dispatch('install');await status();
+  const report=replies.at(-1);
+  assert.equal(report.type,'RELEASE_STATUS');assert.equal(report.version,version);
+  assert.equal(report.cacheName,candidate);assert.equal(report.scope,base);
+  assert.equal(report.assetCount,urls.length);assert.equal(report.complete,true);
+  assert.equal(h.skips(),0);assert.equal(h.claims(),0);
+  h.stores.get(candidate).delete(urls[3]);await status();
+  assert.equal(replies.at(-1).complete,false);
+  assert.equal(h.stores.get(candidate).size,urls.length-1);
+  assert.ok(h.stores.has(old));
+});

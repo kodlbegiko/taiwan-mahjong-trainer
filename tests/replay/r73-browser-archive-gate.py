@@ -53,6 +53,28 @@ def ready(page, url):
     page.wait_for_function('navigator.serviceWorker.controller !== null', timeout=20000)
 
 def check_cache(page, generation, expected):
+    # A cache name is not proof of which worker actually handles this client.
+    status = page.evaluate("""async () => {
+      const controller=navigator.serviceWorker.controller;
+      const reg=await navigator.serviceWorker.getRegistration();
+      if(!controller || !reg)throw Error('No controlled registration');
+      const reply=await new Promise(resolve=>{
+        const channel=new MessageChannel();
+        const timer=setTimeout(()=>{channel.port1.close();resolve(null)},3000);
+        channel.port1.onmessage=e=>{clearTimeout(timer);channel.port1.close();resolve(e.data)};
+        controller.postMessage({type:'GET_RELEASE_STATUS'},[channel.port2]);
+      });
+      return {reply,controllerState:controller.state,scriptURL:controller.scriptURL,
+        sameActive:reg.active===controller,scope:reg.scope,cacheNames:await caches.keys()};
+    }""")
+    print('Controller attestation:', json.dumps(status), flush=True)
+    require(status['reply'] and status['reply'].get('type') == 'RELEASE_STATUS' and
+            status['reply'].get('cacheName') == generation and
+            status['reply'].get('scope') == status['scope'] and
+            status['reply'].get('complete') is True and status['sameActive'] and
+            status['controllerState'] == 'activated',
+            'Wrong or incomplete active controller: ' + repr(status))
+
     actual = page.evaluate("""async ({generation, paths}) => {
       const names=await caches.keys();
       if(!names.includes(generation)) throw Error('Missing active release cache '+generation);
@@ -73,8 +95,11 @@ def check_cache(page, generation, expected):
       if(!navigator.serviceWorker.controller) throw Error('Uncontrolled module client');
       const actual={};
       for(const path of paths){
-        const response=await fetch(new URL(path,location.href),{cache:'no-store'});
-        if(!response.ok)throw Error('Controlled module fetch failed '+path);
+        const url=new URL(path,location.href).href;
+        let response;
+        try { response=await fetch(url,{cache:'no-store'}); }
+        catch(e) {throw Error('Controlled module fetch failed '+url+': '+String(e));}
+        if(!response.ok)throw Error('Controlled module fetch failed '+url+' HTTP '+response.status);
         const hash=await crypto.subtle.digest('SHA-256',await response.arrayBuffer());
         actual[path]=Array.from(new Uint8Array(hash),b=>b.toString(16).padStart(2,'0')).join('');
       }
@@ -190,7 +215,10 @@ def run(engine, previous_tree=None):
                     try:
                         page = context.new_page()
                         errors = []
-                        page.on('pageerror', lambda err: errors.append(str(err)))
+                        def observe(p):
+                            p.on('pageerror', lambda err: errors.append(str(err)))
+                            p.on('requestfailed', lambda req: print('REQUEST_FAILED', req.url, req.failure, flush=True))
+                        observe(page)
                         upgrade = previous_tree is not None and not authority
                         if upgrade:
                             previous_generation = cache_name(previous_tree)
@@ -216,7 +244,7 @@ def run(engine, previous_tree=None):
                             print(label, 'activated new generation; opening new controlled document', flush=True)
                             page.close()
                             page = context.new_page()
-                            page.on('pageerror', lambda err: errors.append(str(err)))
+                            observe(page)
                             ready(page, url)
                             require(page.evaluate('key=>localStorage.getItem(key)', key) == raw,
                                     'Upgrade changed archive bytes before new-document read')
@@ -234,7 +262,7 @@ def run(engine, previous_tree=None):
                         page.close()
                         context.set_offline(True)
                         cold = context.new_page()
-                        cold.on('pageerror', lambda err: errors.append(str(err)))
+                        observe(cold)
                         cold.goto(url, wait_until='load')
                         cold.wait_for_function('navigator.serviceWorker.controller!==null', timeout=20000)
                         check_cache(cold, generation, expected)
