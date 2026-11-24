@@ -78,6 +78,10 @@ function scenario(name){
       seat=name.startsWith('chi')?1:2;
       if(name.endsWith('-open'))s=resolved(s,seat,name.startsWith('chi')?'chi':'pong');
       break;
+    case 'river-discard':
+      s=start(name,{0:['t:4:3'],1:['t:4:0'],2:['t:4:1','t:4:2']});
+      s=act(s,0,'discard','t:4:3');s=resolved(s,-1,'pass');
+      s=act(s,1,'draw');seat=1;break;
     case 'concealed-kong':
       s=start(name,{0:physical(6,4)});seat=0;break;
     default:throw new RangeError('Unknown scenario');
@@ -127,6 +131,27 @@ function efficiency(f,name,reason){
       candidates:available.map(({a,metric})=>({actionId:a.actionId,shanten:metric.shanten,copies:metric.copies})),
       dealInRisk:null,expectedTai:null}};
 }
+function riverPolicy(f,tradeoff){
+  const {view,hand,visible,fixedMelds}=parsed('river-discard');
+  const observed=new Set(view.opponents.find(p=>p.seat===0).river.map(d=>Number(d.tileId.split(':')[1])));
+  const ranking=analyzeDiscards(hand,{visible,fixedMelds});
+  const bestShanten=Math.min(...view.legalActions.filter(a=>a.kind==='discard').map(a=>
+    ranking.find(r=>r.tile===Number(a.tileIds[0].split(':')[1])).shanten));
+  const actions=view.legalActions.filter(a=>a.kind==='discard');
+  const rows=actions.map(a=>{
+    const tile=Number(a.tileIds[0].split(':')[1]),r=ranking.find(r=>r.tile===tile);
+    return {actionId:a.actionId,tile,previouslyDiscarded:observed.has(tile),shanten:r.shanten,copies:r.copies};
+  });
+  const minimum=tradeoff?rows.filter(r=>r.shanten===bestShanten):rows;
+  const matching=minimum.filter(r=>r.previouslyDiscarded);
+  const eligible=matching.length?matching:minimum;
+  const top=tradeoff?Math.max(...eligible.map(r=>r.copies)):null;
+  const accepted=eligible.filter(r=>!tradeoff||r.copies===top).map(r=>r.actionId);
+  if(!matching.length&&!tradeoff)throw new RangeError('River policy fixture lacks observed candidate');
+  return {f,view,kind:'legal-action',options:actions.map(a=>option(a.actionId,tileLabel(Number(a.tileIds[0].split(':')[1]))+' ('+a.tileIds[0]+')')),
+    accepted,reason:tradeoff?'先保留最低向聽；只在該組內偏好指定對手曾捨的牌種，再最大化進張；同分全接受。這是指定練習規則，不是風險模型。':'只辨識指定對手河牌中曾出現的牌種。曾出現不代表不會放槍；不評估實際安全性。',
+    observations:{minimumShanten:bestShanten,candidates:rows,dealInRisk:null,expectedTai:null}};
+}
 const cases=[
  ['l1-01','tile-label','tiles.identity','exact','牌河剛出現的 t:4:3 是哪一種牌？'],
  ['l1-02','meld-class','structure.melds','exact','本情境自己的已完成吃牌面子是哪一類？'],
@@ -146,8 +171,10 @@ const cases=[
  ['l4-02','kong','strategy.open-meld','conditional','指定教學目標：執行一個合法明槓。'],
  ['l4-02','concealed-kong','strategy.open-meld','conditional','指定教學目標：執行一個合法暗槓；不是宣稱槓牌最優。'],
  ['l4-03','risk','strategy.round-timing','conditional','對此公開副露局面，哪個攻守風險結論有證據？'],
+ ['l4-03','public-river-policy','strategy.round-timing','conditional','指定練習：捨出與 0 號座公開河牌曾出現的相同牌種（不代表安全）。'],
  ['l4-04','tai','strategy.scoring-tradeoff','conditional','未有認證台數與風險模型時，能否從牌效唯一決定最高預期得分？'],
  ['l5-01','tradeoff','strategy.synthesis','conditional','本題明定只優化結構牌效、不估放槍及台數：選擇合法最優捨牌。'],
+ ['l5-01','constrained-tradeoff','strategy.synthesis','conditional','指定練習：先最低向聽，再偏好 0 號座曾捨的牌種（若有），最後最多進張；不是實戰最優。'],
  ['l5-02','speed','efficiency.near-tie','conditional','限時做完相同題目更快，何者是可支持的解讀？'],
  ['l5-03','evidence','efficiency.shanten','conditional','哪一項理由能以當前視角與版本重播核對？'],
  ['l5-04','synthesis','strategy.synthesis','conditional','選擇符合當前資訊界線的綜合判斷。']
@@ -217,6 +244,8 @@ function construct(f){
     case 'kong':return actionTask(f,scenario('kong'),'kong','同牌三張加公開牌形成明槓；是否可宣告由指定版本 Rules 決定。');
     case 'concealed-kong':return actionTask(f,scenario('concealed-kong'),'kong','此回合的合法槓是暗槓，按當前 Rules-issued LegalAction 判分；不估算補牌收益。');
     case 'risk':return choice3(f,scenario('pong-open'),'公開副露可觀測，但沒有校準模型便不能報放槍率','公開副露後放槍機率必然是 50%','所有已出現的牌必然安全','公開牌面不揭露暗牌，風險未知；這不是防守最佳行動評分。');
+    case 'public-river-policy':return riverPolicy(f,false);
+    case 'constrained-tradeoff':return riverPolicy(f,true);
     case 'tai':return choice3(f,scenario('pong-open'),'不能，須先定義計台版本與效用模型','有效進張最多必然台數最高','門清必然比任何副露有利','本題固定實驗桌規；不使用未驗證台數或勝率來唯一排序。');
     case 'tradeoff':return efficiency(f,'pong-open','題目只要求結構牌效；相同指標全部滿分。未比較真實攻守得失。');
     case 'speed':return choice3(f,scenario('winning'),'可能更熟悉題型或記住答案，需獨立測驗才可推論能力','必然達大師級','作答時間可替代正確率','計時並非經真人校準的能力量尺。');
