@@ -5,6 +5,8 @@
 import { readBotView, isSupportedBotTableProfile } from './view.js';
 import { analyzePlayerView } from '../strategy/index.js';
 import { analyzeDiscards, analyzeDraws } from '../core/efficiency.js';
+import { rankPublicDiscardCandidates, R7_POLICY_VERSION, R73_POLICY_VERSION, R73_VARIANTS,
+  publicAttackContext, experimentalClaimAllowed } from './strategy-r7.js';
 
 export const BOT_ENGINE_VERSION = 'tw16-bots/0.2.0-r3-experimental';
 const LEVELS = new Set(['Beginner', 'Intermediate', 'Advanced']);
@@ -44,18 +46,28 @@ function decision(bot, view, seed, action, status, reasonCodes, strategyVersion)
     rngSeed: seed, // Independent bot tie-break seed, NEVER the Rules Engine seed.
   });
 }
-function metric(rec, key) { return rec.metrics.find(m => m.name === key)?.value ?? null; }
 
 /**
  * Deterministic decision on PUBLIC information. No GameState parameter, no wall,
  * no opponent concealed and no future RNG. Never constructs a LegalAction.
  * Beginner: bounded shanten/ukeire; Intermediate: canonical public efficiency;
- * Advanced: same canonical order with at most 2 x 4 hypothetical two-draw
- * samples as an explicitly uncalibrated tie-break.
+ * Advanced: R7.1 public caution policy (experimental). R7.3 alternatives
+ * are accessible only through the separate experimental evaluator below.
  */
 export function chooseBotAction(bot, playerView) {
+  return choosePolicy(bot,playerView,'legacy');
+}
+// Deliberately not the UI/default API. Freeze an ablation before holdout.
+export function chooseExperimentalAdvancedAction(bot,playerView,variant) {
+  if(bot?.difficulty!=='Advanced'||!R73_VARIANTS.includes(variant))
+    throw new RangeError('Explicit Advanced experimental variant required');
+  return choosePolicy(bot,playerView,variant);
+}
+function choosePolicy(bot, playerView, variant) {
   assertBot(bot);
   const { view, hand, visible, fixedMelds } = readBotView(playerView);
+  const experimental=variant!=='legacy';
+  const claimExperiment=variant==='claim-only'||variant==='combined';
   if (view.audienceSeat !== bot.seat) throw new RangeError('Bot seat / PlayerView mismatch');
   const seed = [bot.seed, view.gameId, view.asOfEventSeq, bot.seat, bot.difficulty].join('|');
   const legal = view.legalActions;
@@ -74,9 +86,12 @@ export function chooseBotAction(bot, playerView) {
   if (replace) return make(replace, 'ready', ['ENGINE_LEGAL_REPLACE_FLOWER']);
   const ownKongs = legal.filter(a => a.kind === 'kong' &&
     ['CONCEALED_KONG','ADDED_KONG'].includes(a.legalityBasis.reasonCodes[0]));
-  if (ownKongs.length && roll(seed+'|self-kong') < 0.4)
-    return make(ownKongs[0], 'ready', ['ENGINE_LEGAL_SELF_KONG','UNCALIBRATED_KONG_VALUE']);
   const discards = legal.filter(a => a.kind === 'discard');
+  // Preserve the pre-R7 Beginner trajectory, including R5 Seed 87.
+  // Do not gamble on an unverified kong tai value at higher difficulties.
+  if (ownKongs.length && (bot.difficulty === 'Beginner'
+    ? roll(seed+'|self-kong') < 0.4 : discards.length === 0))
+    return make(ownKongs[0], 'ready', ['ENGINE_LEGAL_SELF_KONG','UNCALIBRATED_KONG_VALUE']);
 
   if (discards.length) {
     if (!view.capabilities.structuralScore)
@@ -94,29 +109,19 @@ export function chooseBotAction(bot, playerView) {
       return make(selected, 'ready', ['BASIC_SHANTEN','BASIC_UKEIRE','SEEDED_TOP_THREE'], 'canonical-efficiency/basic');
     }
 
-    const advanced = bot.difficulty === 'Advanced';
     const analysis = analyzePlayerView(view, {
-      seed, samples: advanced ? 4 : 0, maxSimulatedRoutes: advanced ? 2 : 0,
+      seed, samples: 0, maxSimulatedRoutes: 0,
     });
-    const recommendations = analysis.recommendations;
-    if (!recommendations.length)
+    if (!analysis.recommendations.length)
       return make(null, 'unsupported-analysis', ['STRATEGY_UNAVAILABLE'], analysis.engineVersion);
-    let chosen = recommendations[0];
-    if (advanced && recommendations.length > 1) {
-      const first = recommendations[0], second = recommendations[1];
-      const s0 = metric(first, 'postDiscardShanten'), s1 = metric(second, 'postDiscardShanten');
-      const u0 = metric(first, 'oneTurnEffectiveCopies'), u1 = metric(second, 'oneTurnEffectiveCopies');
-      const p0 = metric(first, 'twoTurnImprovementFrequency'), p1 = metric(second, 'twoTurnImprovementFrequency');
-      // A bounded, deliberately conservative two-draw tie-break; NOT real win odds.
-      if (s0 === s1 && u0 !== null && u1 !== null && u0 - u1 <= 1 &&
-          p0 !== null && p1 !== null && p1 > p0) chosen = second;
-    }
+    const ranked = rankPublicDiscardCandidates(view, analysis.recommendations, bot.difficulty, variant);
+    if (!ranked.length)
+      return make(null, 'unsupported-analysis', ['R7_NO_PUBLIC_RANK'], R7_POLICY_VERSION);
+    const chosen = ranked[0];
     const action = discards.find(a => a.actionId === chosen.actionId);
-    if (!action) return make(null, 'unsupported-analysis', ['RECOMMENDATION_NOT_LEGAL'], analysis.engineVersion);
-    return make(action, 'ready',
-      advanced ? ['CANONICAL_EFFICIENCY','VISIBLE_COPIES','BOUNDED_HYPOTHETICAL_TWO_DRAW','NO_CALIBRATED_RISK']
-               : ['CANONICAL_EFFICIENCY','VISIBLE_COPIES','PUBLIC_INFORMATION_ONLY'],
-      analysis.engineVersion + (advanced ? '+bounded-two-draw-v1' : '+baseline-v1'));
+    if (!action) return make(null, 'unsupported-analysis', ['RECOMMENDATION_NOT_LEGAL'], R7_POLICY_VERSION);
+    return make(action, 'ready', chosen.reasonCodes, experimental?R73_POLICY_VERSION+'/'+variant:R7_POLICY_VERSION+'/'+bot.difficulty);
+
   }
 
   // A claim is actionable only when the R3 authority offers it; estimate
@@ -127,7 +132,9 @@ export function chooseBotAction(bot, playerView) {
   if (pass && claims.length && isSupportedBotTableProfile(view.ruleRef) &&
       view.round.phase === 'claim_window' && view.capabilities.structuralScore) {
     const owned = new Set(view.self.concealed.map(t => t.id));
-    const baseline = analyzeDraws(hand, {visible,fixedMelds}).shanten;
+    const baselineAnalysis = analyzeDraws(hand, {visible,fixedMelds});
+    const baseline = baselineAnalysis.shanten;
+    const context=claimExperiment?publicAttackContext(view):null;
     const candidates = [];
     for (const a of claims) {
       const used = a.tileIds.filter(id => owned.has(id));
@@ -140,21 +147,34 @@ export function chooseBotAction(bot, playerView) {
       }
       const nextFixed = fixedMelds+1;
       if (nextFixed > 5) continue;
-      const projected = a.kind === 'kong'
-        ? analyzeDraws(handAfter,{visible,fixedMelds:nextFixed}).shanten
-        : Math.min(...analyzeDiscards(handAfter,{visible,fixedMelds:nextFixed})
-          .map(rank => rank.shanten));
+      // Previously owned consumed tiles are now publicly visible; include
+      // them in experimental inventory, leaving historical policies untouched.
+      const claimVisible=claimExperiment?[...visible,...used.map(id=>Number(id.split(':')[1]))]:visible;
+      const projectedRanks=a.kind==='kong'
+        ? [analyzeDraws(handAfter,{visible:claimVisible,fixedMelds:nextFixed})]
+        : analyzeDiscards(handAfter,{visible:claimVisible,fixedMelds:nextFixed});
+      const projected=Math.min(...projectedRanks.map(r=>r.shanten));
       if (!Number.isFinite(projected)) continue;
-      candidates.push({a, benefit:baseline-projected});
+      const copies=claimExperiment?Math.max(...projectedRanks.filter(r=>r.shanten===projected).map(r=>r.copies)):0;
+      const benefit=baseline-projected;
+      if(claimExperiment&&!experimentalClaimAllowed({gain:benefit,afterCopies:copies,
+        beforeCopies:baselineAnalysis.copies,context,baseline,kind:a.kind}))continue;
+      candidates.push({a, benefit,copies});
     }
-    candidates.sort((a,b)=>b.benefit-a.benefit ||
+    candidates.sort((a,b)=>b.benefit-a.benefit || (claimExperiment?b.copies-a.copies:0) ||
       a.a.actionId.localeCompare(b.a.actionId));
     const best=candidates[0];
-    const threshold=bot.difficulty==='Beginner' ? 1 : 0;
+    // A claim consuming concealed pairs carries unverified closed-hand and
+    // replacement-draw costs. A zero-shanten-gain claim is not forced.
+    const closed = view.self.melds.every(m => !m.open);
+    const pressure = view.opponents.some(p => p.melds.filter(m => m.open).length >= 3);
+    const threshold = claimExperiment ? 0 : bot.difficulty === 'Beginner' ? 1 :
+      bot.difficulty === 'Advanced' && ((closed && baseline <= 1) || pressure) ? 2 : 1;
     if (best && best.benefit>=threshold &&
         (bot.difficulty!=='Beginner' || roll(seed+'|open-claim')<0.45))
       return make(best.a,'ready',['RULES_LEGAL_CLAIM','PUBLIC_POST_MELD_SHANTEN_HEURISTIC',
-        'UNCALIBRATED_CLAIM_VALUE'],'canonical-efficiency/claim-heuristic');
+        'UNCALIBRATED_CLAIM_VALUE'],
+        bot.difficulty === 'Beginner' ? 'canonical-efficiency/claim-heuristic' : experimental?R73_POLICY_VERSION+'/'+variant+'/claim':R7_POLICY_VERSION+'/claim');
   }
   if (pass) return make(pass, 'ready', ['ENGINE_LEGAL_PASS','CLAIM_VALUE_UNVERIFIED']);
   const claim = claims[0];
@@ -184,4 +204,20 @@ export function validateBotDecision(bot, playerView, proposed) {
     throw new RangeError('Bot decision is not a current LegalAction');
   }
   return true;
+}
+
+/**
+ * Auditable, public-only candidate scores. Empty for Beginner (its seeded
+ * three-way policy is intentionally retained as an R5 replay baseline).
+ * Each score is a policy heuristic; none is a calibrated deal-in probability.
+ */
+export function inspectBotDiscardScores(bot, playerView) {
+  assertBot(bot);
+  const {view} = readBotView(playerView);
+  if (view.audienceSeat !== bot.seat) throw new RangeError('Bot seat / PlayerView mismatch');
+  if (bot.difficulty === 'Beginner' ||
+      !view.capabilities.structuralScore ||
+      !view.legalActions.some(a => a.kind === 'discard')) return [];
+  const analysis = analyzePlayerView(view, {samples:0,maxSimulatedRoutes:0});
+  return rankPublicDiscardCandidates(view,analysis.recommendations,bot.difficulty);
 }
