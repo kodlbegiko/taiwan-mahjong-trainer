@@ -1,0 +1,115 @@
+name: R7.4 isolated Academy candidate acceptance
+on:
+  push:
+    branches: [integration/r74-academy-candidate]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: r74-academy-candidate-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  node-and-graph:
+    if: github.ref_name == 'integration/r74-academy-candidate'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      RULES_REQUIRE_R73_SCORING: '1'
+      SCORING_REQUIRE_R73_RULES: '1'
+      REPLAY_REQUIRE_R73_AUTHORITATIVE: '1'
+      STRATEGY_REQUIRE_RULES_INTEGRATION: '1'
+      REPLAY_REQUIRE_R7_RULES: '1'
+      REPLAY_REQUIRE_R7_SCORING: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Record exact candidate
+        run: |
+          set -euo pipefail
+          mkdir -p r74-evidence
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git rev-parse HEAD | tee r74-evidence/tested-sha.txt
+      - name: Full native suite
+        run: |
+          set -euo pipefail
+          npm run check | tee r74-evidence/full-suite.tap
+      - name: Mandatory authority and Academy tests (zero skips)
+        run: |
+          set -euo pipefail
+          node --test tests/rules/r73-authoritative-settlement.test.js tests/scoring/pre-settlement.test.js tests/scoring/r73-rules-integration.test.js tests/replay/r73-authoritative-ledger.test.js tests/replay/r73-authoritative-replay.test.js tests/replay/r73-historical-settlement.test.js tests/replay/r73-mixed-history.test.js tests/academy/r73-scenario-flow.test.js tests/integration/master-academy-learning-adaptive.test.js tests/pwa/sw-transaction.test.js | tee r74-evidence/strict-suite.tap
+          grep -Fxq '# skipped 0' r74-evidence/strict-suite.tap
+      - name: Actual offline runtime graph
+        run: |
+          set -euo pipefail
+          npm install --no-save --package-lock=false --ignore-scripts acorn@8.15.0
+          node scripts/runtime-precache.mjs > r74-evidence/runtime-graph.json
+          node --input-type=module -e "import assert from 'node:assert/strict'; import {readFileSync} from 'node:fs'; const g=JSON.parse(readFileSync('r74-evidence/runtime-graph.json')); assert.equal(g.sourceModules,74); assert.equal(g.shellAssets,120);"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r74-academy-native-evidence
+          path: r74-evidence
+          retention-days: 14
+  academy-browser:
+    if: github.ref_name == 'integration/r74-academy-candidate'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install 'playwright==1.56.0'
+      - name: Exact local Academy and scenario Daily
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          mkdir -p r74-academy-browser
+          git rev-parse HEAD > r74-academy-browser/tested-sha.txt
+          google-chrome --version
+          python tests/browser/academy-combined-e2e.py --screenshots r74-academy-browser
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r74-academy-browser-evidence
+          path: r74-academy-browser
+          retention-days: 14
+  archive-browser:
+    if: github.ref_name == 'integration/r74-academy-candidate'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install 'playwright==1.56.0'
+      - run: python -m playwright install --with-deps chromium
+      - name: Real historical archive and authority cold-offline upgrade
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          old=0be7222cdd3020346c7a909c51e34cc7e6576099
+          git worktree add --detach "$RUNNER_TEMP/r73-baseline" "$old"
+          test "$(git -C "$RUNNER_TEMP/r73-baseline" rev-parse HEAD)" = "$old"
+          mkdir -p r74-archive-browser
+          git rev-parse HEAD > r74-archive-browser/tested-sha.txt
+          python tests/replay/r73-browser-archive-gate.py --engine chromium --previous-tree "$RUNNER_TEMP/r73-baseline" --evidence r74-archive-browser/replay.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r74-archive-browser-evidence
+          path: r74-archive-browser
+          retention-days: 14
