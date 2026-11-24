@@ -80,6 +80,19 @@ function frameFrom(archive,seq) {
      view.legalActions.some(a=>a.actorSeat!==m.ownerSeat||a.expectedRevision!==seq)||
      Object.hasOwn(view,'wall')||Object.hasOwn(view,'rng'))
     throw new ReplayError('VIEW_FORBIDDEN','Rules historical view violates the replay disclosure boundary');
+  if(isRobAddedKong(m.ruleRef)){
+    // Rules v1 redacts anonymous replies and the private trigger provenance
+    // of any public event derived from one. Check that boundary explicitly.
+    const replies=state.events.filter(e=>e.visibility==='seat-private'&&
+      (e.type==='claim'||e.type==='pass'));
+    const privateIds=new Set(replies.map(e=>e.causedByActionId));
+    const replySeqs=new Set(replies.map(e=>e.seq));
+    if(view.publicEvents.some(e=>
+      privateIds.has(e.causedByActionId)||
+      (replySeqs.has(e.seq)&&(e.type!=='claim'||Object.hasOwn(e,'actorSeat')||
+        Object.hasOwn(e,'causedByActionId')||Object.keys(e.payload).length!==0))))
+      throw new ReplayError('VIEW_FORBIDDEN','Private claim provenance escaped R7 Rules projection');
+  }
   if(!strategyUnavailableReason(view))readPlayerView(view);
   return {...V1,frameVersion:FRAME_VERSION,replayId:m.replayId,
     perspective:'player-at-time',asOfEventSeq:seq,

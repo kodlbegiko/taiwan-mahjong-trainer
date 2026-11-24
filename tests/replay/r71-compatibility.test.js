@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {createGame,createDeck,getRuleProfile,listLegalActions,listPendingClaimResponders,
+import {createGame,createDeck,getRuleProfile,getRuleCapabilities,listLegalActions,listPendingClaimResponders,
   applyAction,createPlayerView,replayGame,RuleCapabilityError} from '../../src/rules/index.js';
 import {createReplayService,ReplayError} from '../../src/replay/index.js';
 import {createReplayArchive,validateReplayArchive,replayStateAt,replayIntegrityHashes,checksum} from '../../src/replay/internal.js';
@@ -73,8 +73,11 @@ function prepared(two=false){
 
 const code=(fn,want)=>assert.throws(fn,e=>e instanceof ReplayError&&e.code===want);
 let robberyAvailable=false;
-try {getRuleProfile(R7.profileId,R7.ruleVersion);robberyAvailable=true;} catch {}
-const dependency=robberyAvailable?false:'Rules PR #51 not present; cross-source integration NOT RUN';
+try {
+  getRuleProfile(R7.profileId,R7.ruleVersion);
+  robberyAvailable=getRuleCapabilities(R7).publicEventContractVersion==='tw16-rob-added-kong-public/1.0.0';
+} catch {}
+const dependency=robberyAvailable?false:'Rules PR #51 reviewed public-event contract not present; cross-source integration NOT RUN';
 test('R7.1 dependency must be present on explicit integrated gate',()=>{
   if(process.env.REPLAY_REQUIRE_R7_RULES==='1')assert.ok(robberyAvailable,'Missing Rules PR #51');
 });
@@ -96,14 +99,17 @@ test('R7.1 canonical SHA matches Node SHA-256, JSON and key-order invariance',()
   copy.manifest.scoringVersion='tw16-gametower-comparative@1.0.0-experimental';
   code(()=>validateReplayArchive(copy),'CORRUPT_REPLAY');
 });
-test('R7.1 legacy settled FNV bytes and historical result stay unchanged',()=>{
+function legacySettled(){
   const ref={profileId:'tw16-single-winner-interception',ruleVersion:'experimental-v1'};
   const profile=getRuleProfile(ref.profileId,ref.ruleVersion),all=createDeck(profile);
   const hand=[...Array.from({length:5},(_,t)=>Array.from({length:3},(_,i)=>'t:'+t+':'+i)).flat(),'t:5:0','t:5:1'];
   const extra=hand.pop(),rest=all.filter(x=>!hand.includes(x)&&x!==extra);
   const state=createGame({gameId:'r71-legacy-win',seed:'r71-legacy',dealerSeat:0,...ref,
     fixtureDeck:[...hand,...rest.slice(0,48),extra,...rest.slice(48)]});
-  const end=take(state,choose(state,0,'win'));
+  return take(state,choose(state,0,'win'));
+}
+test('R7.1 legacy settled FNV bytes and historical result stay unchanged',()=>{
+  const end=legacySettled();
   const archive=createReplayArchive(end,{disclosurePolicy:'settled-public-only'});
   delete archive.manifest.integrity.sha256;
   const raw=JSON.stringify(archive),id=archive.manifest.replayId,store=new Map([[key(id),raw]]);
@@ -140,6 +146,12 @@ test('R7.1 successful robbery restores full state and historical minimal liabili
   assert.deepEqual(archive.events.at(-1).turnEvent.payload.delta,r.delta);
   assert.equal(r.delta.reduce((n,v)=>n+v,0),0);
   assert.deepEqual(end.events.slice(-3).map(e=>e.type),['pass','win','settle']);
+  const terminalView=service.getReplayFrame(meta.replayId,end.revision).playerView;
+  const privateTrigger=end.events.at(-3).causedByActionId;
+  assert.ok(privateTrigger);
+  assert.ok(terminalView.publicEvents.every(e=>e.causedByActionId!==privateTrigger));
+  for(const e of terminalView.publicEvents.slice(-3))
+    assert.ok(!Object.hasOwn(e,'causedByActionId'));
   for(const seq of [end.revision-2,end.revision-1])code(()=>service.getReplayFrame(meta.replayId,seq),'NON_ATOMIC_EVENT_SEQ');
   for(const seq of [1,open.revision,end.revision]){
     const frame=service.getReplayFrame(meta.replayId,seq);
@@ -173,6 +185,7 @@ test('R7.1 all PASS commits kong atomically and replays exact tail replacement',
   const {service,meta,archive}=openArchive(end,1);
   assert.equal(committed.events.at(-1).payload.proposalEventId,open.events.at(-1).eventId);
   assert.deepEqual(committed.events.slice(-2).map(e=>e.type),['pass','kong']);
+  assert.ok(!Object.hasOwn(service.getReplayFrame(meta.replayId,committed.revision).publicEvent,'causedByActionId'));
   code(()=>service.getReplayFrame(meta.replayId,committed.revision-1),'NON_ATOMIC_EVENT_SEQ');
   assert.deepEqual(replayStateAt(archive,committed.revision),committed);
   assert.deepEqual(replayStateAt(archive,end.revision),end);
@@ -208,4 +221,45 @@ test('R7.1 competing robbers preserve accepted prefix; rejected final PASS is no
   assert.equal(archive.manifest.completionStatus,'incomplete');
   assert.equal(archive.events.length,state.revision);
   assert.deepEqual(replayStateAt(archive,state.revision),state);
+});
+
+test('R7.1 opt-in comparison scoring never replaces historical Rules results, even with fees',async t=>{
+  let scoring;
+  try {scoring=await import('../../src/scoring/index.js');}
+  catch(error){
+    if(error.code!=='ERR_MODULE_NOT_FOUND'||!error.url?.endsWith('/src/scoring/index.js'))throw error;
+    if(process.env.REPLAY_REQUIRE_R7_SCORING==='1')throw error;
+    t.skip('Scoring PR #52 not present; comparative adapter integration NOT RUN');return;
+  }
+  const cases=[legacySettled()];
+  if(robberyAvailable){const {open}=prepared();cases.push(respond(open,{2:'win'}));}
+  if(process.env.REPLAY_REQUIRE_R7_RULES==='1')assert.equal(cases.length,2);
+  for(const state of cases){
+    const original=JSON.stringify(state);
+    const {service,meta,archive,storage}=openArchive(state,0,'settled-public-only');
+    const raw=storage.get(key(meta.replayId));
+    const definition=cp(scoring.getScoringProfile('tw16-gametower-comparative'));
+    definition.settlement.fee={mode:'fixed-per-player',points:7};
+    const profile=scoring.createScoringProfile(definition);
+    const comparison=scoring.settleRulesState(profile,state);
+    assert.equal(scoring.assertLedgerConservation(comparison),true);
+    assert.equal(comparison.scoringVersion,profile.profileId+'@'+profile.version);
+    assert.equal(comparison.playerTransferDeltas.reduce((n,v)=>n+v,0),0);
+    assert.equal(comparison.playerDeltas.reduce((n,v)=>n+v,0)+comparison.houseDelta,0);
+    assert.equal(comparison.houseDelta,28);
+    const result=state.extensions.tw16.result;
+    if(result.robAddedKong){
+      assert.equal(comparison.payments.length,1);
+      assert.equal(comparison.payments[0].payerSeat,result.sourceSeat);
+      assert.ok(comparison.score.breakdown.some(x=>x.code==='rob-added-kong'));
+    }
+    assert.equal(JSON.stringify(state),original,'comparison scorer must be read-only');
+    assert.equal(storage.get(key(meta.replayId)),raw,'comparison must not write archive');
+    assert.equal(service.loadReplay(meta.replayId).scoringVersion,'tw16-minimal-tai-v1');
+    assert.deepEqual(replayStateAt(archive,state.revision),state);
+    assert.deepEqual(service.getReplayFrame(meta.replayId,1,{perspective:'postgame'}).postgameDisclosure.outcome.delta,result.delta);
+    const forged=cp(archive);
+    forged.manifest.scoringVersion=comparison.scoringVersion;
+    code(()=>validateReplayArchive(forged),'CORRUPT_REPLAY');
+  }
 });

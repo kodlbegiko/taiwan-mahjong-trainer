@@ -26,3 +26,13 @@ Agent 1: obtain public fixed HTTPS deployment SHA, complete a real legal hand, o
 
 
 Initial isolated ECMAScript source-overlay test on 797b7c88 + Rules 633d20fa: 6/7 PASS, one test fixture stale revision (second WIN must be issued from state after first WIN). Corrected fixture; subsequent test evidence recorded in PR #46. Source overlay uses actual Replay/Rules/Strategy view parser, unused coaching dependency fail-on-call stubs and independent Python hashlib vectors; not Node CLI, GitHub Actions, or physical-browser acceptance.
+
+## R7.1 follow-up: reviewed public event contract and comparison scoring
+
+Rules #51 ff27c52526acfdf5fb905b4dd72a229289b8d734 now advertises tw16-rob-added-kong-public/1.0.0 and redacts all private trigger IDs even on public resolved events. Replay requires this exact runtime contract for the new opt-in profile (older pre-release projection refused) and independently checks masked reply sequences and private trigger IDs at frame output. Raw event reconstruction and R5 remain unchanged. A replacement-tail-exhausted state has no issued LegalAction; save its real prefix as incomplete, never synthesize a rejected legal action or a settlement.
+
+Scoring #52 d012205f3cc55905a93b9bf715ee09cea4d8a5a8 now recognizes canonical robbery proposal provenance, exposes comparative rob-added-kong tai, and normalizes fee/ledger signed zero. It still does NOT emit an authoritative Rules ScoringProfile-backed settlement. The new optional comparison test executes its actual read-only adapter against real R5/R7 settlements, verifies responsibility and separate house ledger conservation, and asserts the historical archive/result/version remain untouched. The full new-scorer authoritative replay gate remains BLOCKED. Require both dependencies on the combined checkout:
+
+    REPLAY_REQUIRE_R7_RULES=1 REPLAY_REQUIRE_R7_SCORING=1 node --test tests/replay/*.test.js
+
+Earlier overlay b8036569 + 633d20fa: 7/7 passed including actual completed all-PASS hand; superseded by the newly negotiated contract. Exact latest test evidence is in PR #46 conversation.

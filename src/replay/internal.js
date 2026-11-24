@@ -2,7 +2,7 @@
  * Internal-only replay archive format. Never import this module from public UI.
  * A seeded event ledger is sensitive: it can reconstruct the future wall.
  */
-import { replayGame, validateGameState, getRuleProfile, listLegalActions, applyAction,
+import { replayGame, validateGameState, getRuleProfile, getRuleCapabilities, listLegalActions, applyAction,
   RuleCapabilityError, ENGINE_VERSION, COMPLETE_ENGINE_VERSION } from '../rules/index.js';
 import { sha256Utf8, REPLAY_HASH_VERSION } from './integrity.js';
 
@@ -73,6 +73,11 @@ const isR3 = ref => isRobAddedKong(ref) ||
     ref?.ruleVersion==='experimental-v1');
 function pinnedScoringVersion(profile,ref) {
   if(isR3(ref)) {
+    // The pre-release robbery profile originally exposed private trigger
+    // action IDs in derived public events. Do not accept that older runtime.
+    if(isRobAddedKong(ref) &&
+       getRuleCapabilities(ref).publicEventContractVersion!=='tw16-rob-added-kong-public/1.0.0')
+      throw new ReplayError('UNSUPPORTED_PUBLIC_EVENT_CONTRACT','R7 robbery public projection must negotiate the reviewed contract');
     // The Rules R7 robbery profile still uses minimal discard liability.
     // Scoring PR #52 is not an authoritative Rules settlement integration.
     if(profile.scoringPolicy?.mode!=='configured' ||
@@ -310,7 +315,7 @@ export function validateReplayArchive(archive) {
     }
     return true;
   } catch(error) {
-    if(error instanceof ReplayError && ['UNKNOWN_RULE_PROFILE','UNSUPPORTED_SCORING_PROFILE'].includes(error.code))throw error;
+    if(error instanceof ReplayError && ['UNKNOWN_RULE_PROFILE','UNSUPPORTED_SCORING_PROFILE','UNSUPPORTED_PUBLIC_EVENT_CONTRACT'].includes(error.code))throw error;
     throw new ReplayError('CORRUPT_REPLAY','Replay record does not match canonical seeded Rules Engine',error);
   }
 }
