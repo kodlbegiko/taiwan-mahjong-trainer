@@ -16,19 +16,19 @@ function inspect(k) {
   const q=getR71Question(ref(k)), results=q.options.map(o=>gradeR71Question(ref(k),o.id));
   return {q,results,accepted:results.filter(r=>r.score===1)};
 }
-test('R7.1: 25 new versioned questions, 20 distinct lessons, every public question replay-valid',()=>{
-  assert.equal(R71_QUESTION_REFS.length,25);
-  assert.equal(new Set(R71_QUESTION_REFS.map(x=>x.questionId)).size,25);
+test('R7.1: 27 new versioned questions, 20 distinct lessons, every public question replay-valid',()=>{
+  assert.equal(R71_QUESTION_REFS.length,27);
+  assert.equal(new Set(R71_QUESTION_REFS.map(x=>x.questionId)).size,27);
   const rows=getR71Coverage();
   assert.equal(rows.length,20);
-  assert.equal(rows.reduce((s,r)=>s+r.supplementalQuestionCount,0),25);
+  assert.equal(rows.reduce((s,r)=>s+r.supplementalQuestionCount,0),27);
   assert.deepEqual(rows.map(r=>r.lessonRef.lessonId),LESSONS.map(l=>l.lessonId));
   for(const row of rows) {
     assert.ok(row.supplementalQuestionCount>0);
     assert.equal(row.formalCredit,false);
     assert.equal(row.legacyQuestionCount,5);
     assert.equal(row.status,LESSONS.find(l=>l.lessonId===row.lessonRef.lessonId).status);
-    assert.ok(row.assessedTargetSkillTagIds.every(id=>getSkillTag(id)));
+    assert.ok(row.targetedSkillTagIds.every(id=>getSkillTag(id)));
   }
   for(const r of R71_QUESTION_REFS){
     const q=getR71Question(r);
@@ -79,10 +79,10 @@ test('R7.1: actual Rules-issued CHI/PONG/open KONG/concealed KONG, all matching 
   }
 });
 test('R7.1: independently recompute legal-only shanten/ukeire and all ties after open melds',()=>{
-  for(const k of ['discard','structure-change','open-efficiency','tradeoff']){
+  for(const k of ['discard','structure-change','open-efficiency','tradeoff','near-tie-metric']){
     const {q,accepted}=inspect(k);
     const {hand,visible,fixedMelds}=readPlayerView(q.playerView);
-    if(k!=='discard')assert.equal(fixedMelds,1);
+    if(['structure-change','open-efficiency','tradeoff'].includes(k))assert.equal(fixedMelds,1);
     const ranking=analyzeDiscards(hand,{visible,fixedMelds});
     const legal=q.playerView.legalActions.filter(a=>a.kind==='discard');
     const ranked=legal.map(a=>({id:a.actionId,...ranking.find(r=>r.tile===Number(a.tileIds[0].split(':')[1]))}))
