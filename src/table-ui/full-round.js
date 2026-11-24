@@ -6,6 +6,10 @@
 import * as rules from '../rules/index.js';
 
 const KEY = 'tw-mahjong-master-academy:full-table:r3:v1';
+export const AUTHORITY_EXPERIMENT_KEY = 'tw-mahjong-master-academy:full-table:authority-experiment:v1';
+const AUTHORITY_REPLAY_PREFIX = 'tw-mahjong-authority-experiment:';
+const isAuthority = p => p?.status==='experimental' &&
+  p.profileId==='tw16-authoritative-scoring' && p.ruleVersion==='experimental-v1';
 const HUMAN = 0;
 const DIFFICULTIES=Object.freeze(['Beginner','Intermediate','Advanced']);
 function checkedDifficulty(value){
@@ -36,7 +40,7 @@ export function fullRoundCapability() {
   } catch { return false; }
 }
 
-export async function createFullRoundSession({storage} = {}) {
+export async function createFullRoundSession({storage,enableAuthoritative=false} = {}) {
   if (!fullRoundCapability()) throw new Error('R3 Rules / Claim Host 尚未整合最新契約');
   const [botApi,replayApi] = await Promise.all([
     import('../bots/index.js'), import('../replay/index.js')
@@ -51,15 +55,33 @@ export async function createFullRoundSession({storage} = {}) {
       typeof storage.setItem !== 'function')
     throw new Error('正式 R3 對局需要可靠的本機儲存');
 
+  // Explicit developer-only opt-in, with an isolated checkpoint and replay
+  // namespace. Never let an unsupported experiment block legacy history.
+  if(typeof enableAuthoritative!=='boolean')throw new TypeError('Invalid authority opt-in');
+  let settlementRuntime;
+  if(enableAuthoritative){
+    const p=rules.listRuleProfiles().find(isAuthority);
+    if(!p||typeof rules.createSettlementRuntime!=='function')
+      throw new Error('Authority Rules capability unavailable');
+    const scoring=await import('../scoring/index.js');
+    settlementRuntime=rules.createSettlementRuntime(scoring);
+  }
+  const opts={settlementRuntime};
+  const key=enableAuthoritative?AUTHORITY_EXPERIMENT_KEY:KEY;
+  const supported=p=>enableAuthoritative?isAuthority(p):isR3(p);
+  const replayStorage=enableAuthoritative?{
+    getItem:k=>storage.getItem(AUTHORITY_REPLAY_PREFIX+k),
+    setItem:(k,v)=>storage.setItem(AUTHORITY_REPLAY_PREFIX+k,v)
+  }:storage;
   let state = null, controller = null, blocked = false, submitting=false;
   let botDifficulty='Beginner';
   let storageWarning = '', replayWarning = '', replayId = null;
-  const replays = replayApi.createReplayService({storage});
+  const replays = replayApi.createReplayService({storage:replayStorage,...opts});
 
   function persist(next,{paused=controller?.isPaused()??false,difficulty=botDifficulty}={}) {
     if (blocked) throw new Error('舊紀錄損壞，禁止覆蓋');
     try {
-      storage.setItem(KEY, JSON.stringify({version:1, gameState:next, botCheckpoint:{paused}, botDifficulty:checkedDifficulty(difficulty)}));
+      storage.setItem(key, JSON.stringify({version:1, gameState:next, botCheckpoint:{paused}, botDifficulty:checkedDifficulty(difficulty)}));
       storageWarning = '';
     } catch (e) {
       storageWarning = 'R3 對局儲存失敗，重新整理可能遺失進度：' + e.message;
@@ -82,8 +104,8 @@ export async function createFullRoundSession({storage} = {}) {
       actionId:submission.actionId,
       actorSeat:submission.actorSeat,
       expectedRevision:submission.expectedRevision
-    }).state;
-    rules.validateGameState(next);
+    },opts).state;
+    rules.validateGameState(next,opts);
     // Save first; do not report this action as durable when storage rejected it.
     persist(next);
     state = next;
@@ -114,19 +136,19 @@ export async function createFullRoundSession({storage} = {}) {
           ? (rules.listPendingClaimResponders(state)[0] ?? state.round.currentSeat)
           : state.round.currentSeat,
       getPendingClaimResponders:()=>rules.listPendingClaimResponders(state),
-      getPlayerView:seat=>rules.createPlayerView(state,seat),
+      getPlayerView:seat=>rules.createPlayerView(state,seat,state.revision,opts),
       submitAction:submission=>commit(submission)
     });
   }
   function restore() {
-    const raw=storage.getItem(KEY);
+    const raw=storage.getItem(key);
     if (!raw) return false;
     try {
       const obj=JSON.parse(raw);
-      if (obj?.version!==1 || !obj.gameState || !isR3(rules.getRuleProfile(
+      if (obj?.version!==1 || !obj.gameState || !supported(rules.getRuleProfile(
         obj.gameState.ruleRef?.profileId,obj.gameState.ruleRef?.ruleVersion
       ))) throw new Error('Invalid R3 checkpoint');
-      rules.validateGameState(obj.gameState);
+      rules.validateGameState(obj.gameState,opts);
       botDifficulty=checkedDifficulty(Object.hasOwn(obj,'botDifficulty')?obj.botDifficulty:'Beginner');
       state=obj.gameState;
       setupController(obj.botCheckpoint??null);
@@ -141,10 +163,11 @@ export async function createFullRoundSession({storage} = {}) {
   function start({profileId,ruleVersion,difficulty='Beginner',fixedSeed=null}={}) {
     checkedDifficulty(difficulty);
     if (blocked) throw new Error(storageWarning);
-    const preferred=rules.listRuleProfiles().find(isR5) ?? rules.listRuleProfiles().find(isR3);
+    const preferred=enableAuthoritative?rules.listRuleProfiles().find(isAuthority):
+      rules.listRuleProfiles().find(isR5) ?? rules.listRuleProfiles().find(isR3);
     const p=rules.getRuleProfile(profileId??preferred?.profileId,ruleVersion??preferred?.ruleVersion);
     profileId=p.profileId;ruleVersion=p.ruleVersion;
-    if (!isR3(p)) throw new Error('目前只支援明確 experimental R3 RuleProfile');
+    if (!supported(p)) throw new Error('桌規未在此實驗性宿主開放');
     const config=fixedSeed===null?(()=>{
       const seed='r3-'+(globalThis.crypto?.randomUUID?.() ??
         String(Date.now())+'-'+Math.floor(Math.random()*1000000));
@@ -154,8 +177,8 @@ export async function createFullRoundSession({storage} = {}) {
     if(fixedSeed!==null && (state?.gameId===config.gameId ||
       replays.listReplays().some(m=>m.gameId===config.gameId)))
       throw new Error('此固定種子對局已存在；使用獨立測試瀏覽器工作階段重現，不覆寫既有 Replay');
-    const next=rules.createGame({...config,profileId,ruleVersion,dealerSeat:HUMAN});
-    rules.validateGameState(next);
+    const next=rules.createGame({...config,profileId,ruleVersion,dealerSeat:HUMAN},opts);
+    rules.validateGameState(next,opts);
     persist(next,{paused:false,difficulty});
     botDifficulty=difficulty;
     state=next;
@@ -165,7 +188,7 @@ export async function createFullRoundSession({storage} = {}) {
   }
   function snapshot() {
     if (!state) return null;
-    const view=rules.createPlayerView(state,HUMAN);
+    const view=rules.createPlayerView(state,HUMAN,state.revision,opts);
     if (view.opponents.some(x=>Object.hasOwn(x,'concealed')))
       throw new Error('Rules PlayerView exposes opponent concealed');
     const r=state.round.phase==='settled' ? state.extensions?.tw16?.result : null;
@@ -273,6 +296,6 @@ export async function createFullRoundSession({storage} = {}) {
     start,restore,snapshot,submit,advanceBots,replay,
     pause(){controller?.pause();if(state)persist(state);return snapshot();},
     resume(){controller?.resume();if(state)persist(state);return snapshot();},
-    availableProfiles(){return rules.listRuleProfiles().filter(isR3);}
+    availableProfiles(){return rules.listRuleProfiles().filter(supported);}
   });
 }

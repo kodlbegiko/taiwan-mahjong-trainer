@@ -217,6 +217,7 @@ async function dailyAction(kind) {
   // Read values before the progress indicator rerenders the form.
   const selectedMinutes=kind==='start'?
     Number(root.querySelector('#daily-minutes')?.value??30):null;
+  const selectedMode=kind==='start'?(root.querySelector('#daily-mode')?.value??'structural'):null;
   if(kind==='abort'&&!window.confirm(
     '結束今天的訓練？已保存的正式成績不會刪除。'))return;
   busy=true;lastError='';
@@ -230,7 +231,7 @@ async function dailyAction(kind) {
     // Invoke the panel method first: it sets loading/submitting synchronously.
     // Then paint that explicit state, while the official locked API is pending.
     let operation;
-    if(kind==='start')operation=daily.start(selectedMinutes);
+    if(kind==='start')operation=daily.start(selectedMinutes,selectedMode);
     else if(kind==='resume')operation=daily.resume();
     else if(kind==='submit')operation=daily.submit(root);
     else if(kind==='complete')operation=daily.finish();

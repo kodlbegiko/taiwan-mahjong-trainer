@@ -355,3 +355,48 @@ test('focused practice uses verified unseen same-skill variations, recap keeps i
     .questions.some(q => q.questionId === exercise.id));
   assert(scheduled.session.questionRefs.every(q => q.questionVersion === 'legacy-exercise-v3'));
 });
+
+test('R7.4 diagnostic distinguishes no evidence, repeated practice and broad observed performance',()=>{
+  const recommend = records => {
+    const profile = makeProfile(records);
+    return getTodayRecommendation(profile, makePlan(records), clock);
+  };
+  const empty = recommend([]);
+  assert.equal(empty.skillDiagnostics[0].status,'unobserved');
+  assert.deepEqual(empty.evidencePriorityTags,[]);
+  assert.deepEqual(empty.samplingPriorityTags,[skill.tagId]);
+  const small = recommend([entries[0]]);
+  assert.equal(small.skillDiagnostics[0].status,'insufficient-evidence');
+  assert.equal(small.skillDiagnostics[0].observedMean,1);
+  assert.deepEqual(small.evidencePriorityTags,[]);
+  const repeat = Array.from({length:5},(_,i)=>({kind:'legacy-v3',
+    record:createDecisionRecord(exercise,exercise.answer.expectedTiles,{
+      attemptId:'repeat-'+i,timestamp:clock,durationMs:1000})}));
+  const repeated = recommend(repeat);
+  assert.equal(repeated.skillDiagnostics[0].uniqueQuestionCount,1);
+  assert.equal(repeated.skillDiagnostics[0].status,'insufficient-evidence');
+  const distinct = Array.from({length:5},(_,i)=>{
+    const q=createExercise({seed:'r74-diagnostic-'+i,taskType:'multi_wait'});
+    return {kind:'legacy-v3',record:createDecisionRecord(q,q.answer.expectedTiles,{
+      attemptId:'distinct-'+i,timestamp:clock,durationMs:1000})};
+  });
+  const high = recommend(distinct);
+  assert.ok(high.skillDiagnostics[0].uniqueQuestionCount>=3);
+  assert.equal(high.skillDiagnostics[0].status,'observed-high-score');
+  assert.equal(high.diagnosticPolicy.calibratedMastery,false);
+  assert.deepEqual(high.evidencePriorityTags,[]);
+  const wrong = Array.from({length:5},(_,i)=>{
+    const q=createExercise({seed:'r74-diagnostic-'+i,taskType:'multi_wait'});
+    return {kind:'legacy-v3',record:createDecisionRecord(q,[],{
+      attemptId:'wrong-'+i,timestamp:clock,durationMs:1000})};
+  });
+  assert.deepEqual(recommend(wrong).evidencePriorityTags,[skill.tagId]);
+});
+test('R7.4 recommendation refuses mismatched identity, time and missing record provenance',()=>{
+  const profile=makeProfile(),plan=makePlan();
+  assert.throws(()=>getTodayRecommendation(profile,{...plan,profileId:'other-profile'},clock),/different ability profile/);
+  assert.throws(()=>getTodayRecommendation(profile,plan,'2026-11-18T03:00:00Z'),/time mismatch/);
+  assert.throws(()=>getTodayRecommendation({...profile,updatedAt:'2026-11-20T03:00:00Z'},plan,'2026-11-21T03:00:00Z'),/time mismatch/);
+  assert.throws(()=>getTodayRecommendation(makeProfile([]),plan,clock),/evidence absent/);
+  assert.equal(getTodayRecommendation(profile,plan,clock).dueQuestions.length,1);
+});

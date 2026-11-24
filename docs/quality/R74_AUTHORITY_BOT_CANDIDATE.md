@@ -1,0 +1,2 @@
+# Isolated R7.4 authority Bot candidate
+Parent e89e3623571817de8063ff050a7a74351de5402a; Bot source d6e8d0ebf5a3cd1f9993b18b3d31384a63e9a889. Source delta checked against previously integrated blobs; source SW not copied, existing transactional SW preserved. Experimental policy only, no public enablement. Strict real Rules/Scoring/Bot tests must pass without skips. This is scripted deterministic coverage, not random full-match or release certification. Source browser offline failure remains unresolved. Exact candidate CI NOT_RUN.

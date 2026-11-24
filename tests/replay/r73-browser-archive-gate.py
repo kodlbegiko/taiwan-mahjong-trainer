@@ -11,6 +11,7 @@ import json
 import re
 import shutil
 import sys
+from time import monotonic
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 
@@ -46,13 +47,99 @@ def copy_release(source, target):
     shutil.copytree(source, target, ignore=shutil.ignore_patterns(
         '.git', 'node_modules', '__pycache__', '.pytest_cache', '*.png.b64.txt'))
 
+def wait_resolved_true(page, predicate, *, arg=None, timeout=30000, label):
+    """Poll the *resolved* JS boolean, not a truthy Promise/JSHandle.
+
+    Playwright's page.evaluate awaits returned Promises. Its wait_for_function
+    predicate is not used for asynchronous ServiceWorker/CacheStorage checks.
+    Do not accept null, a nonempty object, or any other truthy value as PASS.
+    """
+    deadline = monotonic() + timeout / 1000
+    attempts = 0
+    last = None
+    while monotonic() < deadline:
+        attempts += 1
+        last = page.evaluate(predicate, arg)
+        if last is True:
+            print('WAIT_RESOLVED', label, attempts, flush=True)
+            return
+        page.wait_for_timeout(100)
+    raise AssertionError(f'{label}: timeout after {attempts} polls; last resolved value={last!r}')
+
+
+def verify_wait_primitive(page):
+    # Regression: asynchronous false and null must not finish the gate;
+    # the third invocation resolves to true. No arbitrary sleep as evidence.
+    page.evaluate('() => { window.__replayWaitProbe=0; }')
+    wait_resolved_true(page, """async () => {
+      await Promise.resolve();
+      const n=++window.__replayWaitProbe;
+      return n===1 ? false : n===2 ? null : true;
+    }""", timeout=5000, label='async-predicate-regression')
+    require(page.evaluate('window.__replayWaitProbe') == 3,
+            'Async predicate accepted a non-true result')
+    page.evaluate('delete window.__replayWaitProbe')
+
+
 def ready(page, url):
     page.goto(url, wait_until='load')
-    page.wait_for_function("async () => !!(await navigator.serviceWorker.getRegistration())?.active", timeout=30000)
+    wait_resolved_true(page, "async () => (await navigator.serviceWorker.getRegistration())?.active?.state==='activated'", label='active-worker-ready')
     page.reload(wait_until='load')
     page.wait_for_function('navigator.serviceWorker.controller !== null', timeout=20000)
 
+def quiesce_registration(page):
+    # Complete any unchanged-script update before replacing served bytes.
+    page.evaluate("""async () => {
+      const r=await navigator.serviceWorker.getRegistration();
+      if(!r)throw Error('Missing registration');
+      await r.update();
+    }""")
+    wait_resolved_true(page, """async () => {
+      const r=await navigator.serviceWorker.getRegistration();
+      return !!r && !r.installing && !r.waiting &&
+        r.active===navigator.serviceWorker.controller &&
+        r.active?.state==='activated';
+    }""", label='registration-quiescent')
+
+def install_control_document(page, url, tree):
+    # An initially uncontrolled same-origin HTML document without the app's
+    # automatic update or reload handlers. The actual production SW claims it.
+    # Retain this document during activation; do not change storage or SW code.
+    (tree / 'replay-upgrade-control.html').write_text(
+        '<!doctype html><meta charset="utf-8"><title>Replay upgrade control</title>',
+        encoding='utf-8')
+    page.goto(url + 'replay-upgrade-control.html', wait_until='load')
+    page.evaluate("""async base => {
+      await navigator.serviceWorker.register(new URL('sw.js',base),{scope:base});
+      await navigator.serviceWorker.ready;
+    }""", url)
+    page.wait_for_function('navigator.serviceWorker.controller?.state==="activated"',timeout=30000)
+    quiesce_registration(page)
+    verify_wait_primitive(page)
+
 def check_cache(page, generation, expected):
+    # A cache name is not proof of which worker actually handles this client.
+    status = page.evaluate("""async () => {
+      const controller=navigator.serviceWorker.controller;
+      const reg=await navigator.serviceWorker.getRegistration();
+      if(!controller || !reg)throw Error('No controlled registration');
+      const reply=await new Promise(resolve=>{
+        const channel=new MessageChannel();
+        const timer=setTimeout(()=>{channel.port1.close();resolve(null)},3000);
+        channel.port1.onmessage=e=>{clearTimeout(timer);channel.port1.close();resolve(e.data)};
+        controller.postMessage({type:'GET_RELEASE_STATUS'},[channel.port2]);
+      });
+      return {reply,controllerState:controller.state,scriptURL:controller.scriptURL,
+        sameActive:reg.active===controller,scope:reg.scope,cacheNames:await caches.keys()};
+    }""")
+    print('Controller attestation:', json.dumps(status), flush=True)
+    require(status['reply'] and status['reply'].get('type') == 'RELEASE_STATUS' and
+            status['reply'].get('cacheName') == generation and
+            status['reply'].get('scope') == status['scope'] and
+            status['reply'].get('complete') is True and status['sameActive'] and
+            status['controllerState'] == 'activated',
+            'Wrong or incomplete active controller: ' + repr(status))
+
     actual = page.evaluate("""async ({generation, paths}) => {
       const names=await caches.keys();
       if(!names.includes(generation)) throw Error('Missing active release cache '+generation);
@@ -67,6 +154,24 @@ def check_cache(page, generation, expected):
       return actual;
     }""", {'generation': generation, 'paths': list(expected)})
     require(actual == expected, 'Cached runtime bytes differ from checkout')
+    # CacheStorage parity alone does not prove the page receives those bytes.
+    # Check the controlled fetch path without bypassing its Service Worker.
+    delivered = page.evaluate("""async paths => {
+      if(!navigator.serviceWorker.controller) throw Error('Uncontrolled module client');
+      const actual={};
+      for(const path of paths){
+        const url=new URL(path,location.href).href;
+        let response;
+        try { response=await fetch(url,{cache:'no-store'}); }
+        catch(e) {throw Error('Controlled module fetch failed '+url+': '+String(e));}
+        if(!response.ok)throw Error('Controlled module fetch failed '+url+' HTTP '+response.status);
+        const hash=await crypto.subtle.digest('SHA-256',await response.arrayBuffer());
+        actual[path]=Array.from(new Uint8Array(hash),b=>b.toString(16).padStart(2,'0')).join('');
+      }
+      return actual;
+    }""", list(expected))
+    require(delivered == expected, 'Controlled fetch runtime differs from checkout: ' +
+            repr([p for p in expected if delivered.get(p) != expected[p]]))
 
 def seed_archive(page, fixture):
     # Seed only the committed synthetic archive, representing an existing user
@@ -128,26 +233,36 @@ def readback(page, fixture, key, raw, *, authoritative):
     return result
 
 def update_worker(page, url, old_generation, new_generation):
-    # Existing app opts out of forced skipWaiting; explicitly acknowledge the
-    # update in the controlled test browser, as a user would.
+    # Capture the old controller before publishing/acknowledging the update.
+    # The application's update listener can also acknowledge a waiting worker.
+    # Checking waiting and posting in separate Playwright calls races activation.
     page.evaluate("""async () => {
-      const registration=await navigator.serviceWorker.ready;
+      const registration=await navigator.serviceWorker.getRegistration();
+      if(!registration || !window.__replayOldController) throw Error('Missing old controller');
+      window.__replayAcknowledged=null;
       await registration.update();
     }""")
-    page.wait_for_function("""async () => {
+    wait_resolved_true(page, """async () => {
       const r=await navigator.serviceWorker.getRegistration();
-      return !!r.waiting;
-    }""", timeout=30000)
-    page.evaluate("""async () => {
-      const r=await navigator.serviceWorker.getRegistration();
-      r.waiting.postMessage({type:'SKIP_WAITING'});
-    }""")
-    page.wait_for_function("""async ({oldName,newName}) => {
+      if(!r) throw Error('Registration lost during upgrade');
+      const waiting=r.waiting;
+      if(waiting && waiting!==window.__replayAcknowledged){
+        window.__replayAcknowledged=waiting;
+        waiting.postMessage({type:'SKIP_WAITING'});
+      }
+      const controller=navigator.serviceWorker.controller;
+      return !!controller && controller!==window.__replayOldController &&
+        controller.state==='activated' && r.active===controller && !r.waiting && !r.installing;
+    }""", label='new-controller-activated')
+    wait_resolved_true(page, """async ({oldName,newName}) => {
       const names=await caches.keys();
       return names.includes(newName)&&!names.includes(oldName);
-    }""", arg={'oldName': old_generation, 'newName': new_generation}, timeout=30000)
-    ready(page, url)
-
+    }""", arg={'oldName': old_generation, 'newName': new_generation},
+        label='retired-cache-removed')
+    # Do not import new modules in the pre-upgrade page. The application
+    # performs its own controllerchange reload, which can race a test reload.
+    # The caller opens a new document in the SAME browser context/storage.
+    
 def run(engine, previous_tree=None):
     old = json.loads((FIXTURES / 'r73-historical-win.json').read_text())
     new = json.loads((FIXTURES / 'r73-authoritative-robbery-archive.json').read_text())
@@ -161,18 +276,22 @@ def run(engine, previous_tree=None):
         browser = getattr(pw, engine).launch(headless=True)
         try:
             for label, fixture, authority, scores in cases:
-                with served_site() as (url, tree):
+                http_events = []
+                with served_site(fresh_sw=True, update_http=http_events) as (url, tree):
                     context = browser.new_context(service_workers='allow')
                     try:
                         page = context.new_page()
                         errors = []
-                        page.on('pageerror', lambda err: errors.append(str(err)))
+                        def observe(p):
+                            p.on('pageerror', lambda err: errors.append(str(err)))
+                            p.on('requestfailed', lambda req: print('REQUEST_FAILED', req.url, req.failure, flush=True))
+                        observe(page)
                         upgrade = previous_tree is not None and not authority
                         if upgrade:
                             previous_generation = cache_name(previous_tree)
                             require(previous_generation != generation, 'Upgrade must change actual cache generation')
                             copy_release(previous_tree, tree)
-                            ready(page, url)
+                            install_control_document(page, url, tree)
                             key, raw = seed_archive(page, fixture)
                             # Verify old runtime can read this exact old record,
                             # without requiring new authority/Scoring modules.
@@ -183,38 +302,55 @@ def run(engine, previous_tree=None):
                               if(meta.scoringVersion!=='tw16-minimal-tai-v1'||localStorage.getItem(key)!==raw)
                                 throw Error('Old runtime cannot read historical archive');
                             }""", {'id': fixture['manifest']['replayId'], 'key': key, 'raw': raw})
+                            page.evaluate("""() => {
+                              window.__replayOldController=navigator.serviceWorker.controller;
+                              if(!window.__replayOldController)throw Error('Missing baseline controller');
+                            }""")
                             copy_release(ROOT, tree)
                             update_worker(page, url, previous_generation, generation)
+                            print(label, 'activated new generation in neutral control document', flush=True)
+                            check_cache(page, generation, expected)
+                            page.close()
+                            page = context.new_page()
+                            observe(page)
+                            ready(page, url)
+                            quiesce_registration(page)
+                            require(page.evaluate('key=>localStorage.getItem(key)', key) == raw,
+                                    'Upgrade changed archive bytes before new-document read')
                         else:
                             ready(page, url)
                             key, raw = seed_archive(page, fixture)
                         check_cache(page, generation, expected)
+                        print(label, 'cache and controlled delivery byte parity PASS', flush=True)
                         online = readback(page, fixture, key, raw, authoritative=authority)
                         require(online['delta'] == scores, 'Frozen score mismatch')
+                        print(label, 'online replay and original bytes PASS', flush=True)
                         page.reload(wait_until='load')
                         require(readback(page, fixture, key, raw, authoritative=authority) == online,
                                 'Reload changed archive outcome')
                         page.close()
                         context.set_offline(True)
                         cold = context.new_page()
-                        cold.on('pageerror', lambda err: errors.append(str(err)))
+                        observe(cold)
                         cold.goto(url, wait_until='load')
                         cold.wait_for_function('navigator.serviceWorker.controller!==null', timeout=20000)
                         check_cache(cold, generation, expected)
                         offline = readback(cold, fixture, key, raw, authoritative=authority)
                         require(offline == online, 'Cold offline archive/digest mismatch')
+                        print(label, 'cold-offline replay parity PASS', flush=True)
                         require(not errors, 'Browser page errors: ' + repr(errors))
                         results.append({'case':label,'status':'PASS','upgrade':upgrade,
                                         'scoringVersion':online['scoringVersion'],
                                         'delta':online['delta'],'hash':online['hash'],
                                         'bytesPreserved':online['bytesPreserved']})
                     finally:
+                        print(label, 'SW_HTTP', json.dumps(http_events), flush=True)
                         context.close()
         finally:
             browser.close()
     return {'engine':engine,'status':'PASS','cacheGeneration':generation,
             'previousTreeProvided':previous_tree is not None,
-            'runtimeByteParity':True,'cases':results,
+            'runtimeByteParity':True,'controlledDeliveryByteParity':True,'cases':results,
             'scope':'isolated localhost module/storage gate; not public HTTPS or UI full match'}
 
 if __name__ == '__main__':

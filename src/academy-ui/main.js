@@ -176,6 +176,10 @@ root?.addEventListener('click',event=>{
       bridge.question=null;bridge.phase='idle';show('lessons');return;
     } else if(action==='begin-lesson'){
       bridge.startLesson(btn.dataset.lesson);
+    } else if(action==='begin-scenario'){
+      bridge.startScenario(btn.dataset.lesson);
+    } else if(action==='choose-scenario'){
+      bridge.select(btn.dataset.option);
     } else if(action==='choose'){
       bridge.select(Number(btn.dataset.tile));
     } else if(action==='submit'){
@@ -184,6 +188,9 @@ root?.addEventListener('click',event=>{
       bridge.startLesson(bridge.selectedLessonId);
     } else if(action==='return-lesson'){
       bridge.question=null;bridge.phase='idle';bridge.error=null;
+    } else if(action==='review-scenario'){
+      bridge.startScenario(btn.dataset.lesson,{questionRef:{questionId:btn.dataset.question,questionVersion:btn.dataset.version}});
+      show('lessons');return;
     } else if(action==='review-question'){
       bridge.startLesson(btn.dataset.lesson,{questionRef:{
         questionId:btn.dataset.question,questionVersion:btn.dataset.version}});
@@ -192,7 +199,7 @@ root?.addEventListener('click',event=>{
       window.location.reload();return;
     }
     render();
-    if(['begin-lesson','submit','next'].includes(action)){
+    if(['begin-lesson','begin-scenario','submit','next'].includes(action)){
       document.querySelector(bridge.phase==='answering'?'#academy-question':'#academy-grade')?.scrollIntoView({block:'start'});
     }
   }catch(error){

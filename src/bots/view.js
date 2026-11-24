@@ -4,7 +4,7 @@
  * cannot read a dealer hand still holding physical flowers.  Never weaken
  * that canonical validator: use this narrow fail-closed replacement adapter.
  */
-import { readPlayerView, isRobAddedKongRuleRef, validateRobKongPublicEvent } from '../strategy/view.js';
+import { readPlayerView, isRobAddedKongRuleRef, isAuthoritativeRuleRef, validateRobKongPublicEvent } from '../strategy/view.js';
 
 // Exact, versioned table profiles only. Never infer policy from a profile name
 // prefix or accept an unreviewed future version.
@@ -196,6 +196,68 @@ export function readBotView(input) {
  * earlier Strategy pre-settlement schema intentionally does not recognize.
  * Accept only a detached, redacted Rules PlayerView; no GameState fallback.
  */
+// Controller-only public accounting check. No scoring computation or private
+// ledger is accepted. The Rules host remains responsible for canonical legality.
+const safeNonnegative=n=>Number.isSafeInteger(n)&&n>=0&&!Object.is(n,-0);
+const seat=n=>safeNonnegative(n)&&n<4;
+const sameArray=(a,b)=>Array.isArray(a)&&a.length===b.length&&a.every((n,i)=>n===b[i]);
+const sum=a=>a.reduce((s,n)=>s+BigInt(n),0n);
+function verifyAuthorityTerminal(v,event){
+  const p=event.payload,s=p.settlement;
+  allow(p,['settlement','robAddedKong'],'authority settle payload');
+  allow(s,['contractVersion','settlementId','scoringVersion','status','unit','reason','winType',
+    'winnerSeat','sourceSeat','payerSeats','publicEvidenceEventIds','tai','breakdown','payments',
+    'playerTransferDeltas','playerDeltas','fees','houseDelta'],'public settlement');
+  required(event===v.publicEvents.at(-1)&&event.seq===v.asOfEventSeq&&
+    s.contractVersion==='tw16-pre-settlement/1.0.0'&&s.settlementId===v.round.roundId&&
+    s.scoringVersion==='tw16-gametower-authoritative@1.0.0-experimental'&&
+    s.status==='experimental-not-rule-certified'&&s.unit==='abstract-points'&&
+    safeNonnegative(s.tai)&&s.houseDelta===0&&!Object.is(s.houseDelta,-0)&&
+    Array.isArray(s.fees)&&s.fees.length===0&&Array.isArray(s.breakdown)&&
+    Array.isArray(s.payments)&&Array.isArray(s.payerSeats)&&
+    Array.isArray(s.playerDeltas)&&s.playerDeltas.length===4&&
+    s.playerDeltas.every(n=>Number.isSafeInteger(n)&&!Object.is(n,-0))&&
+    sameArray(s.playerTransferDeltas,s.playerDeltas)&&sameArray(v.round.scores,s.playerDeltas)&&
+    sum(s.playerDeltas)===0n,'authority terminal accounting');
+  const item=(x,scope)=>{
+    allow(x,['code','name','tai','ruleVersion','source','scope'],'public tai item');
+    required(['code','name','ruleVersion','source'].every(k=>typeof x[k]==='string'&&x[k].length>0)&&
+      x.scope===scope&&x.ruleVersion===s.scoringVersion&&safeNonnegative(x.tai),'public tai item');
+  };
+  s.breakdown.forEach(x=>item(x,'hand'));
+  required(sum(s.breakdown.map(x=>x.tai))===BigInt(s.tai),'hand tai total');
+  const publicIds=new Set(v.publicEvents.filter(e=>e.seq<event.seq&&e.actorSeat!==undefined||
+    e.seq<event.seq&&e.type==='deal').map(e=>e.eventId));
+  required(Array.isArray(s.publicEvidenceEventIds)&&
+    new Set(s.publicEvidenceEventIds).size===s.publicEvidenceEventIds.length&&
+    s.publicEvidenceEventIds.every(id=>typeof id==='string'&&publicIds.has(id)),'public evidence references');
+  if(s.reason==='exhaustive-draw'){
+    required(s.winnerSeat===null&&s.sourceSeat===null&&s.winType===null&&
+      event.actorSeat===undefined&&!Object.hasOwn(p,'robAddedKong')&&s.tai===0&&
+      s.breakdown.length===0&&s.payments.length===0&&s.payerSeats.length===0&&
+      s.playerDeltas.every(n=>n===0)&&!v.publicEvents.some(e=>e.type==='win'),'authority draw');
+    return;
+  }
+  const w=v.publicEvents.at(-2);
+  required(s.reason==='win'&&seat(s.winnerSeat)&&seat(s.sourceSeat)&&
+    ['self-draw','discard','rob-added-kong'].includes(s.winType)&&
+    (s.winType==='self-draw')===(s.winnerSeat===s.sourceSeat)&&
+    event.actorSeat===s.winnerSeat&&w?.type==='win'&&w.seq===event.seq-1&&
+    w.payload.seat===s.winnerSeat&&w.payload.sourceSeat===s.sourceSeat&&
+    (s.winType==='rob-added-kong')===Object.hasOwn(p,'robAddedKong'),'authority win binding');
+  const payers=s.winType==='self-draw'?[0,1,2,3].filter(n=>n!==s.winnerSeat):[s.sourceSeat];
+  required(sameArray(s.payerSeats,payers)&&sameArray(s.payments.map(x=>x.payerSeat),payers),'authority payer set');
+  const net=[0n,0n,0n,0n];
+  for(const x of s.payments){
+    allow(x,['payerSeat','payeeSeat','points','handTai','appliedTai','dealerItems'],'public payment');
+    required(x.payeeSeat===s.winnerSeat&&safeNonnegative(x.points)&&
+      x.handTai===s.tai&&safeNonnegative(x.appliedTai)&&Array.isArray(x.dealerItems),'authority payment');
+    x.dealerItems.forEach(y=>item(y,'payment'));
+    required(BigInt(x.appliedTai)===BigInt(s.tai)+sum(x.dealerItems.map(y=>y.tai)),'payment tai total');
+    net[x.payerSeat]-=BigInt(x.points);net[x.payeeSeat]+=BigInt(x.points);
+  }
+  required(net.every((n,i)=>n===BigInt(s.playerDeltas[i])),'authority payment/delta mismatch');
+}
 export function readSettledBotView(input) {
   const v = detached(input);
   allow(v, rootKeys, 'settled root');
@@ -217,10 +279,14 @@ export function readSettledBotView(input) {
       'settled opponent redaction');
     seats.add(opp.seat);
   }
+  const authority=isAuthoritativeRuleRef(v.ruleRef);
+  if(authority)required(v.publicEvents.filter(e=>e.type==='settle').length===1&&
+    v.publicEvents.at(-1)?.type==='settle','authority terminal settlement');
   for (const event of v.publicEvents) {
     allow(event, publicEventKeys, 'settled event');
     const robEvent=validateRobKongPublicEvent(event,v.publicEvents,v.ruleRef,true);
-    if(!robEvent)allow(event.payload, [...publicPayloadKeys, 'claimResolution'],
+    if(authority&&event.type==='settle')verifyAuthorityTerminal(v,event);
+    else if(!robEvent)allow(event.payload, [...publicPayloadKeys, 'claimResolution'],
       'settled public payload');
     required(event.visibility === 'public' &&
       event.ruleRef?.profileId === v.ruleRef.profileId &&

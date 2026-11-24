@@ -5,7 +5,8 @@
 import { readBotView, isSupportedBotTableProfile } from './view.js';
 import { analyzePlayerView } from '../strategy/index.js';
 import { analyzeDiscards, analyzeDraws } from '../core/efficiency.js';
-import { rankPublicDiscardCandidates, R7_POLICY_VERSION } from './strategy-r7.js';
+import { rankPublicDiscardCandidates, R7_POLICY_VERSION, R73_POLICY_VERSION, R73_VARIANTS,
+  publicAttackContext, experimentalClaimAllowed } from './strategy-r7.js';
 
 export const BOT_ENGINE_VERSION = 'tw16-bots/0.2.0-r3-experimental';
 const LEVELS = new Set(['Beginner', 'Intermediate', 'Advanced']);
@@ -50,12 +51,23 @@ function decision(bot, view, seed, action, status, reasonCodes, strategyVersion)
  * Deterministic decision on PUBLIC information. No GameState parameter, no wall,
  * no opponent concealed and no future RNG. Never constructs a LegalAction.
  * Beginner: bounded shanten/ukeire; Intermediate: canonical public efficiency;
- * Advanced: same canonical order with at most 2 x 4 hypothetical two-draw
- * samples as an explicitly uncalibrated tie-break.
+ * Advanced: R7.1 public caution policy (experimental). R7.3 alternatives
+ * are accessible only through the separate experimental evaluator below.
  */
 export function chooseBotAction(bot, playerView) {
+  return choosePolicy(bot,playerView,'legacy');
+}
+// Deliberately not the UI/default API. Freeze an ablation before holdout.
+export function chooseExperimentalAdvancedAction(bot,playerView,variant) {
+  if(bot?.difficulty!=='Advanced'||!R73_VARIANTS.includes(variant))
+    throw new RangeError('Explicit Advanced experimental variant required');
+  return choosePolicy(bot,playerView,variant);
+}
+function choosePolicy(bot, playerView, variant) {
   assertBot(bot);
   const { view, hand, visible, fixedMelds } = readBotView(playerView);
+  const experimental=variant!=='legacy';
+  const claimExperiment=variant==='claim-only'||variant==='combined';
   if (view.audienceSeat !== bot.seat) throw new RangeError('Bot seat / PlayerView mismatch');
   const seed = [bot.seed, view.gameId, view.asOfEventSeq, bot.seat, bot.difficulty].join('|');
   const legal = view.legalActions;
@@ -102,13 +114,13 @@ export function chooseBotAction(bot, playerView) {
     });
     if (!analysis.recommendations.length)
       return make(null, 'unsupported-analysis', ['STRATEGY_UNAVAILABLE'], analysis.engineVersion);
-    const ranked = rankPublicDiscardCandidates(view, analysis.recommendations, bot.difficulty);
+    const ranked = rankPublicDiscardCandidates(view, analysis.recommendations, bot.difficulty, variant);
     if (!ranked.length)
       return make(null, 'unsupported-analysis', ['R7_NO_PUBLIC_RANK'], R7_POLICY_VERSION);
     const chosen = ranked[0];
     const action = discards.find(a => a.actionId === chosen.actionId);
     if (!action) return make(null, 'unsupported-analysis', ['RECOMMENDATION_NOT_LEGAL'], R7_POLICY_VERSION);
-    return make(action, 'ready', chosen.reasonCodes, R7_POLICY_VERSION+'/'+bot.difficulty);
+    return make(action, 'ready', chosen.reasonCodes, experimental?R73_POLICY_VERSION+'/'+variant:R7_POLICY_VERSION+'/'+bot.difficulty);
 
   }
 
@@ -120,7 +132,9 @@ export function chooseBotAction(bot, playerView) {
   if (pass && claims.length && isSupportedBotTableProfile(view.ruleRef) &&
       view.round.phase === 'claim_window' && view.capabilities.structuralScore) {
     const owned = new Set(view.self.concealed.map(t => t.id));
-    const baseline = analyzeDraws(hand, {visible,fixedMelds}).shanten;
+    const baselineAnalysis = analyzeDraws(hand, {visible,fixedMelds});
+    const baseline = baselineAnalysis.shanten;
+    const context=claimExperiment?publicAttackContext(view):null;
     const candidates = [];
     for (const a of claims) {
       const used = a.tileIds.filter(id => owned.has(id));
@@ -133,27 +147,34 @@ export function chooseBotAction(bot, playerView) {
       }
       const nextFixed = fixedMelds+1;
       if (nextFixed > 5) continue;
-      const projected = a.kind === 'kong'
-        ? analyzeDraws(handAfter,{visible,fixedMelds:nextFixed}).shanten
-        : Math.min(...analyzeDiscards(handAfter,{visible,fixedMelds:nextFixed})
-          .map(rank => rank.shanten));
+      // Previously owned consumed tiles are now publicly visible; include
+      // them in experimental inventory, leaving historical policies untouched.
+      const claimVisible=claimExperiment?[...visible,...used.map(id=>Number(id.split(':')[1]))]:visible;
+      const projectedRanks=a.kind==='kong'
+        ? [analyzeDraws(handAfter,{visible:claimVisible,fixedMelds:nextFixed})]
+        : analyzeDiscards(handAfter,{visible:claimVisible,fixedMelds:nextFixed});
+      const projected=Math.min(...projectedRanks.map(r=>r.shanten));
       if (!Number.isFinite(projected)) continue;
-      candidates.push({a, benefit:baseline-projected});
+      const copies=claimExperiment?Math.max(...projectedRanks.filter(r=>r.shanten===projected).map(r=>r.copies)):0;
+      const benefit=baseline-projected;
+      if(claimExperiment&&!experimentalClaimAllowed({gain:benefit,afterCopies:copies,
+        beforeCopies:baselineAnalysis.copies,context,baseline,kind:a.kind}))continue;
+      candidates.push({a, benefit,copies});
     }
-    candidates.sort((a,b)=>b.benefit-a.benefit ||
+    candidates.sort((a,b)=>b.benefit-a.benefit || (claimExperiment?b.copies-a.copies:0) ||
       a.a.actionId.localeCompare(b.a.actionId));
     const best=candidates[0];
     // A claim consuming concealed pairs carries unverified closed-hand and
     // replacement-draw costs. A zero-shanten-gain claim is not forced.
     const closed = view.self.melds.every(m => !m.open);
     const pressure = view.opponents.some(p => p.melds.filter(m => m.open).length >= 3);
-    const threshold = bot.difficulty === 'Beginner' ? 1 :
+    const threshold = claimExperiment ? 0 : bot.difficulty === 'Beginner' ? 1 :
       bot.difficulty === 'Advanced' && ((closed && baseline <= 1) || pressure) ? 2 : 1;
     if (best && best.benefit>=threshold &&
         (bot.difficulty!=='Beginner' || roll(seed+'|open-claim')<0.45))
       return make(best.a,'ready',['RULES_LEGAL_CLAIM','PUBLIC_POST_MELD_SHANTEN_HEURISTIC',
         'UNCALIBRATED_CLAIM_VALUE'],
-        bot.difficulty === 'Beginner' ? 'canonical-efficiency/claim-heuristic' : R7_POLICY_VERSION+'/claim');
+        bot.difficulty === 'Beginner' ? 'canonical-efficiency/claim-heuristic' : experimental?R73_POLICY_VERSION+'/'+variant+'/claim':R7_POLICY_VERSION+'/claim');
   }
   if (pass) return make(pass, 'ready', ['ENGINE_LEGAL_PASS','CLAIM_VALUE_UNVERIFIED']);
   const claim = claims[0];

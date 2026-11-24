@@ -39,14 +39,21 @@ jobs:
           echo "SOURCE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
           git fetch origin integration/mahjong-full-game
           owner_head=HEAD
-          if [[ "${{ github.head_ref }}" == 'integration/mahjong-r7-release-audit' ]]; then
+          if [[ "${{ github.head_ref }}" == 'integration/mahjong-r7-release-audit' || "${{ github.ref_name }}" == 'integration/r74-combined-candidate' ]]; then
             owner_head=d7fdc5fbcb9073d41cf2ecb4b41a3286013ecb4b
-            git fetch --no-tags origin "$owner_head"
+            attestation_head=6b99b60f9c401c9bc5195027d55a7388328266ca
+            git fetch --no-tags origin "$owner_head" "$attestation_head"
             git merge-base --is-ancestor d02eb508a0c302997f5e10a4eaf01c85bf0e6fb7 "$owner_head"
-            for file in tests/browser/_release_site.py tests/pwa/mobile-update-gates.py tests/pwa/sw-transaction.test.js; do
+            for file in tests/browser/_release_site.py tests/pwa/mobile-update-gates.py; do
               git diff --exit-code "$owner_head" HEAD -- "$file"
             done
+            # The candidate adds one attestation test to the exact owner suite.
+            # Verify the pinned integration source AND preserve every owner byte.
+            git diff --exit-code "$attestation_head" HEAD -- tests/pwa/sw-transaction.test.js
+            git show "$owner_head:tests/pwa/sw-transaction.test.js" > "$RUNNER_TEMP/pwa-owner.js"
+            python -c 'from pathlib import Path; import sys; assert Path("tests/pwa/sw-transaction.test.js").read_bytes().startswith(Path(sys.argv[1]).read_bytes()), "PWA owner test changed or removed"' "$RUNNER_TEMP/pwa-owner.js"
             echo "PWA_SOURCE_SHA=$owner_head" >> "$GITHUB_STEP_SUMMARY"
+            echo "PWA_ATTESTATION_SOURCE_SHA=$attestation_head" >> "$GITHUB_STEP_SUMMARY"
           fi
           while IFS= read -r file; do
             case "$file" in

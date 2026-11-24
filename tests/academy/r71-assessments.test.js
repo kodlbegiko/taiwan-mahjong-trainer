@@ -132,7 +132,7 @@ test('R7.1: independent practice is not a second score store or legacy-v3 record
   assert.throws(()=>submitAcademyAnswer(ref('chi'),choice,opts),/版本/);
   assert.equal(JSON.stringify(submitAcademyAnswer({questionId:'academy-q-001',questionVersion:'1.0.0'},
     ex.answer.optimalTiles[0],opts)),bytes);
-  assert.equal(VERIFIED_SCENARIO_SCORER_COUNT,0,'Do not register pending experimental scorer');
+  assert.equal(VERIFIED_SCENARIO_SCORER_COUNT,5,'Only separate R7.3 exact-objective registry is enabled; R7.1 preview remains unregistered');
   assert.equal(auditAcademyContent().curriculum.fullyAssessedObjectives,10);
 });
 
