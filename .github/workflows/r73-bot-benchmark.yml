@@ -1,0 +1,99 @@
+name: R7.3 Bot calibration and independent validation
+on:
+  pull_request:
+    paths:
+      - 'src/bots/**'
+      - 'src/strategy/**'
+      - 'scripts/bots/r73-*'
+      - '.github/workflows/r73-bot-benchmark.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: r73-bot-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  calibration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        batch: [0, 1, 2, 3]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: GITHUB_SHA="$(git rev-parse HEAD)" node scripts/bots/r73-benchmark.js calibration ${{ matrix.batch }} evidence/calibration-${{ matrix.batch }}.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r73-calibration-${{ matrix.batch }}
+          path: evidence/*.json
+  select:
+    needs: calibration
+    runs-on: ubuntu-latest
+    outputs:
+      selected: ${{ steps.select.outputs.selected }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: r73-calibration-*
+          path: raw
+      - id: select
+        run: |
+          node scripts/bots/r73-aggregate.js calibration raw evidence/calibration-report.json
+          echo "selected=$(node -p "require('./evidence/calibration-report.json').selection.variant")" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: r73-calibration-report
+          path: evidence/calibration-report.json
+  validation:
+    needs: select
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        batch: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: GITHUB_SHA="$(git rev-parse HEAD)" node scripts/bots/r73-benchmark.js validation ${{ matrix.batch }} evidence/validation-${{ matrix.batch }}.json "${{ needs.select.outputs.selected }}"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r73-validation-${{ matrix.batch }}
+          path: evidence/*.json
+  report:
+    needs: [select, validation]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: r73-validation-*
+          path: raw
+      - run: node scripts/bots/r73-aggregate.js validation raw evidence/validation-report.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: r73-validation-report
+          path: evidence/validation-report.json
