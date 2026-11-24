@@ -138,6 +138,30 @@
         "unsupported",
         "explicit-versioned"
       ]
+    },
+    "robAddedKong": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "proposalEventId",
+        "fromSeat",
+        "tileId"
+      ],
+      "properties": {
+        "proposalEventId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "fromSeat": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3
+        },
+        "tileId": {
+          "type": "string",
+          "pattern": "^t:(0|[1-9]|[12][0-9]|3[0-3]):[0-3]$"
+        }
+      }
     }
   },
   "allOf": [
@@ -153,6 +177,38 @@
         "required": [
           "winningTileId"
         ]
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "robAddedKong"
+        ]
+      },
+      "then": {
+        "required": [
+          "winningTileId"
+        ],
+        "properties": {
+          "via": {
+            "const": "discard"
+          },
+          "ruleRef": {
+            "type": "object",
+            "required": [
+              "profileId",
+              "ruleVersion"
+            ],
+            "properties": {
+              "profileId": {
+                "const": "tw16-rob-added-kong"
+              },
+              "ruleVersion": {
+                "const": "experimental-v1"
+              }
+            }
+          }
+        }
       }
     }
   ]

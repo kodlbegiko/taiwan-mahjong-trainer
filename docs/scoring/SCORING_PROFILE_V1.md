@@ -21,7 +21,7 @@ Status: DRAFT. Not a universal Taiwanese 16-tile ruleset. Not a certified compet
 - [Gogogame rules](https://www.gogogame.com.tw/htm/rule_3000.html): says Taipei, Taichung and Southern variants differ; its optional 10% commercial fee cannot be assumed on other tables.
 
 Sample profiles:
-- tw16-gametower-comparative@1.0.0-experimental: seat-matched correct flowers, flower-set replacement, round/seat winds; no separate kong bonus.
+- tw16-gametower-comparative@1.0.0-experimental: seat-matched correct flowers, flower-set replacement, round/seat winds; no separate kong bonus; versioned robbery event +1, strict 平胡 2, 全求人 2, authenticated 槓上開花／海底 +1.
 - tw16-gametower-see-flower-wind@1.0.0-experimental: opt-in alternative where each flower and wind triplet counts, open kong 1 and concealed kong 2; all flower tiles count individually, complete four-flower sets retain the documented 2 tai, and **無字無花** adds 2 tai when there are no honor tiles or flowers.
 - createScoringProfile(customJson): validates a source-attributed copy. All inputs must have explicit sourceRefs and ruleRefs, and status remains experimental. The code never merges Taipei, Taichung, Southern and tournament variations by assumption.
 
@@ -33,7 +33,7 @@ Import from src/scoring/index.js. Public exports: createScoringProfile, getScori
 
 scoreWinningHand(profile, evidence) requires exact RuleProfile ref, valid winner/source/dealer seats, self-draw or discard mode, winning player's concealed tile inventory, valid melds, flower IDs, claimed winning tile for discards, explicitly supplied dealerStreak. Matching seat/round wind is mandatory when needed for relevant tai. Dealer streak >0 requires referenced previous rounds but the references must be independently checked against prior authoritative Rules events by the integrator; arbitrary caller-provided strings are not cryptographically verified proof.
 
-The alternative 見花見字 mode retains 2 tai for each complete four-flower family on top of its 1 tai per flower, following the source statement that this mode replaces seat-aligned flowers and winds, not the pre-existing flower-set tai. The optional **無字無花** item is disabled in the conventional profile. Flat-hand (平胡) precedence and wait-shape evidence are not yet implemented, so this experimental calculation remains incomplete in ambiguous five-sequence cases.
+The alternative 見花見字 mode retains 2 tai for each complete four-flower family on top of its 1 tai per flower, following the source statement that this mode replaces seat-aligned flowers and winds, not the pre-existing flower-set tai. The optional **無字無花** item is disabled in the conventional profile. R7.1 implements strict 平胡 using **five sequences, suited eye, no honors or flowers, discard win and a provable two-sided pre-win wait**. In 見花見字, 平胡 suppresses the overlapping 無字無花 item. The remaining wait types remain explicitly unsupported pending complete event and precedence review.
 
 The solver checks physical tile ID uniqueness when provided, each standard tile type <=4, exact physical kong/meld shape, five completed melds plus pair, and every valid concealed-hand decomposition. It selects the highest legal tai decomposition, with the discarder-provided last tile attributed to pair/sequence/triplet as needed for concealed-triplet logic.
 
@@ -41,7 +41,7 @@ Each item exposes code, Traditional Chinese name, evidence, tai, ruleVersion, so
 
 Mutual exclusions: concealed-selfdraw 3 replaces the separate concealed/selfdraw entries; small/big dragons suppress each individual dragon fan; big winds suppress matching wind fan; three/four/five concealed-triplet tiers replace lower tiers; flower set in default mode replaces the matching seat flower in that set; normal/見花見字 modes differ by an explicit profile switch. Full ordinary hand with no eligible tai remains zero tai rather than fabricated baseline.
 
-Unsupported additional fields such as `waitShape`, `firstTurnWin`, `readyDeclaration`, `liabilityPolicy` and `winReason` fail closed instead of being silently ignored. A self-draw cannot carry a contradictory discard `winningTile`. Unknown evidence throws RangeError. Unknown requested capabilities throw ScoringCapabilityError with code UNSUPPORTED_SCORING_CAPABILITY and capability field. R7 does not infer unique wait, two-sided flat-hand, earthly/heavenly wins, seven flower grab, eight flower wins, rob added kong, pass-winner liability, multiple simultaneous winners, or ready-hand announcements from insufficient data.
+Unsupported additional fields such as `waitShape`, `firstTurnWin`, `readyDeclaration`, `liabilityPolicy` and `winReason` fail closed instead of being silently ignored. A self-draw cannot carry a contradictory discard `winningTile`. Unknown evidence throws RangeError. Unknown requested capabilities throw ScoringCapabilityError with code UNSUPPORTED_SCORING_CAPABILITY and capability field. R7.1 supports source-linked single-winner 搶槓胡 (the added-kong declarer alone pays), private-ledger proven 槓上開花 after concealed/added kong or a non-initial flower replacement, and the last live draw at the configured 16-tile reserve boundary (海底撈月). These are **opt-in experimental** calculations, never authorized by public PlayerView or a caller-supplied flag. Unverified declarations, heavenly/earthly wins, seven flower grab, eight flower wins, unique/edge/closed/pair wait categories, multiwinner and 包牌 remain unsupported.
 
 ## Accounting
 
@@ -52,5 +52,7 @@ A legal self-draw creates three payments; a discard win creates one payer paymen
 No changes to src/rules, src/bots, src/table-ui, src/replay, sw.js, package.json, old Golden expected results, integration branch or main. The R7 contract is a read-only opt-in module and not an immediate live-rule replacement.
 
 To integrate later: Rules must publish versioned, verified wind/round/dealer streak/last-draw facts, own the profile change, call Scoring from the authoritative private host, publish breakdown and per-payer settlement atomically, preserve old replay history, and gate all new rules behind a separately versioned RuleProfile and Golden acceptance. A passing new golden suite cannot authorize release by itself.
+
+R7-001: settlement uses canonical +0 at every accounting boundary and rejects externally tampered signed -0 in ledgers. Both zero and positive fee amounts have strict deep-equality and JSON round-trip tests.
 
 Run node --test tests/scoring/golden.test.js, then npm run check on the *exact* R7 head. A CI result from a different commit SHA is not sufficient evidence.

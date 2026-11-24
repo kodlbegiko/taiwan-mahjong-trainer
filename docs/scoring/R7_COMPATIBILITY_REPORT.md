@@ -18,7 +18,7 @@
 
 ## What can be tested now
 
-- `tests/scoring/golden.test.js` comprises **26** source-owned Golden test callbacks.
+- `tests/scoring/golden.test.js` comprises **40** source-owned Golden test callbacks.
 - Deterministic subtest S22 evaluates **150** generated legal conventional wins and seat-permuted zero-sum settlements.
 - S21 builds a real game using `tw16-single-winner-interception@experimental-v1`, submits its legal WIN action, checks Rules `validateGameState` and `replayGame` round trip, verifies original legacy [540,-180,-180,-180] points remain unchanged, then runs the **read-only** R7 scoring adapter.
 - Others check zero tai, composite/mutual exclusions, dragon/wind families, concealed vs claimed triplets, ordinary and 見花見字 flowers/kongs including 無字無花 and complete flower set, per-payer dealer and streak, separate external fees, exhaustive draw, malformed/unavailable facts, corrupt account transfers and unsafe integer arithmetic.
@@ -28,11 +28,18 @@
 
 1. Rules owns actual dealer streak: the scorer cannot attest previous round history; the existing R5 API exposes only handIndex and single preceding round reference.
 2. Correct `seatWindType` comes from authoritative table seat-opening mapping, **not** from dealerSeat. The current R5 Rules state does not publish such a validated value; the scorer must reject missing proof when matching flowers/winds need it.
-3. The scorer accepts five-meld-and-eye ordinary wins only. R5 special wins, rob added kong and multiple-winner liability are not implemented. No fabricated `specialWin` or payer fallback.
+3. The scorer still requires five-meld-and-eye ordinary wins. An opt-in R7 RuleProfile marker can now establish **single robbery**, with a verified `kong_proposed`, one private WIN, matching public WIN/SETTLE, and declarer-only liability. Full flower-only wins and multiwinner liability remain unimplemented; the Rules PR #51 is separate and not merged to the base.
 4. R5 `win` + `settle` events carry minimal tai/delta, not new scoring version/breakdown/evidence. A new RuleProfile and additive event namespace are necessary to publish R7 score as authoritative.
 5. The Rules-facing proposed JSON schema is in `rules-scoring-event-proposal.schema.json`; its fact envelope is **not emitted in R5** and is not proof of the value merely by appearing in a client request.
-6. A no-honor/no-flower winning hand can potentially qualify for 平胡, whose wait-shape constraints are unsupported. R7 must not be advertised as a complete table calculator or authoritative payout under that ambiguity.
+6. Strict structural 平胡 now requires the provable two-sided pre-win shape, discard win, suited eye, five sequences and no flower/honor; a missing generic wait declaration is **not** converted into a 0-tai flag. Unique/edge/middle/pair wait awards still require separately approved definition and event proof. 槓上開花/海底 are gated by private Rules event ancestry and the experimental tail boundary.
 7. Human review must resolve what it means for flower sets to coexist with the 見花見字 per-flower mode on the intended platform. The sample follows the GameTower text stating that mode replaces seat-matching flowers/winds while adding optional tai, but this is **one explicit policy**, not a Taiwan-wide default.
+
+## R7.1 signed-zero regression and rule evidence
+
+- Root R7-001: `settleExhaustiveDraw` produced `-0` from `-fee.points` when fee=0, so strict Node `deepEqual` failed. The shared ledger now canonicalizes zero *before emitting account amounts*, including fees, sums and transfer deltas. Signed-zero corruption in external ledger input fails validation; JSON roundtrips are checked.
+- New scoring Goldens: R7-001 zero/positive/-0 fees and conservation; Rules R7 `kong_proposed` → WIN/PASS arbiter marker, strict one-payer robbery, marker/replay order tamper; deterministic Pinghu and full exposed hand; authenticated kong/flower replacement, source last-live draw and unsupported variants.
+- Reused S22 seeded 150 legal winning hands and S21 real R5 Rules win/replay proving old [540,-180,-180,-180] remains untouched. The R7 robbery tests are **contract fixtures based on Agent 2 source**, not yet an end-to-end joint-branch CI execution.
+- Cross-module matrix: baseline R5 Rules = unchanged scorer + no robbery, baseline Replay = unchanged historical frames, new R7 Rules profile = staged proposal + marker (requires integrator), R7 Scoring = opt-in event validation, Replay R7 marker = NOT acceptance-tested jointly yet. No merge to main.
 
 ## Policy/source traceability
 
@@ -48,7 +55,7 @@ The bundled comparative profile is anchored primarily in [GameTower](https://www
 - [x] Golden scenarios and seeded 150-hand subtest
 - [x] R5 legacy scoring, Rules replay and single-win integration remain stable in sandbox tests
 - [x] Proposed Rules schema and event compatibility notes
-- [ ] Official exact-HEAD `npm run check` / Github Actions Verify concludes and passes
+- [ ] Official exact-HEAD `npm run check` / Github Actions Verify concludes and passes (R7-001 historic 382 PASS / 1 FAIL / 1 SKIP was fixed in source; previous red CI cannot count as pass)
 - [ ] Rules-host publishes authoritative seat-wind/streak/special-win facts
 - [ ] New Rules version pins ScoringProfile and emits versioned breakdown/ledger atomically
 - [ ] UI/Replay/real-table end-to-end integrator acceptance
