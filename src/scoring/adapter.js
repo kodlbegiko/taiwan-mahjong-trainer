@@ -64,9 +64,19 @@ export function evidenceFromSettledRulesState(state,{seatWindType,prevailingWind
       x.fromSeat===marker.fromSeat&&x.tileId===marker.tileId;
     const proposal=events.find(e=>e.eventId===marker.proposalEventId);
     const sourcePlayer=state.players?.[r.sourceSeat];
-    const claimed=events.filter(e=>e.visibility==='seat-private'&&
-      e.type==='claim'&&e.payload?.kind==='win'&&
+    const replies=events.filter(e=>
+      ['claim','pass'].includes(e.type)&&
       e.payload?.claimEventId===marker.proposalEventId);
+    const claimed=replies.filter(e=>e.type==='claim'&&e.payload?.kind==='win');
+    const validReplies=replies.length===3&&
+      new Set(replies.map(e=>e.actorSeat)).size===3&&
+      replies.every(e=>e.visibility==='seat-private'&&
+        Number.isInteger(e.actorSeat)&&e.actorSeat>=0&&e.actorSeat<4&&
+        e.actorSeat!==r.sourceSeat&&e.seq>proposal?.seq&&e.seq<win[0].seq&&
+        (e.type==='claim'
+          ? e.payload.kind==='win'&&Array.isArray(e.payload.tileIds)&&
+            e.payload.tileIds.length===1&&e.payload.tileIds[0]===marker.tileId
+          : e.payload.kind==='pass'&&e.payload.tileIds===undefined));
     const type=id=>/^t:(0|[1-9]|[12][0-9]|3[0-3]):[0-3]$/.exec(id)?.[1];
     if(state.ruleRef?.profileId!=='tw16-rob-added-kong'||
       state.ruleRef?.ruleVersion!=='experimental-v1'||
@@ -82,7 +92,7 @@ export function evidenceFromSettledRulesState(state,{seatWindType,prevailingWind
       proposal.payload?.kind!=='ADDED_KONG'||
       proposal.payload?.tileId!==marker.tileId||
       proposal.seq>=win[0].seq||
-      claimed.length!==1||claimed[0].actorSeat!==r.winnerSeat||
+      !validReplies||claimed.length!==1||claimed[0].actorSeat!==r.winnerSeat||
       claimed[0].seq<=proposal.seq||claimed[0].seq>=win[0].seq||
       !sourcePlayer?.melds?.some(m=>m.kind==='triplet'&&m.open&&
         type(m.tileIds?.[0])===type(marker.tileId))||
