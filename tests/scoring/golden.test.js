@@ -514,3 +514,78 @@ test('R7.1 全求人 five open melds adds 2 tai without duplicating pair-wait ta
   assert.equal(l.payments.length,1);
   assert.equal(l.playerTransferDeltas.reduce((n,x)=>n+x,0),0);
 });
+
+
+function supplementalWinSnapshot(kind){
+  const flower=kind==='flower',kong=kind==='kong'||kind==='open-kong';
+  const winningTile='t:18:0';
+  const meld=kong?[{kind:'kong',open:kind==='open-kong',
+    tileIds:['t:6:0','t:6:1','t:6:2','t:6:3']}]:[];
+  const concealed=kong?[31,31,31,32,32,32,33,33,33,9,10,11,18,18]:dragons;
+  const sourceEvent=kong?{
+    eventId:'evt:supplement:1',seq:1,type:'kong',visibility:'public',actorSeat:1,
+    payload:{kind:kind==='open-kong'?'kong':'CONCEALED_KONG',tileIds:meld[0].tileIds}
+  }:flower?{
+    eventId:'evt:supplement:1',seq:1,type:'flower',visibility:'seat-private',actorSeat:1,
+    payload:{tileId:f('season-spring'),replacementTileId:winningTile}
+  }:null;
+  const drawEvent={eventId:'evt:supplement:2',seq:2,type:'draw',
+    visibility:'seat-private',actorSeat:1,payload:{tileId:winningTile,
+      source:kong?'tail':'live'}};
+  const prior=flower?[{eventId:'evt:supplement:0',seq:0,type:'discard',actorSeat:0,
+    visibility:'public',payload:{tileId:'t:2:0'}},sourceEvent]:
+    kong?[sourceEvent]:[];
+  const events=[...prior,...(flower?[]:[drawEvent]),
+    {eventId:'evt:supplement:3',seq:3,type:'win',visibility:'public',
+      payload:{winnerSeat:1,sourceSeat:1,via:'self-draw'}},
+    {eventId:'evt:supplement:4',seq:4,type:'settle',visibility:'public',
+      payload:{reason:'win',winnerSeat:1,delta:[0,0,0,0]}}];
+  return {ruleRef:ref,round:{phase:'settled',prevailingWind:'east',dealerSeat:3,
+    handIndex:0,scores:[0,0,0,0]},wall:Array(16).fill('reserved'),
+    players:[{concealed:[],melds:[],flowers:[]},
+      {concealed,flowers:flower?[f('season-spring')]:[],melds:meld},
+      {concealed:[],melds:[],flowers:[]},{concealed:[],melds:[],flowers:[]}],
+    events,extensions:{tw16:{lastDraw:{seat:1,tileId:winningTile,
+      source:kong?'replacement':flower?'flower':'live'},
+      result:{reason:'win',winnerSeat:1,sourceSeat:1,via:'self-draw',
+        winningTileId:winningTile}}}};
+}
+test('R7.1 valid private concealed-kong supplement gives 槓上開花 1 and selfdraw payer three',()=>{
+  const state=supplementalWinSnapshot('kong');
+  const e=evidenceFromSettledRulesState(state);
+  assert.equal(e.specialDraw?.kind,'kong-bloom');
+  assert.equal(e.specialDraw?.drawEventId,'evt:supplement:2');
+  const score=scoreRulesState(p,state);
+  assert.equal(score.breakdown.find(x=>x.code==='kong-bloom')?.tai,1);
+  const ledger=settleRulesState(p,state);
+  assert.equal(ledger.payments.length,3);
+  assert.equal(assertLedgerConservation(ledger),true);
+});
+test('R7.1 live last-draw 海底 1 needs authoritative reserve size and exact draw',()=>{
+  const state=supplementalWinSnapshot('live');
+  assert.equal(evidenceFromSettledRulesState(state).specialDraw?.kind,'sea-bottom');
+  assert.equal(scoreRulesState(p,state).breakdown.find(x=>x.code==='sea-bottom')?.tai,1);
+  state.wall.push('one more live tile');
+  assert.equal(evidenceFromSettledRulesState(state).specialDraw,undefined);
+  assert.ok(!scoreRulesState(p,state).breakdown.some(x=>x.code==='sea-bottom'));
+});
+test('R7.1 flower replacement wins after a discard can qualify, but initial setup remains unsupported',()=>{
+  const state=supplementalWinSnapshot('flower');
+  const e=evidenceFromSettledRulesState(state);
+  assert.equal(e.specialDraw?.kind,'kong-bloom');
+  assert.equal(scoreRulesState(p,state).breakdown.find(x=>x.code==='kong-bloom')?.tai,1);
+  const initial=structuredClone(state);
+  initial.events=initial.events.filter(x=>x.type!=='discard');
+  assert.throws(()=>evidenceFromSettledRulesState(initial),ScoringCapabilityError);
+});
+test('R7.1 unreviewed open-kong selfdraw and corrupted draw provenance reject explicitly',()=>{
+  assert.throws(()=>evidenceFromSettledRulesState(supplementalWinSnapshot('open-kong')),
+    ScoringCapabilityError);
+  const malformed=supplementalWinSnapshot('live');
+  malformed.events[0].payload.source='unknown';
+  assert.throws(()=>evidenceFromSettledRulesState(malformed),ScoringCapabilityError);
+  const forged=supplementalWinSnapshot('kong');
+  forged.events[1].payload.tileId='t:18:1';
+  assert.equal(evidenceFromSettledRulesState(forged).specialDraw,undefined,
+    'non-matching last draw cannot claim gang-bloom bonus');
+});
