@@ -1,4 +1,4 @@
-import {scoreWinningHand} from './evaluate.js';
+import {scoreWinningHand,ScoringCapabilityError} from './evaluate.js';
 import {settleWinningHand} from './settlement.js';
 
 /**
@@ -98,6 +98,43 @@ export function evidenceFromSettledRulesState(state,{seatWindType,prevailingWind
       e.visibility==='public'&&e.actorSeat===r.sourceSeat&&
       e.payload?.tileId===r.winningTileId&&e.seq<win[0].seq))
     throw new RangeError('Discard-win lacks source event provenance');
+  // Supplemental win tai require a private Rules ledger and the exact winning
+  // draw event; public PlayerView never exposes replacement tile identities.
+  let specialDraw;
+  if(r.via==='self-draw'&&typeof r.winningTileId==='string'){
+    const last=events.filter(e=>e.seq<win[0].seq&&e.actorSeat===r.winnerSeat&&
+      ((e.type==='draw'&&e.visibility==='seat-private'&&
+        e.payload?.tileId===r.winningTileId)||
+       (e.type==='flower'&&e.visibility==='seat-private'&&
+        e.payload?.replacementTileId===r.winningTileId))).at(-1);
+    if(last){
+      if(events.some(e=>e.seq>last.seq&&e.seq<win[0].seq&&
+        e.actorSeat===r.winnerSeat&&
+        ['discard','draw','flower','kong'].includes(e.type)))
+        throw new RangeError('Winning draw is not the most recent owned tile event');
+      if(last.type==='draw'&&last.payload.source==='tail'){
+        const lastKong=events.filter(e=>e.type==='kong'&&e.visibility==='public'&&
+          e.actorSeat===r.winnerSeat&&e.seq<last.seq).at(-1);
+        if(!lastKong)throw new ScoringCapabilityError('unproven-kong-supplement');
+        if(!['CONCEALED_KONG','ADDED_KONG'].includes(lastKong.payload?.kind))
+          throw new ScoringCapabilityError('open-kong-supplement-win-variant');
+        if(events.some(e=>e.seq>lastKong.seq&&e.seq<last.seq&&
+          ['draw','discard','flower','kong'].includes(e.type)))
+          throw new RangeError('Broken kong replacement event adjacency');
+        specialDraw={kind:'kong-bloom',sourceEventId:lastKong.eventId,
+          drawEventId:last.eventId};
+      }else if(last.type==='flower'){
+        if(!events.some(e=>e.type==='discard'&&e.seq<last.seq))
+          throw new ScoringCapabilityError('initial-flower-replacement-variant');
+        specialDraw={kind:'kong-bloom',sourceEventId:last.eventId,
+          drawEventId:last.eventId};
+      }else if(last.type==='draw'&&last.payload.source==='live'&&
+        Array.isArray(state.wall)&&state.wall.length===16&&
+        state.extensions?.tw16?.lastDraw?.source==='live')
+        specialDraw={kind:'sea-bottom',sourceEventId:last.eventId,
+          drawEventId:last.eventId};
+    }
+  }
   const actualPrevailing=WIND_TYPES[state.round.prevailingWind];
   if(actualPrevailing===undefined||
     (prevailingWindType!==undefined&&prevailingWindType!==actualPrevailing))
@@ -117,6 +154,7 @@ export function evidenceFromSettledRulesState(state,{seatWindType,prevailingWind
       kind:m.kind,open:m.open,tileIds:[...m.tileIds]})),
     flowers:[...player.flowers],
     ...(robAddedKong?{robAddedKong}:{}),
+    ...(specialDraw?{specialDraw}:{}),
     ...(r.via==='discard'?{winningTile:r.winningTileId}:{}),
     ...(seatWindType===undefined?{}:{seatWindType}),
     prevailingWindType,dealerStreak,streakEvidence};
