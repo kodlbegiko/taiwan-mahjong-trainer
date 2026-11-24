@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { LESSONS, getSkillTag, VERIFIED_SCENARIO_SCORER_COUNT,
-  submitAcademyAnswer, validateAcademyDecisionRecord } from '../../src/academy/index.js';
+  submitAcademyAnswer, validateAcademyDecisionRecord, createAcademyDecisionRecord } from '../../src/academy/index.js';
 import { getCanonicalExercise } from '../../src/academy/question-internal.js';
 import { R71_ASSESSMENT_VERSION, R71_QUESTION_REFS, listR71QuestionRefs,
-  getR71Question, gradeR71Question, validateR71Question, getR71Coverage, getR71LessonPlan, R71_LESSON_PLAN_VERSION } from '../../src/academy/r71-assessments.js';
+  getR71Question, gradeR71Question, validateR71Question, getR71Coverage, getR71LessonPlan, R71_LESSON_PLAN_VERSION, buildR71ScenarioReviewBundle } from '../../src/academy/r71-assessments.js';
 import { auditAcademyContent } from '../../src/academy/content-audit.js';
 import { readPlayerView } from '../../src/strategy/view.js';
 import { analyzeDiscards } from '../../src/core/efficiency.js';
@@ -193,4 +193,35 @@ test('R7.1 preview never enters Daily or creates a duplicate archive record afte
   assert.equal(again.status,'already-answered');
   assert.equal(storage.getItem(ARCHIVE_STORAGE_KEY),bytes);
   assert.equal(make().progress({asOf:later}).completed,1);
+});
+
+test('R7.1 review bundle is compatible with action-based scenario proposal but cannot mint records',()=>{
+  let count=0;
+  for(const r of R71_QUESTION_REFS){
+    const q=getR71Question(r);
+    if(q.taskType!=='legal-action'){
+      assert.throws(()=>buildR71ScenarioReviewBundle(r),/not a LegalAction/);
+      continue;
+    }
+    count++;
+    const bundle=buildR71ScenarioReviewBundle(r);
+    assert.equal(bundle.question.status,'draft');
+    assert.equal(bundle.fixture.verified,false);
+    assert.equal(bundle.question.answerKey.correctnessBasis,'unverified');
+    assert.equal(bundle.reviewPolicy.officialCredit,false);
+    assert.deepEqual(bundle.fixture.legalActionIds,q.options.map(o=>o.id));
+    for(const id of bundle.fixture.legalActionIds){
+      assert.ok(q.playerView.legalActions.some(a=>a.actionId===id));
+      assert.equal(bundle.fixture.results[id].score,gradeR71Question(r,id).score);
+    }
+    assert.throws(()=>createAcademyDecisionRecord(bundle.question,bundle.fixture.legalActionIds[0],{
+      timestamp:'2026-11-20T09:00:00.000Z',durationMs:100,attemptId:'r71-review-do-not-mint'
+    }));
+    const pretend=clone(bundle.question);
+    pretend.status='validated';pretend.answerKey.correctnessBasis='exact';
+    assert.throws(()=>createAcademyDecisionRecord(pretend,bundle.fixture.legalActionIds[0],{
+      timestamp:'2026-11-20T09:00:00.000Z',durationMs:100,attemptId:'r71-unregistered-do-not-mint'
+    }));
+  }
+  assert.equal(count,11);
 });
