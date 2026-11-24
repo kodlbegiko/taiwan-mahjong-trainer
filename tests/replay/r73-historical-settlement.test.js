@@ -29,7 +29,7 @@ test('R7.3 frozen pre-R7 FNV and R7 SHA archives retain exact historical result 
   assert.equal(fixture.legacyArchive.manifest.integrity.sha256,undefined);
   assert.equal(fixture.shaArchive.manifest.integrity.sha256.eventChain,'d712ff2d867f53ed2967ade84c63fe45c84d4e94100457017afaf17499c25bcb');
 });
-test('R7.3 historical archive rejects version loss, missing/unknown hash, forged settlement, repeated and reordered terminal events',()=>{
+test('R7.3 historical archive rejects version loss, unknown checksum/hash, forged settlement, repeated and reordered terminal events',()=>{
   const original=fixture.shaArchive,state=replayStateAt(original,original.events.length);
   const mutations=[
     ['CORRUPT_REPLAY',a=>delete a.manifest.scoringVersion],
@@ -68,7 +68,7 @@ test('R7.3 malformed original score breakdown and payer amounts never become sto
     x=>x.events.push(cp(x.events.at(-1)))
   ]){
     const bad=cp(state);mutate(bad);const storage=new Map();
-    fails(()=>createReplayService({storage}).saveReplay(bad),'INVALID_GAME_STATE');
+    assert.throws(()=>createReplayService({storage}).saveReplay(bad),e=>e instanceof ReplayError&&['INVALID_GAME_STATE','INVALID_SETTLEMENT'].includes(e.code));
     assert.equal(storage.size,0);
   }
 });

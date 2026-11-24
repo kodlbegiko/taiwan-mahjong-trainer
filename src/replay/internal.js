@@ -290,6 +290,8 @@ export function validateReplayArchive(archive) {
        !Array.isArray(archive.events)||!Array.isArray(archive.decisions))
       throw new Error('archive shape/version');
     const m=archive.manifest,r3=isR3(m.ruleRef);
+    // Resolve the historical identity before interpreting engine-specific fields.
+    const profile=assertProfile(m.ruleRef);
     if(m.schemaVersion!==1||m.contractVersion!==CONTRACT_VERSION||
        m.replayVersion!==REPLAY_VERSION||m.replayId!=='replay:'+m.gameId||
        !Number.isInteger(m.ownerSeat)||m.ownerSeat<0||m.ownerSeat>3||
@@ -301,7 +303,6 @@ export function validateReplayArchive(archive) {
        m.eventCount!==archive.events.length||
        m.verificationScope!==(r3?'experimental-r3-full-round':'experimental-bounded-draw-discard'))
       throw new Error('manifest version/identity');
-    const profile=assertProfile(m.ruleRef);
     const pinned=pinnedScoringVersion(profile,m.ruleRef);
     if(typeof m.scoringVersion!=='string'||!m.scoringVersion)
       throw new Error('Missing historical scoring version');
