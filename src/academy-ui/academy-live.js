@@ -13,12 +13,13 @@ function chooseQuestion(bridge){
   const q=bridge.question;
   if(!q) return '';
   const waiting=bridge.phase==='answering';
-  const isDiscard=q.taskType==='discard';
+  const isDiscard=q.taskType==='discard',scenario=q.taskType==='scenario';
   const choices=q.prompt.options;
   const selected=new Set(bridge.choice);
   const hand= q.prompt.legacyHand.map((tile,i)=>'<span class="academy-hand-tile tile" role="img" aria-label="第'+(i+1)+'張 '+escapeHTML(tileAccessibleName(tile))+'">'+tileFaceMarkup(tile)+'</span>').join('');
   // No answerKey and no raw GameState. All buttons receive public tile options.
-  const options=(isDiscard?q.prompt.legacyHand:choices).map((tile,i)=>{
+  const options=scenario?choices.map(id=>'<button type="button" class="academy-action secondary" data-live-action="choose-scenario" data-option="'+escapeHTML(id)+'" aria-pressed="'+String(selected.has(id))+'"'+(!waiting?' disabled':'')+'>'+escapeHTML(q.prompt.optionLabels[id])+'</button>').join(''):
+    (isDiscard?q.prompt.legacyHand:choices).map((tile,i)=>{
     const available=choices.includes(tile);
     return '<button type="button" class="academy-choice tile" data-live-action="choose" data-tile="'+tile+'"'+
       ' aria-pressed="'+String(selected.has(tile))+'" aria-label="'+escapeHTML(tileAccessibleName(tile))+
@@ -42,13 +43,14 @@ function chooseQuestion(bridge){
     +'<p>'+escapeHTML(q.instructionsZhTW??(isDiscard?'請選擇捨牌':'選出全部胡牌張'))+'</p>'
     +'<p class="academy-caption">QuestionPublic · 僅顯示玩家可見牌張；作答前不顯示答案或正確性</p>'
     +'<h3>手牌 '+q.prompt.legacyHand.length+' 張</h3><div class="academy-live-hand" role="group" aria-label="公開手牌">'+hand+'</div>'
-    +'<h3>'+(isDiscard?'選一張棄牌':'從 34 種牌中選出所有胡牌張')+'</h3><div class="academy-choice-grid" role="group" aria-label="合法作答選項">'+options+'</div>'
-    +'<p id="academy-selected" aria-live="polite">已選 '+selected.size+' 種牌'+(selected.size?'：'+bridge.choice.map(tileAccessibleName).join('、'):'')+'</p>'
-    +(waiting?button('確認送出正式評分','submit',isDiscard&&!bridge.choice.length?'disabled':'','primary'):'')
+    +(scenario?'<p>固定面子 '+q.prompt.playerView.self.melds.length+' 組；已知明牌：</p><div class="academy-live-hand">'+q.prompt.visibleTiles.map(tileFaceMarkup).join('')+'</div>':'')
+    +'<h3>'+(scenario?'選擇合法動作':isDiscard?'選一張棄牌':'從 34 種牌中選出所有胡牌張')+'</h3><div class="academy-choice-grid" role="group" aria-label="合法作答選項">'+options+'</div>'
+    +'<p id="academy-selected" aria-live="polite">已選 '+selected.size+(scenario?' 個動作':' 種牌')+(selected.size?'：'+escapeHTML(bridge.choice.map(x=>scenario?q.prompt.optionLabels[x]:tileAccessibleName(x)).join('、')):'')+'</p>'
+    +(waiting?button('確認送出正式評分','submit',(isDiscard||scenario)&&!bridge.choice.length?'disabled':'','primary'):'')
     +(bridge.warning?reason(bridge.warning):'')+(bridge.error?reason(bridge.error):'')+feedback
-    +(bridge.phase==='saved'?'<p class="academy-success" role="status">已經讀回確認：原始 v3 紀錄、課程關聯、Adaptive 能力與複習資料均已更新。</p>':'')
+    +(bridge.phase==='saved'?'<p class="academy-success" role="status">'+(scenario?'已經讀回確認：Academy V1 情境紀錄、Adaptive 能力與複習資料均已更新。':'已經讀回確認：原始 v3 紀錄、課程關聯、Adaptive 能力與複習資料均已更新。')+'</p>':'')
     +(bridge.phase==='partial'?reason('僅部分資料已保存。不可視為完成完整學習閉環；請核對後再繼續。'):'')
-    +((bridge.phase==='saved')?button('下一題','next','','primary')+button('返回原課程','return-lesson'):'')
+    +((bridge.phase==='saved')?(scenario?'':button('下一題','next','','primary'))+button('返回原課程','return-lesson'):'')
     +((bridge.phase==='failed'||bridge.phase==='partial')?button('重新載入並核對紀錄','reload'):'')
     +'</section>';
 }
@@ -77,6 +79,7 @@ function lessonsView(b) {
       '<h3>教學內容</h3>'+current.contentBlocks.filter(x=>x.kind!=='tile-example').map(x=>'<p>'+escapeHTML(x.content)+'</p>').join('')+
       '<p class="academy-caption">目前課程狀態：'+escapeHTML(current.status)+'。尚未驗證的攻防、台數及模擬不計分。</p>'+
       button(b.canStart(current)?'開始／繼續此課程':'先完成先修課程','begin-lesson','data-lesson="'+escapeHTML(current.lessonId)+'"'+(!b.canStart(current)?' disabled':''),'primary')+
+      (b.scenarioRefs?.(current.lessonId).length?button('客觀情境評估（獨立正式紀錄）','begin-scenario','data-lesson="'+escapeHTML(current.lessonId)+'"'+(!b.canStart(current)?' disabled':'')):'')+
       '</section>':'')+'</div>'
     +chooseQuestion(b);
 }
@@ -103,7 +106,7 @@ function todayView(b){
     +(due.length?due.slice(0,6).map(x=>{
       const link=b.reviewLink(x);
       return '<div class="academy-queue-row"><div><strong>'+escapeHTML(x.skillTagIds.join('、')||x.questionId)+'</strong><small>'+escapeHTML(x.questionId)+' · '+date(x.dueAt)+'</small></div>'+
-        (link?button('重做','review-question','data-lesson="'+escapeHTML(link.lessonId)+'" data-question="'+escapeHTML(link.questionId)+'" data-version="'+escapeHTML(link.questionVersion)+'"'):'<span class="academy-muted">須由正式題庫映射才能重做</span>')+'</div>';
+        (link?button('重做',link.scenario?'review-scenario':'review-question','data-lesson="'+escapeHTML(link.lessonId)+'" data-question="'+escapeHTML(link.questionId)+'" data-version="'+escapeHTML(link.questionVersion)+'"'):'<span class="academy-muted">須由正式題庫映射才能重做</span>')+'</div>';
     }).join(''):'<p>沒有到期的可重播題目，不代表能力已達標。</p>')+'</section>'
     +'<section class="academy-surface"><h2>訓練 Session</h2><p>'+
       (b.session?'來源：TrainingSession · '+escapeHTML(b.session.status??'未知狀態'):'正式 TrainingSession 尚未由 AI 6 的 Public Façade 提供；不建立假的每日課表。')+'</p></section>';

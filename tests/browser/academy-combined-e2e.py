@@ -155,6 +155,79 @@ def run(out):
         take(page,out,'mobile-390-quota-fail-closed.png')
         results['quota']={'scored_as_durable':False,'legacy_record_written':False}
         ctx.close()
+        # Independent official scenario path; never inject a fake scorer or record.
+        ctx=browser.new_context(viewport={'width':390,'height':844},service_workers='allow')
+        page=ctx.new_page()
+        page.goto(base,wait_until='networkidle')
+        live_ready(page)
+        page.locator('[data-live-action="select-lesson"][data-lesson="academy-l1-01"]').click()
+        page.locator('[data-live-action="begin-scenario"]').click()
+        page.locator('[data-live-action="choose-scenario"]').first.click()
+        take(page,out,'r73-scenario-answering.png')
+        page.locator('[data-live-action="submit"]').click()
+        page.locator('#academy-grade').wait_for(timeout=45000)
+        check(page.locator('.academy-success').is_visible(),'scenario not durably saved')
+        check('Academy V1' in page.locator('.academy-success').inner_text(),'wrong record family')
+        proof=page.evaluate("""() => {
+          const s=JSON.parse(localStorage.getItem('tw-mahjong-master-academy:state:v1'));
+          return {records:s.academyRecords.length,questions:s.academyQuestions.length,
+            record:s.academyRecords[0],links:s.provenanceLinks.length,
+            ability:s.abilityProfile.sourceRecordRefs,review:s.reviewPlan.items,
+            v3:localStorage.getItem('tw-mahjong-trainer:archive:v3')};
+        }""")
+        check(proof['records']==1 and proof['questions']==1 and proof['links']==0 and proof['v3'] is None,
+              'scenario incorrectly minted v3 or duplicate record')
+        check(any(r['kind']=='academy-v1' and r['id']==proof['record']['id'] for r in proof['ability']),
+              'scenario ability evidence missing')
+        check(any(i['questionId']=='academy-scenario-tile-identity' and
+                  not any(r.startswith('unavailable:') for r in i['reasonCodes']) for i in proof['review']),
+              'scenario review evidence unavailable')
+        take(page,out,'r73-scenario-saved.png')
+        page.wait_for_function("() => Boolean(navigator.serviceWorker.controller)",timeout=30000)
+        ctx.set_offline(True)
+        nextpage=ctx.new_page()
+        nextpage.goto(base,wait_until='domcontentloaded',timeout=30000)
+        live_ready(nextpage)
+        nextpage.locator('[data-live-action="select-lesson"][data-lesson="academy-l1-01"]').click()
+        nextpage.locator('[data-live-action="begin-scenario"]').click()
+        check(nextpage.locator('[data-live-action="choose-scenario"]').count()==17,
+              'offline new tab lost registered scenario')
+        check(nextpage.evaluate("""() => JSON.parse(localStorage.getItem(
+          'tw-mahjong-master-academy:state:v1')).academyRecords.length""")==1,'offline reload duplicated record')
+        take(nextpage,out,'r73-scenario-offline.png')
+        ctx.close()
+        # Actual Daily UI with explicit scenario mode, separate origin context.
+        ctx=browser.new_context(viewport={'width':390,'height':844})
+        page=ctx.new_page()
+        page.goto(base,wait_until='networkidle')
+        page.locator('[data-table-nav="daily"]').click(timeout=45000)
+        page.locator('#daily-mode').wait_for(timeout=45000)
+        page.locator('#daily-mode').select_option('scenario')
+        page.locator('[data-daily-start]').click()
+        page.locator('[data-daily-question-ref]').wait_for(timeout=45000)
+        check('academy-scenario-tile-identity@1.0.0'==
+              page.locator('[data-daily-question-ref]').get_attribute('data-daily-question-ref'),
+              'Daily selected a locked, unpublished or wrong-version scenario')
+        page.locator('[name="daily-answer"]').first.check()
+        page.evaluate("""() => {const b=document.querySelector('[data-daily-submit]');b.click();b.click();}""")
+        page.locator('[data-daily-state="saved"][data-daily-record-id]').wait_for(timeout=45000)
+        check(page.evaluate("""() => {
+          const s=JSON.parse(localStorage.getItem('tw-mahjong-master-academy:state:v1'));
+          return s.academyRecords.length===1 && s.trainingSessions.length===1 &&
+            s.trainingSessions[0].status==='completed' &&
+            s.trainingSessions[0].recordRefs.length===1 &&
+            s.trainingSessions[0].recordRefs[0].kind==='academy-v1' &&
+            localStorage.getItem('tw-mahjong-trainer:archive:v3')===null;
+        }"""),'scenario Daily did not durably link exactly one real record')
+        take(page,out,'r73-daily-saved.png')
+        page.reload(wait_until='networkidle')
+        page.locator('[data-table-nav="daily"]').click(timeout=45000)
+        page.wait_for_function("""() => document.querySelector('[data-daily-state="ready"]') &&
+          document.querySelector('#full-table-root').innerText.includes('1 / 1')""",timeout=45000)
+        take(page,out,'r73-daily-reload.png')
+        results['r73_scenario']={'academy_record':True,'ability_review':True,
+          'offline_new_tab':True,'daily_ui':True,'daily_reload':True,'no_v3_shadow':True}
+        ctx.close()
         browser.close()
         (out/'combined-academy-e2e.json').write_text(json.dumps(results,indent=2),encoding='utf-8')
         print('PASS REAL COMBINED ACADEMY '+json.dumps(results))

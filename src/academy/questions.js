@@ -5,6 +5,9 @@ import { createDecisionRecord, validateDecisionRecord } from '../training/record
 import { tileLabel } from '../tiles.js';
 import { createAcademyProvenance } from './provenance.js';
 import { getErrorType, CONTRACT_VERSION, SCHEMA_VERSION } from './registry.js';
+import { getScenarioPublicQuestion, getScenarioFullQuestion, listScenarioQuestionRefs,
+  gradeScenarioQuestion } from './scenario-scorers.js';
+import { createAcademyDecisionRecord } from './records.js';
 
 const clone=x=>JSON.parse(JSON.stringify(x));
 function resolve(ref) {
@@ -16,11 +19,13 @@ function resolve(ref) {
   return spec;
 }
 export function listQuestionRefs({lessonId,taskType}={}) {
+  if(taskType==='scenario')return listScenarioQuestionRefs({lessonId});
   return QUESTION_REFS.filter((ref,i)=>
     (lessonId==null || BANK_SPEC[i].lessonId===lessonId) &&
     (taskType==null || BANK_SPEC[i].taskType===taskType)).map(clone);
 }
 export function toPublicQuestion(questionRef) {
+  if(questionRef?.questionId?.startsWith('academy-scenario-'))return getScenarioPublicQuestion(questionRef);
   const spec=resolve(questionRef);
   const q=getFullQuestion(spec.questionId);
   // Construct exclusively from a strict allowlist; never spread internal objects.
@@ -125,12 +130,19 @@ function grade(ref,choice,{durationMs=0,timestamp='2000-01-01T00:00:00.000Z',att
   return {gradingResult,record};
 }
 export function gradeAcademyQuestion(ref,choice) {
+  if(ref?.questionId?.startsWith('academy-scenario-'))return gradeScenarioQuestion(ref,choice);
   return grade(ref,choice).gradingResult;
 }
-/** The only official records created here are legacy-v3; scenarios use their own sidecar. */
+/** Structural submissions use canonical v3; registered scenarios use academy-v1 only. */
 export function submitAcademyAnswer(ref,choice,{durationMs,timestamp,attemptId}={}) {
   if(durationMs===undefined || timestamp===undefined)
     throw new TypeError('正式作答必須提供 durationMs 與 timestamp');
+  if(ref?.questionId?.startsWith('academy-scenario-')){
+    const question=getScenarioPublicQuestion(ref);
+    const record=createAcademyDecisionRecord(getScenarioFullQuestion(ref),choice,{durationMs,timestamp,attemptId});
+    return {gradingResult:gradeScenarioQuestion(ref,choice),record,
+      recordRef:{kind:'academy-v1',id:record.id},question};
+  }
   const {gradingResult,record}=grade(ref,choice,{durationMs,timestamp,attemptId});
   const provenance=createAcademyProvenance(record,ref);
   return {gradingResult,record,recordRef:{kind:'legacy-v3',id:record.id},provenance};

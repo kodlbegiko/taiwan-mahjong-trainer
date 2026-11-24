@@ -6,7 +6,8 @@ export { ACADEMY_QUESTION_VERSION,QUESTION_REFS } from './catalog.js';
 export { listQuestionRefs,toPublicQuestion,listPublicQuestions,gradeAcademyQuestion,
   submitAcademyAnswer } from './questions.js';
 export { createAcademyDecisionRecord,validateAcademyDecisionRecord,toRecordRef } from './records.js';
-export { VERIFIED_SCENARIO_SCORER_COUNT } from './scenario-scorers.js';
+export { VERIFIED_SCENARIO_SCORER_COUNT, SCENARIO_SCORING_VERSION,
+  listScenarioQuestionRefs, getScenarioPublicQuestion, gradeScenarioQuestion, validateScenarioQuestion } from './scenario-scorers.js';
 export {
   ACADEMY_PROVENANCE_VERSION, getAcademyExerciseMapping,
   findAcademyQuestionByExerciseId, createAcademyProvenance,

@@ -62,7 +62,7 @@ export function createDailyTrainingController(storage, {
 
   function sourceVerified(q) {
     try {
-      if(!q || Object.hasOwn(q,'answerKey') || q.status!=='validated' || !['discard','tenpai','multi_wait'].includes(q.taskType) ||
+      if(!q || Object.hasOwn(q,'answerKey') || q.status!=='validated' || !['discard','tenpai','multi_wait','scenario'].includes(q.taskType) ||
         !q.generator || !Array.isArray(q.prompt?.options) || !q.prompt.options.length ||
         !Array.isArray(q.skillTagIds) || !q.skillTagIds.length ||
         !q.lessonRef || typeof q.lessonRef.lessonId!=='string') return false;
@@ -70,16 +70,20 @@ export function createDailyTrainingController(storage, {
       const authoritative=learning.toPublicQuestion(ref);
       if(!same(q,authoritative)) return false;
       const lesson=learning.getLessonPublic(q.lessonRef.lessonId);
-      if(lesson?.status!=='published' ||
-        !lesson.questionRefs.some(r=>id(r)===id(ref))) return false;
-      const choice=q.taskType==='discard'?Number(q.prompt.options[0]):[];
+      if(lesson?.status!=='published'||lesson.lessonVersion!==q.lessonRef.lessonVersion)return false;
+      if(q.taskType==='scenario'){
+        if(typeof learning.listScenarioQuestionRefs!=='function'||typeof learning.validateScenarioQuestion!=='function'||
+           !learning.listScenarioQuestionRefs({lessonId:lesson.lessonId}).some(r=>id(r)===id(ref))||
+           learning.validateScenarioQuestion(q,{publicOnly:true})!==true)return false;
+      }else if(!lesson.questionRefs.some(r=>id(r)===id(ref)))return false;
+      const choice=q.taskType==='scenario'?q.prompt.options[0]:q.taskType==='discard'?Number(q.prompt.options[0]):[];
       const grade=learning.gradeAcademyQuestion(ref,choice);
       return grade?.status==='graded' &&
         grade?.scoringVersion!==undefined && grade?.scoringVersion!==null;
     } catch { return false; }
   }
 
-  function publishedCatalog() {
+  function publishedCatalog(mode='structural') {
     const lessons=learning.listLessons().filter(l=>l.status==='published');
     // A published lesson is not automatically unlocked. Do not infer
     // completion from quiz scores: use durable canonical provenance only.
@@ -91,8 +95,9 @@ export function createDailyTrainingController(storage, {
     const unlocked=lessons.filter(lesson=>
       (lesson.prerequisiteLessonIds??[]).every(dep=>completedLessons.has(dep)));
     const unique=new Map();
-    for(const lesson of unlocked)for(const ref of learning.listQuestionRefs({lessonId:lesson.lessonId})){
-      if(!lesson.questionRefs.some(r=>id(r)===id(ref))) continue;
+    for(const lesson of unlocked)for(const ref of (mode==='scenario'?
+      (learning.listScenarioQuestionRefs?.({lessonId:lesson.lessonId})??[]):learning.listQuestionRefs({lessonId:lesson.lessonId}))){
+      if(mode==='structural'&&!lesson.questionRefs.some(r=>id(r)===id(ref))) continue;
       const q=learning.toPublicQuestion(ref);
       if(!sourceVerified(q)) continue;
       unique.set(id(ref),{
@@ -121,9 +126,10 @@ export function createDailyTrainingController(storage, {
     return clone(session);
   }
 
-  function ensureToday({asOf,minutes=30}={}) {
+  function ensureToday({asOf,minutes=30,mode='structural'}={}) {
     const at=utc(asOf);
     if(![10,20,30,60].includes(minutes)) throw new RangeError('Unsupported DailySession length');
+    if(!['structural','scenario'].includes(mode))throw new RangeError('Unsupported DailySession mode');
     const {day,session:existing}=daySessions(at);
     if(existing) { validateTrainingSession(existing); return clone(existing); }
     const initial=adaptive.rebuild({asOf:at});
@@ -131,11 +137,13 @@ export function createDailyTrainingController(storage, {
       'Cannot create a DailySession without durable storage');
     const state=adaptive.load();
     if(!state.abilityProfile||!state.reviewPlan)throw new RangeError('Canonical ability/review not available');
-    const catalog=publishedCatalog();
+    const catalog=publishedCatalog(mode);
     const {session}=planDailyTraining({
       profile:state.abilityProfile,reviewPlan:state.reviewPlan,
-      records:adaptive.readLegacy().archive.records,
-      provenanceLinks:state.provenanceLinks??[],learning,registry,
+      // The published/unlocked catalog is already authoritative. Historical
+      // records influence the rebuilt profile and review plan above; do not
+      // reintroduce retired or conflicting historical candidates here.
+      records:[],provenanceLinks:[],learning,registry,
       validateAcademyDecisionRecord,
       validateAcademyQuestion:sourceVerified,
       questionCatalog:catalog,minutes,asOf:at,
@@ -145,7 +153,7 @@ export function createDailyTrainingController(storage, {
     if(!session.questionRefs.length)throw new RangeError('No verified questions selected; session refused');
     session.extensions['adaptive.daily']={
       schemaVersion:1,algorithmVersion:DAILY_TRAINING_VERSION,
-      timezone,dayKey:day,source:'canonical-learning-published-only',
+      timezone,dayKey:day,source:'canonical-learning-published-only',...(mode==='scenario'?{mode}:{}),
     };
     // The V1 Adaptive sidecar is the sole persisted session authority.
     validateTrainingSession(session);
@@ -165,16 +173,27 @@ export function createDailyTrainingController(storage, {
     if(!sourceVerified(q))throw new RangeError('Question version/scorer no longer verified');
     return clone(q);
   }
+  function completedRows(state,session){
+    const links=(state.provenanceLinks??[]).filter(x=>x.sessionId===session.sessionId)
+      .map(p=>({questionRef:clone(p.academyQuestionRef),recordRef:clone(p.recordRef)}));
+    for(const ref of session.recordRefs.filter(r=>r.kind==='academy-v1')){
+      const record=state.academyRecords.find(r=>r.id===ref.id);
+      if(!record)throw new RangeError('Missing scenario session record');
+      links.push({questionRef:clone(record.questionRef),recordRef:clone(ref)});
+    }
+    const keys=new Set(links.map(x=>id(x.questionRef)));
+    if(keys.size!==links.length||links.some(x=>!session.questionRefs.some(q=>id(q)===id(x.questionRef))))
+      throw new RangeError('Corrupted DailySession provenance');
+    return links;
+  }
   function progress({asOf}={}) {
     const at=utc(asOf),session=readToday({asOf:at});
     if(!session)return null;
     adaptive.rebuild({asOf:at});
     const persisted=adaptive.getSession(session.sessionId);
     const state=adaptive.load();
-    const linked=(state.provenanceLinks??[]).filter(x=>x.sessionId===session.sessionId);
-    const seen=new Set(linked.map(x=>id(x.academyQuestionRef)));
-    if(seen.size!==linked.length||linked.some(x=>!session.questionRefs.some(q=>id(q)===id(x.academyQuestionRef))))
-      throw new RangeError('Corrupted DailySession provenance');
+    const linked=completedRows(state,persisted);
+    const seen=new Set(linked.map(x=>id(x.questionRef)));
     return {session:clone(persisted),completed:seen.size,total:session.questionRefs.length,
       nextQuestionRef:clone(session.questionRefs.find(q=>!seen.has(id(q)))??null)};
   }
@@ -184,6 +203,22 @@ export function createDailyTrainingController(storage, {
   function proveDurableAnswer(sessionId,questionRef,recordRef) {
     const fail=reason=>{ throw new AcademyStorageError('DURABLE_PROOF_FAILED',
       'Canonical Daily durability evidence is incomplete: '+reason); };
+    if(recordRef?.kind==='academy-v1'){
+      const state=adaptive.load(),session=state.trainingSessions.find(s=>s.sessionId===sessionId);
+      const record=state.academyRecords.find(r=>r.id===recordRef.id);
+      const q=state.academyQuestions.find(x=>id(x)===id(questionRef));
+      if(!record||!q||id(record.questionRef)!==id(questionRef)||
+        validateAcademyDecisionRecord(record,{question:q})!==true||
+        !session||session.extensions?.['adaptive.daily']?.mode!=='scenario'||
+        session.recordRefs.filter(r=>r.kind==='academy-v1'&&r.id===recordRef.id).length!==1||
+        !session.questionRefs.some(r=>id(r)===id(questionRef)))fail('scenario-record-proof');
+      if(!state.abilityProfile?.sourceRecordRefs?.some(r=>r.kind==='academy-v1'&&r.id===recordRef.id)||
+        !state.reviewPlan?.items?.some(item=>id(item)===id(questionRef)&&
+          item.sourceRecordRefs.some(r=>r.kind==='academy-v1'&&r.id===recordRef.id)))
+        fail('scenario-derived-proof');
+      return {status:'verified',archive:'academy-v1',recordRef:clone(recordRef),
+        sessionId,sidecarRevision:state.revision,abilityEvidence:true,reviewPlanId:state.reviewPlan.planId};
+    }
     if(recordRef?.kind!=='legacy-v3' || typeof recordRef.id!=='string')fail('record-ref');
     const {archive,hasCanonicalV3}=adaptive.readLegacy();
     if(!hasCanonicalV3)fail('archive-v3-missing');
@@ -217,6 +252,15 @@ export function createDailyTrainingController(storage, {
     // Terminal means no submissions, including retries of already-answered
     // questions. Resume/review must use the read-only API instead.
     if(!['planned','active'].includes(day.status))throw new RangeError('DailySession is terminal');
+    if(day.extensions?.['adaptive.daily']?.mode==='scenario'){
+      try{
+        adaptive.rebuild({asOf:at});
+        const state=adaptive.load(),session=adaptive.getSession(day.sessionId);
+        const prior=completedRows(state,session).find(p=>id(p.questionRef)===id(ref));
+        if(prior)return {status:'already-answered',recordRef:clone(prior.recordRef),
+          durabilityProof:proveDurableAnswer(day.sessionId,ref,prior.recordRef),session};
+      }catch(error){return {status:'recovery-required',errorCode:error.code??'RECOVERY_FAILED',message:error.message,session:day};}
+    }
     const existing=(adaptive.load().provenanceLinks??[]).find(p=>
       p.sessionId===day.sessionId&&id(p.academyQuestionRef)===id(ref));
     if(existing)return {status:'already-answered',
@@ -279,9 +323,7 @@ export function createDailyTrainingController(storage, {
         nextStep:'start',abilityProfile:null,reviewPlan:null,error:null};
       const state=adaptive.load();
       const session=current.session;
-      const links=(state.provenanceLinks??[]).filter(p=>p.sessionId===session.sessionId);
-      const completed=links.map(p=>({questionRef:clone(p.academyQuestionRef),
-        recordRef:clone(p.recordRef)}));
+      const completed=completedRows(state,session);
       const answered=new Set(completed.map(p=>id(p.questionRef)));
       const remaining=session.questionRefs.filter(q=>!answered.has(id(q)));
       const ability=state.abilityProfile;
