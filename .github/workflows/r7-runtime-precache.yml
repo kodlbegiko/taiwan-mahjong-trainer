@@ -1,0 +1,139 @@
+name: R7 Runtime Precache Contract
+on:
+  pull_request:
+    branches: [integration/mahjong-full-game]
+    paths:
+      - 'src/**'
+      - 'public/**'
+      - 'data/**'
+      - 'index.html'
+      - 'sw.js'
+      - 'scripts/runtime-precache.mjs'
+      - '.github/workflows/r7-runtime-precache.yml'
+  push:
+    branches: [integration/mahjong-full-game]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  graph:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-save --package-lock=false --ignore-scripts acorn@8.15.0
+      - name: Audit actual checkout ESM graph and complete cache inventory
+        run: |
+          mkdir -p r7-graph
+          git rev-parse HEAD > r7-graph/tested-sha.txt
+          node scripts/runtime-precache.mjs > r7-graph/runtime-graph.json
+      - name: Prove a newly added uncached module fails the gate
+        run: |
+          set -euo pipefail
+          probe=src/r7-precache-omission-probe.js
+          test ! -e "$probe"
+          trap 'rm -f "$probe"' EXIT
+          printf 'export const uncached = true;\n' > "$probe"
+          if node scripts/runtime-precache.mjs > r7-graph/negative-probe.txt 2>&1; then
+            echo "Uncached module incorrectly passed" >&2
+            exit 1
+          fi
+          grep -q 'Runtime JS inventory differs' r7-graph/negative-probe.txt
+          echo "PASS: uncached runtime module rejected" >> r7-graph/negative-probe.txt
+      - name: Prove a runtime import of a QA-only module fails the gate
+        run: |
+          set -euo pipefail
+          entry=src/app.js
+          qa=src/academy/content-audit.js
+          cp "$entry" "$RUNNER_TEMP/r7-app-original.js"
+          created=0
+          if test ! -f "$qa"; then
+            printf 'export const qaOnly = true;\n' > "$qa"
+            created=1
+          fi
+          trap 'cp "$RUNNER_TEMP/r7-app-original.js" "$entry"; if test "$created" = 1; then rm -f "$qa"; fi' EXIT
+          printf '\nimport "./academy/content-audit.js";\n' >> "$entry"
+          if node scripts/runtime-precache.mjs > r7-graph/qa-import-negative-probe.txt 2>&1; then
+            echo "QA-only runtime import incorrectly passed" >&2; exit 1
+          fi
+          grep -q 'needs uncached/missing src/academy/content-audit.js' r7-graph/qa-import-negative-probe.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r7-runtime-graph
+          path: r7-graph
+
+  combined-candidate:
+    # Pinned R7.2 application + PR50-owned R7.3 fix; no push or engine edits.
+    if: github.event_name == 'pull_request' && github.event.pull_request.number == 50
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: npm install --no-save --package-lock=false --ignore-scripts acorn@8.15.0
+      - run: python -m pip install playwright==1.56.0
+      - name: Compose exact R7.2 base and PR50 owned transaction fix in runner only
+        id: compose
+        run: |
+          set -euo pipefail
+          mkdir -p r7-combined-evidence
+          git rev-parse HEAD > r7-combined-evidence/pr50-sha.txt
+          git config user.name "R7 integration QA"
+          git config user.email "r7-qa@example.invalid"
+          fix_sha=$(git rev-parse HEAD)
+          integrated=793bbb1caeef79b94e0bb29bf2ea66b3f7c43f4d
+          git cat-file -e "$integrated^{commit}" || git fetch --no-tags origin "$integrated"
+          git checkout --detach "$integrated"
+          # Apply only SW/test/contract changes from this PR; preserve R7.2 game code.
+          git checkout "$fix_sha" -- scripts/runtime-precache.mjs tests/pwa/mobile-update-gates.py tests/pwa/sw-transaction.test.js tests/browser/_release_site.py
+          # SW is owned by PR50; restore its implementation, then regenerate the
+          # complete integrated inventory/version from the actual composed tree.
+          git checkout "$fix_sha" -- sw.js
+          git add sw.js scripts/runtime-precache.mjs tests/pwa tests/browser/_release_site.py
+          node scripts/runtime-precache.mjs --write > r7-combined-evidence/runtime-graph.json
+          git add sw.js
+          git commit -m "R7.3 isolated transaction candidate"
+          git rev-parse HEAD > r7-combined-evidence/composed-source-sha.txt
+          node scripts/runtime-precache.mjs > /dev/null
+          node --test tests/pwa/sw-transaction.test.js
+          # R7-008 negative probe on actual integrated source (not a missing file).
+          cp src/app.js "$RUNNER_TEMP/r7-app-original.js"
+          trap 'cp "$RUNNER_TEMP/r7-app-original.js" src/app.js' EXIT
+          printf '\nimport "./academy/content-audit.js";\n' >> src/app.js
+          if node scripts/runtime-precache.mjs > r7-combined-evidence/qa-import-negative-probe.txt 2>&1; then
+            echo "QA-only runtime import passed" >&2; exit 1
+          fi
+          grep -q 'needs uncached/missing src/academy/content-audit.js' r7-combined-evidence/qa-import-negative-probe.txt
+          cp "$RUNNER_TEMP/r7-app-original.js" src/app.js
+          trap - EXIT
+          cp sw.js r7-combined-evidence/generated-sw.txt
+          git hash-object sw.js > r7-combined-evidence/generated-sw-blob.txt
+      - name: Candidate viewport and accessibility regression
+        if: steps.compose.outcome == 'success'
+        run: python tests/browser/mobile-pwa-a11y-gates.py --evidence r7-combined-evidence/viewport
+      - name: Candidate PWA cold start and update rollback
+        if: always() && steps.compose.outcome == 'success'
+        run: PHASE3_REQUIRE_SINGLE_WINNER=1 python tests/pwa/mobile-update-gates.py --with-game-history --evidence r7-combined-evidence/pwa
+      - name: Candidate full round, settlement, Replay, Daily and offline reload
+        if: always() && steps.compose.outcome == 'success'
+        run: PHASE3_REQUIRE_SINGLE_WINNER=1 python tests/browser/full-table-ui-r3-gates.py --screenshots r7-combined-evidence/full-match
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r7-combined-candidate-evidence
+          path: r7-combined-evidence
+          if-no-files-found: warn
+          retention-days: 14
