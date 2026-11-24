@@ -1,7 +1,7 @@
 /* Offline-first, atomic shell for GitHub Pages root or /repo/ deployments.
  * IMPORTANT: change CACHE_VERSION whenever any precached file changes.
  * The install event only succeeds if the entire listed release is cached. */
-const CACHE_VERSION = 'tmt-v02-realistic-tiles-master-academy-phase3-r7-mobile-pwa-a11y-20261124-r7.1';
+const CACHE_VERSION = 'tmt-v02-realistic-tiles-master-academy-phase3-r7-mobile-pwa-a11y-20261124-r7.1b';
 const SHELL_CACHE = `tmt-shell-${CACHE_VERSION}`;
 const BASE = new URL('./', self.location.href);
 const SHELL = [
@@ -153,7 +153,9 @@ self.addEventListener('fetch', event => {
   if (url.origin !== BASE.origin || !url.pathname.startsWith(BASE.pathname)) return;
   // HTML fallback for the application URL, never a cross-origin or API response.
   const requestedPath = url.pathname === BASE.pathname ? BASE.pathname : url.pathname;
-  if (!SHELL_PATHS.has(requestedPath) && event.request.mode !== 'navigate') return;
+  const runtimeModule = requestedPath.startsWith(new URL('./src/', BASE).pathname) &&
+    /\.(?:m?js|css)$/.test(requestedPath);
+  if (!SHELL_PATHS.has(requestedPath) && !runtimeModule && event.request.mode !== 'navigate') return;
   event.respondWith((async () => {
     const cache = await caches.open(SHELL_CACHE);
     const canonical = event.request.mode === 'navigate'
@@ -163,7 +165,7 @@ self.addEventListener('fetch', event => {
     if (cached) return cached;
     // A controlled client must never mix older HTML with a newer uncached JS/CSS
     // byte. Cache corruption or an incomplete deploy fails closed instead.
-    if (SHELL_PATHS.has(requestedPath) || event.request.mode === 'navigate') {
+    if (SHELL_PATHS.has(requestedPath) || runtimeModule || event.request.mode === 'navigate') {
       return Response.error();
     }
     return fetch(event.request);

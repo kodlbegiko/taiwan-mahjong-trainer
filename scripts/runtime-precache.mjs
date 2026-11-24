@@ -1,12 +1,12 @@
 /* R7.1 build/audit tool, not browser runtime. Requires pinned acorn (see CI). */
 import { readFileSync, readdirSync, existsSync, statSync, writeFileSync } from 'node:fs';
-import { join, posix, resolve } from 'node:path';
+import { join, posix } from 'node:path';
 import { createHash } from 'node:crypto';
 import { parse } from 'acorn';
 const read = path => readFileSync(path, 'utf8');
 const list = dir => readdirSync(dir, { withFileTypes: true }).flatMap(e =>
   e.isDirectory() ? list(join(dir, e.name)) : [join(dir, e.name)]);
-const inventory = list('src').filter(p => p.endsWith('.js')).sort();
+const inventory = list('src').filter(p => /\.m?js$/.test(p)).sort();
 const marker = /  \/\/ BEGIN GENERATED RUNTIME JS[^\n]*\n[\s\S]*?  \/\/ END GENERATED RUNTIME JS/;
 let sw = read('sw.js');
 if (!marker.test(sw)) throw Error('Generated SW inventory markers missing');
@@ -29,7 +29,7 @@ function dep(owner, spec, kind) {
   const p = posix.normalize(posix.join(posix.dirname(owner), spec));
   requireAsset(p, owner);
   edges.push({from:owner, to:p, kind});
-  if (p.endsWith('.js')) visit(p);
+  if (/\.m?js$/.test(p)) visit(p);
 }
 function walk(n, fn) {
   if (!n || typeof n !== 'object') return;

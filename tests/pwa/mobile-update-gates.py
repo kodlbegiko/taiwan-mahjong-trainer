@@ -2,8 +2,10 @@
 import argparse
 import json
 import re
+import sys
 from pathlib import Path
 from playwright.sync_api import sync_playwright
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'browser'))
 from _release_site import served_site
 
 def require(value, why):
@@ -73,6 +75,20 @@ def main():
                 }""")
                 require(integrity, 'old controller fell back to network on missing shell JS')
                 results.append({'case': 'missing-old-js-fails-closed', 'status': 'PASS'})
+                # A new module deployed after installation is not part of the old
+                # release. Even while online the controller must refuse its bytes.
+                probe = app / 'src/r7-uncached-module-probe.js'
+                probe.write_text('export const probe = true;', encoding='utf-8')
+                try:
+                    refused = page.evaluate("""async () => {
+                      try { await fetch('./src/r7-uncached-module-probe.js'); return false; }
+                      catch (error) { return true; }
+                    }""")
+                    require(refused, 'old shell accepted an unlisted runtime module')
+                    results.append({'case': 'unlisted-runtime-module-fails-closed', 'status': 'PASS'})
+                finally:
+                    probe.unlink()
+
 
                 sw = app / 'sw.js'
                 missing = app / 'src/academy-ui/academy.css'
