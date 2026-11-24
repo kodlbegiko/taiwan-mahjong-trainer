@@ -67,6 +67,21 @@ def check_cache(page, generation, expected):
       return actual;
     }""", {'generation': generation, 'paths': list(expected)})
     require(actual == expected, 'Cached runtime bytes differ from checkout')
+    # CacheStorage parity alone does not prove the page receives those bytes.
+    # Check the controlled fetch path without bypassing its Service Worker.
+    delivered = page.evaluate("""async paths => {
+      if(!navigator.serviceWorker.controller) throw Error('Uncontrolled module client');
+      const actual={};
+      for(const path of paths){
+        const response=await fetch(new URL(path,location.href),{cache:'no-store'});
+        if(!response.ok)throw Error('Controlled module fetch failed '+path);
+        const hash=await crypto.subtle.digest('SHA-256',await response.arrayBuffer());
+        actual[path]=Array.from(new Uint8Array(hash),b=>b.toString(16).padStart(2,'0')).join('');
+      }
+      return actual;
+    }""", list(expected))
+    require(delivered == expected, 'Controlled fetch runtime differs from checkout: ' +
+            repr([p for p in expected if delivered.get(p) != expected[p]]))
 
 def seed_archive(page, fixture):
     # Seed only the committed synthetic archive, representing an existing user
@@ -153,8 +168,10 @@ def update_worker(page, url, old_generation, new_generation):
       const names=await caches.keys();
       return names.includes(newName)&&!names.includes(oldName);
     }""", arg={'oldName': old_generation, 'newName': new_generation}, timeout=30000)
-    ready(page, url)
-
+    # Do not import new modules in the pre-upgrade page. The application
+    # performs its own controllerchange reload, which can race a test reload.
+    # The caller opens a new document in the SAME browser context/storage.
+    
 def run(engine, previous_tree=None):
     old = json.loads((FIXTURES / 'r73-historical-win.json').read_text())
     new = json.loads((FIXTURES / 'r73-authoritative-robbery-archive.json').read_text())
@@ -196,12 +213,21 @@ def run(engine, previous_tree=None):
                             }""")
                             copy_release(ROOT, tree)
                             update_worker(page, url, previous_generation, generation)
+                            print(label, 'activated new generation; opening new controlled document', flush=True)
+                            page.close()
+                            page = context.new_page()
+                            page.on('pageerror', lambda err: errors.append(str(err)))
+                            ready(page, url)
+                            require(page.evaluate('key=>localStorage.getItem(key)', key) == raw,
+                                    'Upgrade changed archive bytes before new-document read')
                         else:
                             ready(page, url)
                             key, raw = seed_archive(page, fixture)
                         check_cache(page, generation, expected)
+                        print(label, 'cache and controlled delivery byte parity PASS', flush=True)
                         online = readback(page, fixture, key, raw, authoritative=authority)
                         require(online['delta'] == scores, 'Frozen score mismatch')
+                        print(label, 'online replay and original bytes PASS', flush=True)
                         page.reload(wait_until='load')
                         require(readback(page, fixture, key, raw, authoritative=authority) == online,
                                 'Reload changed archive outcome')
@@ -214,6 +240,7 @@ def run(engine, previous_tree=None):
                         check_cache(cold, generation, expected)
                         offline = readback(cold, fixture, key, raw, authoritative=authority)
                         require(offline == online, 'Cold offline archive/digest mismatch')
+                        print(label, 'cold-offline replay parity PASS', flush=True)
                         require(not errors, 'Browser page errors: ' + repr(errors))
                         results.append({'case':label,'status':'PASS','upgrade':upgrade,
                                         'scoringVersion':online['scoringVersion'],
@@ -225,7 +252,7 @@ def run(engine, previous_tree=None):
             browser.close()
     return {'engine':engine,'status':'PASS','cacheGeneration':generation,
             'previousTreeProvided':previous_tree is not None,
-            'runtimeByteParity':True,'cases':results,
+            'runtimeByteParity':True,'controlledDeliveryByteParity':True,'cases':results,
             'scope':'isolated localhost module/storage gate; not public HTTPS or UI full match'}
 
 if __name__ == '__main__':
