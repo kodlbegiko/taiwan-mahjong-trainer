@@ -1,0 +1,32 @@
+name: R7.4 isolated authority Bot acceptance
+on:
+  push:
+    branches: [integration/r74-authority-bot-candidate]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  authority-contract:
+    if: github.ref_name == 'integration/r74-authority-bot-candidate'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Real authority Rules / Bot / Scoring integration without skips
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          RULES_REQUIRE_R73_SCORING=1 SCORING_REQUIRE_R73_RULES=1 node --test tests/integration/r74-authority-bot.test.js tests/rules/r73-authoritative-settlement.test.js tests/scoring/r73-rules-integration.test.js tests/bots/r7-rob-kong-contract.test.js | tee "$RUNNER_TEMP/authority-bot.tap"
+          grep -Fxq '# skipped 0' "$RUNNER_TEMP/authority-bot.tap"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: authority-bot-exact-native
+          path: ${{ runner.temp }}/authority-bot.tap
+          retention-days: 14

@@ -1,0 +1,101 @@
+name: R7 Mobile PWA Accessibility Regression
+on:
+  pull_request:
+    branches: [integration/mahjong-full-game]
+    paths:
+      - '.github/workflows/r7-mobile-pwa-a11y.yml'
+      - 'index.html'
+      - 'style.css'
+      - 'src/table-ui/table.css'
+      - 'src/table-ui/view.js'
+      - 'src/table-ui/a11y.js'
+      - 'sw.js'
+      - 'public/manifest.webmanifest'
+      - 'tests/browser/mobile-pwa-a11y-gates.py'
+      - 'tests/pwa/mobile-update-gates.py'
+      - 'tests/pwa/sw-transaction.test.js'
+      - 'tests/browser/_release_site.py'
+      - 'docs/quality/R7_MOBILE_PWA_A11Y.md'
+      - 'scripts/runtime-precache.mjs'
+      - '.github/workflows/r7-runtime-precache.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source-and-node:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Confirm exact tested commit and ownership boundary
+        run: |
+          set -euo pipefail
+          echo "SOURCE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
+          git fetch origin integration/mahjong-full-game
+          owner_head=HEAD
+          if [[ "${{ github.head_ref }}" == 'integration/mahjong-r7-release-audit' || "${{ github.ref_name }}" == 'integration/r74-combined-candidate' ]]; then
+            owner_head=d7fdc5fbcb9073d41cf2ecb4b41a3286013ecb4b
+            attestation_head=6b99b60f9c401c9bc5195027d55a7388328266ca
+            git fetch --no-tags origin "$owner_head" "$attestation_head"
+            git merge-base --is-ancestor d02eb508a0c302997f5e10a4eaf01c85bf0e6fb7 "$owner_head"
+            for file in tests/browser/_release_site.py tests/pwa/mobile-update-gates.py; do
+              git diff --exit-code "$owner_head" HEAD -- "$file"
+            done
+            # The candidate adds one attestation test to the exact owner suite.
+            # Verify the pinned integration source AND preserve every owner byte.
+            git diff --exit-code "$attestation_head" HEAD -- tests/pwa/sw-transaction.test.js
+            git show "$owner_head:tests/pwa/sw-transaction.test.js" > "$RUNNER_TEMP/pwa-owner.js"
+            python -c 'from pathlib import Path; import sys; assert Path("tests/pwa/sw-transaction.test.js").read_bytes().startswith(Path(sys.argv[1]).read_bytes()), "PWA owner test changed or removed"' "$RUNNER_TEMP/pwa-owner.js"
+            echo "PWA_SOURCE_SHA=$owner_head" >> "$GITHUB_STEP_SUMMARY"
+            echo "PWA_ATTESTATION_SOURCE_SHA=$attestation_head" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          while IFS= read -r file; do
+            case "$file" in
+              index.html|style.css|sw.js|public/manifest.webmanifest|src/table-ui/table.css|src/table-ui/view.js|src/table-ui/a11y.js|tests/browser/mobile-pwa-a11y-gates.py|tests/pwa/mobile-update-gates.py|tests/pwa/sw-transaction.test.js|tests/browser/_release_site.py|docs/quality/R7_MOBILE_PWA_A11Y.md|.github/workflows/r7-mobile-pwa-a11y.yml|scripts/runtime-precache.mjs|.github/workflows/r7-runtime-precache.yml) ;;
+              *) echo "::error::Out-of-scope file changed: $file"; exit 1 ;;
+            esac
+          done < <(git diff --name-only origin/integration/mahjong-full-game..."$owner_head")
+      - name: Fast SVG and Service Worker compatibility contract
+        run: node --test tests/tile-assets-integrity.test.js
+      - name: R7-010 deterministic transaction fault injection
+        run: node --test tests/pwa/sw-transaction.test.js
+      - name: Run existing Node and compatibility regressions
+        run: npm run check
+  browser-pwa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install browser test dependency
+        run: |
+          python -m pip install playwright==1.56.0
+          google-chrome --version
+      - name: Record exact source under test
+        run: |
+          mkdir -p r7-mobile-evidence
+          git rev-parse HEAD | tee r7-mobile-evidence/tested-sha.txt
+          google-chrome --version > r7-mobile-evidence/browser-version.txt
+      - name: Six viewports, landscape, keyboard and legacy contract
+        run: python tests/browser/mobile-pwa-a11y-gates.py --evidence r7-mobile-evidence
+      - name: Cold offline, broken update rollback and explicit upgrade
+        if: always()
+        run: PHASE3_REQUIRE_SINGLE_WINNER=1 python tests/pwa/mobile-update-gates.py --with-game-history --evidence r7-mobile-evidence
+      - name: Upload PASS/FAIL evidence and screenshots (not real-device certification)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: r7-mobile-pwa-a11y-evidence
+          path: r7-mobile-evidence
+          retention-days: 14
+          if-no-files-found: warn

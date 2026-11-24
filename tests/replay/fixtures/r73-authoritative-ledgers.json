@@ -1,0 +1,695 @@
+{
+  "provenance": {
+    "scoringCommit": "4db3d3e1583455c65084f6594a9531128ddbe025",
+    "description": "Actual pure Scoring #52 output on synthetic host DTOs adapted from its A02-A05 cases. NOT actual Rules GameState, LegalAction or Replay archive evidence."
+  },
+  "fixtures": [
+    {
+      "type": "discard",
+      "envelope": {
+        "contractVersion": "tw16-pre-settlement/1.0.0",
+        "ruleRef": {
+          "profileId": "tw16-authoritative-scoring",
+          "ruleVersion": "experimental-v1"
+        },
+        "scoringRef": {
+          "profileId": "tw16-gametower-authoritative",
+          "version": "1.0.0-experimental"
+        },
+        "publicEventContractVersion": "tw16-rob-added-kong-public/1.0.0",
+        "gameId": "r73-ledger-discard",
+        "roundId": "r73-ledger-discard-round-0",
+        "sourceRevision": 5,
+        "settlementId": "r73-ledger-discard-round-0",
+        "reason": "win",
+        "winType": "discard",
+        "payerSeats": [
+          0
+        ],
+        "evidence": {
+          "ruleRef": {
+            "profileId": "tw16-authoritative-scoring",
+            "ruleVersion": "experimental-v1"
+          },
+          "winnerSeat": 1,
+          "sourceSeat": 0,
+          "via": "discard",
+          "dealerSeat": 3,
+          "dealerStreak": 0,
+          "concealed": [
+            "t:3:0",
+            "t:4:0",
+            "t:5:0",
+            "t:9:0",
+            "t:10:0",
+            "t:11:0",
+            "t:12:0",
+            "t:13:0",
+            "t:14:0",
+            "t:18:0",
+            "t:19:0",
+            "t:20:0",
+            "t:27:0"
+          ],
+          "melds": [
+            {
+              "kind": "sequence",
+              "open": true,
+              "tileIds": [
+                "t:0:0",
+                "t:1:0",
+                "t:2:0"
+              ]
+            }
+          ],
+          "flowers": [],
+          "winningTile": "t:27:1",
+          "prevailingWindType": 27
+        },
+        "evidenceEventIds": [
+          "evt:r73-ledger-discard:1",
+          "evt:r73-ledger-discard:5"
+        ],
+        "winningTileId": "t:27:1"
+      },
+      "ledger": {
+        "contractVersion": "tw16-scoring/1.0.0-experimental",
+        "scoringVersion": "tw16-gametower-authoritative@1.0.0-experimental",
+        "status": "experimental-not-rule-certified",
+        "unit": "abstract-points",
+        "reason": "win",
+        "winnerSeat": 1,
+        "sourceSeat": 0,
+        "score": {
+          "contractVersion": "tw16-scoring/1.0.0-experimental",
+          "scoringVersion": "tw16-gametower-authoritative@1.0.0-experimental",
+          "status": "experimental-not-rule-certified",
+          "tai": 1,
+          "breakdown": [
+            {
+              "code": "unique-wait",
+              "name": "獨聽",
+              "tai": 1,
+              "evidence": "exactly one structural winning tile type before the actual winning tile; excludes 全求人",
+              "ruleVersion": "tw16-gametower-authoritative@1.0.0-experimental",
+              "source": "https://www.gametower.com.tw/Games/Freeplay/MJ/Star31/Data/i_ingame-count.aspx",
+              "scope": "hand"
+            }
+          ],
+          "decomposition": {
+            "pair": 27,
+            "melds": [
+              {
+                "kind": "sequence",
+                "type": 0,
+                "open": true
+              },
+              {
+                "kind": "sequence",
+                "type": 3,
+                "open": false
+              },
+              {
+                "kind": "sequence",
+                "type": 9,
+                "open": false
+              },
+              {
+                "kind": "sequence",
+                "type": 12,
+                "open": false
+              },
+              {
+                "kind": "sequence",
+                "type": 18,
+                "open": false
+              }
+            ],
+            "ronRole": "pair"
+          },
+          "via": "discard",
+          "winnerSeat": 1,
+          "sourceSeat": 0,
+          "ruleRef": {
+            "profileId": "tw16-authoritative-scoring",
+            "ruleVersion": "experimental-v1"
+          },
+          "excludedCapabilities": [
+            "flower-only-wins",
+            "unverified-specific-wait-bonuses",
+            "bao-pai",
+            "multi-winner",
+            "declared-ready",
+            "heaven-earth-wins"
+          ],
+          "sourceRefs": [
+            "https://www.gametower.com.tw/Games/Freeplay/MJ/Star31/Data/i_ingame-count.aspx",
+            "https://mahjongorchid.com/zh-tw/tai/"
+          ]
+        },
+        "payments": [
+          {
+            "payerSeat": 0,
+            "payeeSeat": 1,
+            "points": 1,
+            "handTai": 1,
+            "appliedTai": 1,
+            "dealerItems": []
+          }
+        ],
+        "playerTransferDeltas": [
+          -1,
+          1,
+          0,
+          0
+        ],
+        "fees": [],
+        "houseDelta": 0,
+        "playerDeltas": [
+          -1,
+          1,
+          0,
+          0
+        ],
+        "settlementId": "r73-ledger-discard-round-0",
+        "gameId": "r73-ledger-discard",
+        "roundId": "r73-ledger-discard-round-0",
+        "sourceRevision": 5,
+        "ruleRef": {
+          "profileId": "tw16-authoritative-scoring",
+          "ruleVersion": "experimental-v1"
+        },
+        "scoringRef": {
+          "profileId": "tw16-gametower-authoritative",
+          "version": "1.0.0-experimental"
+        },
+        "preSettlementContractVersion": "tw16-pre-settlement/1.0.0",
+        "publicEventContractVersion": "tw16-rob-added-kong-public/1.0.0",
+        "winType": "discard",
+        "evidenceEventIds": [
+          "evt:r73-ledger-discard:1",
+          "evt:r73-ledger-discard:5"
+        ]
+      }
+    },
+    {
+      "type": "self-draw",
+      "envelope": {
+        "contractVersion": "tw16-pre-settlement/1.0.0",
+        "ruleRef": {
+          "profileId": "tw16-authoritative-scoring",
+          "ruleVersion": "experimental-v1"
+        },
+        "scoringRef": {
+          "profileId": "tw16-gametower-authoritative",
+          "version": "1.0.0-experimental"
+        },
+        "publicEventContractVersion": "tw16-rob-added-kong-public/1.0.0",
+        "gameId": "r73-ledger-self-draw",
+        "roundId": "r73-ledger-self-draw-round-0",
+        "sourceRevision": 5,
+        "settlementId": "r73-ledger-self-draw-round-0",
+        "reason": "win",
+        "winType": "self-draw",
+        "payerSeats": [
+          0,
+          2,
+          3
+        ],
+        "evidence": {
+          "ruleRef": {
+            "profileId": "tw16-authoritative-scoring",
+            "ruleVersion": "experimental-v1"
+          },
+          "winnerSeat": 1,
+          "sourceSeat": 1,
+          "via": "self-draw",
+          "dealerSeat": 3,
+          "dealerStreak": 0,
+          "concealed": [
+            "t:3:0",
+            "t:4:0",
+            "t:5:0",
+            "t:9:0",
+            "t:10:0",
+            "t:11:0",
+            "t:12:0",
+            "t:13:0",
+            "t:14:0",
+            "t:18:0",
+            "t:19:0",
+            "t:20:0",
+            "t:27:0",
+            "t:27:1"
+          ],
+          "melds": [
+            {
+              "kind": "sequence",
+              "open": true,
+              "tileIds": [
+                "t:0:0",
+                "t:1:0",
+                "t:2:0"
+              ]
+            }
+          ],
+          "flowers": [],
+          "prevailingWindType": 27
+        },
+        "evidenceEventIds": [
+          "evt:r73-ledger-self-draw:1",
+          "evt:r73-ledger-self-draw:5"
+        ],
+        "winningTileId": "t:27:1"
+      },
+      "ledger": {
+        "contractVersion": "tw16-scoring/1.0.0-experimental",
+        "scoringVersion": "tw16-gametower-authoritative@1.0.0-experimental",
+        "status": "experimental-not-rule-certified",
+        "unit": "abstract-points",
+        "reason": "win",
+        "winnerSeat": 1,
+        "sourceSeat": 1,
+        "score": {
+          "contractVersion": "tw16-scoring/1.0.0-experimental",
+          "scoringVersion": "tw16-gametower-authoritative@1.0.0-experimental",
+          "status": "experimental-not-rule-certified",
+          "tai": 2,
+          "breakdown": [
+            {
+              "code": "self-draw",
+              "name": "自摸",
+              "tai": 1,
+              "evidence": "self-draw winning tile",
+              "ruleVersion": "tw16-gametower-authoritative@1.0.0-experimental",
+              "source": "https://www.gametower.com.tw/Games/Freeplay/MJ/Star31/Data/i_ingame-count.aspx",
+              "scope": "hand"
+            },
+            {
+              "code": "unique-wait",
+              "name": "獨聽",
+              "tai": 1,
+              "evidence": "exactly one structural winning tile type before the actual winning tile; excludes 全求人",
+              "ruleVersion": "tw16-gametower-authoritative@1.0.0-experimental",
+              "source": "https://www.gametower.com.tw/Games/Freeplay/MJ/Star31/Data/i_ingame-count.aspx",
+              "scope": "hand"
+            }
+          ],
+          "decomposition": {
+            "pair": 27,
+            "melds": [
+              {
+                "kind": "sequence",
+                "type": 0,
+                "open": true
+              },
+              {
+                "kind": "sequence",
+                "type": 3,
+                "open": false
+              },
+              {
+                "kind": "sequence",
+                "type": 9,
+                "open": false
+              },
+              {
+                "kind": "sequence",
+                "type": 12,
+                "open": false
+              },
+              {
+                "kind": "sequence",
+                "type": 18,
+                "open": false
+              }
+            ],
+            "ronRole": "self-draw"
+          },
+          "via": "self-draw",
+          "winnerSeat": 1,
+          "sourceSeat": 1,
+          "ruleRef": {
+            "profileId": "tw16-authoritative-scoring",
+            "ruleVersion": "experimental-v1"
+          },
+          "excludedCapabilities": [
+            "flower-only-wins",
+            "unverified-specific-wait-bonuses",
+            "bao-pai",
+            "multi-winner",
+            "declared-ready",
+            "heaven-earth-wins"
+          ],
+          "sourceRefs": [
+            "https://www.gametower.com.tw/Games/Freeplay/MJ/Star31/Data/i_ingame-count.aspx",
+            "https://mahjongorchid.com/zh-tw/tai/"
+          ]
+        },
+        "payments": [
+          {
+            "payerSeat": 0,
+            "payeeSeat": 1,
+            "points": 2,
+            "handTai": 2,
+            "appliedTai": 2,
+            "dealerItems": []
+          },
+          {
+            "payerSeat": 2,
+            "payeeSeat": 1,
+            "points": 2,
+            "handTai": 2,
+            "appliedTai": 2,
+            "dealerItems": []
+          },
+          {
+            "payerSeat": 3,
+            "payeeSeat": 1,
+            "points": 3,
+            "handTai": 2,
+            "appliedTai": 3,
+            "dealerItems": [
+              {
+                "code": "dealer",
+                "name": "莊家",
+                "tai": 1,
+                "evidence": "dealer in this payment",
+                "ruleVersion": "tw16-gametower-authoritative@1.0.0-experimental",
+                "source": "https://www.gametower.com.tw/Games/Freeplay/MJ/Star31/Data/i_ingame-count.aspx",
+                "scope": "payment"
+              }
+            ]
+          }
+        ],
+        "playerTransferDeltas": [
+          -2,
+          7,
+          -2,
+          -3
+        ],
+        "fees": [],
+        "houseDelta": 0,
+        "playerDeltas": [
+          -2,
+          7,
+          -2,
+          -3
+        ],
+        "settlementId": "r73-ledger-self-draw-round-0",
+        "gameId": "r73-ledger-self-draw",
+        "roundId": "r73-ledger-self-draw-round-0",
+        "sourceRevision": 5,
+        "ruleRef": {
+          "profileId": "tw16-authoritative-scoring",
+          "ruleVersion": "experimental-v1"
+        },
+        "scoringRef": {
+          "profileId": "tw16-gametower-authoritative",
+          "version": "1.0.0-experimental"
+        },
+        "preSettlementContractVersion": "tw16-pre-settlement/1.0.0",
+        "publicEventContractVersion": "tw16-rob-added-kong-public/1.0.0",
+        "winType": "self-draw",
+        "evidenceEventIds": [
+          "evt:r73-ledger-self-draw:1",
+          "evt:r73-ledger-self-draw:5"
+        ]
+      }
+    },
+    {
+      "type": "rob-added-kong",
+      "envelope": {
+        "contractVersion": "tw16-pre-settlement/1.0.0",
+        "ruleRef": {
+          "profileId": "tw16-authoritative-scoring",
+          "ruleVersion": "experimental-v1"
+        },
+        "scoringRef": {
+          "profileId": "tw16-gametower-authoritative",
+          "version": "1.0.0-experimental"
+        },
+        "publicEventContractVersion": "tw16-rob-added-kong-public/1.0.0",
+        "gameId": "r73-ledger-rob-added-kong",
+        "roundId": "r73-ledger-rob-added-kong-round-0",
+        "sourceRevision": 5,
+        "settlementId": "r73-ledger-rob-added-kong-round-0",
+        "reason": "win",
+        "winType": "rob-added-kong",
+        "payerSeats": [
+          0
+        ],
+        "evidence": {
+          "ruleRef": {
+            "profileId": "tw16-authoritative-scoring",
+            "ruleVersion": "experimental-v1"
+          },
+          "winnerSeat": 1,
+          "sourceSeat": 0,
+          "via": "discard",
+          "dealerSeat": 3,
+          "dealerStreak": 0,
+          "concealed": [
+            "t:3:0",
+            "t:4:0",
+            "t:5:0",
+            "t:9:0",
+            "t:10:0",
+            "t:11:0",
+            "t:12:0",
+            "t:13:0",
+            "t:14:0",
+            "t:18:0",
+            "t:19:0",
+            "t:20:0",
+            "t:27:0"
+          ],
+          "melds": [
+            {
+              "kind": "sequence",
+              "open": true,
+              "tileIds": [
+                "t:0:0",
+                "t:1:0",
+                "t:2:0"
+              ]
+            }
+          ],
+          "flowers": [],
+          "winningTile": "t:27:1",
+          "prevailingWindType": 27,
+          "robAddedKong": {
+            "proposalEventId": "evt:r73-ledger-rob-added-kong:1",
+            "fromSeat": 0,
+            "tileId": "t:27:1"
+          }
+        },
+        "evidenceEventIds": [
+          "evt:r73-ledger-rob-added-kong:1",
+          "evt:r73-ledger-rob-added-kong:5"
+        ],
+        "winningTileId": "t:27:1"
+      },
+      "ledger": {
+        "contractVersion": "tw16-scoring/1.0.0-experimental",
+        "scoringVersion": "tw16-gametower-authoritative@1.0.0-experimental",
+        "status": "experimental-not-rule-certified",
+        "unit": "abstract-points",
+        "reason": "win",
+        "winnerSeat": 1,
+        "sourceSeat": 0,
+        "score": {
+          "contractVersion": "tw16-scoring/1.0.0-experimental",
+          "scoringVersion": "tw16-gametower-authoritative@1.0.0-experimental",
+          "status": "experimental-not-rule-certified",
+          "tai": 2,
+          "breakdown": [
+            {
+              "code": "rob-added-kong",
+              "name": "搶槓胡",
+              "tai": 1,
+              "evidence": "public kong_proposed evt:r73-ledger-rob-added-kong:1 / source seat 0 / tile t:27:1",
+              "ruleVersion": "tw16-gametower-authoritative@1.0.0-experimental",
+              "source": "https://www.gametower.com.tw/Games/Freeplay/MJ/Star31/Data/i_ingame-count.aspx",
+              "scope": "hand"
+            },
+            {
+              "code": "unique-wait",
+              "name": "獨聽",
+              "tai": 1,
+              "evidence": "exactly one structural winning tile type before the actual winning tile; excludes 全求人",
+              "ruleVersion": "tw16-gametower-authoritative@1.0.0-experimental",
+              "source": "https://www.gametower.com.tw/Games/Freeplay/MJ/Star31/Data/i_ingame-count.aspx",
+              "scope": "hand"
+            }
+          ],
+          "decomposition": {
+            "pair": 27,
+            "melds": [
+              {
+                "kind": "sequence",
+                "type": 0,
+                "open": true
+              },
+              {
+                "kind": "sequence",
+                "type": 3,
+                "open": false
+              },
+              {
+                "kind": "sequence",
+                "type": 9,
+                "open": false
+              },
+              {
+                "kind": "sequence",
+                "type": 12,
+                "open": false
+              },
+              {
+                "kind": "sequence",
+                "type": 18,
+                "open": false
+              }
+            ],
+            "ronRole": "pair"
+          },
+          "via": "discard",
+          "winnerSeat": 1,
+          "sourceSeat": 0,
+          "ruleRef": {
+            "profileId": "tw16-authoritative-scoring",
+            "ruleVersion": "experimental-v1"
+          },
+          "excludedCapabilities": [
+            "flower-only-wins",
+            "unverified-specific-wait-bonuses",
+            "bao-pai",
+            "multi-winner",
+            "declared-ready",
+            "heaven-earth-wins"
+          ],
+          "sourceRefs": [
+            "https://www.gametower.com.tw/Games/Freeplay/MJ/Star31/Data/i_ingame-count.aspx",
+            "https://mahjongorchid.com/zh-tw/tai/"
+          ]
+        },
+        "payments": [
+          {
+            "payerSeat": 0,
+            "payeeSeat": 1,
+            "points": 2,
+            "handTai": 2,
+            "appliedTai": 2,
+            "dealerItems": []
+          }
+        ],
+        "playerTransferDeltas": [
+          -2,
+          2,
+          0,
+          0
+        ],
+        "fees": [],
+        "houseDelta": 0,
+        "playerDeltas": [
+          -2,
+          2,
+          0,
+          0
+        ],
+        "settlementId": "r73-ledger-rob-added-kong-round-0",
+        "gameId": "r73-ledger-rob-added-kong",
+        "roundId": "r73-ledger-rob-added-kong-round-0",
+        "sourceRevision": 5,
+        "ruleRef": {
+          "profileId": "tw16-authoritative-scoring",
+          "ruleVersion": "experimental-v1"
+        },
+        "scoringRef": {
+          "profileId": "tw16-gametower-authoritative",
+          "version": "1.0.0-experimental"
+        },
+        "preSettlementContractVersion": "tw16-pre-settlement/1.0.0",
+        "publicEventContractVersion": "tw16-rob-added-kong-public/1.0.0",
+        "winType": "rob-added-kong",
+        "evidenceEventIds": [
+          "evt:r73-ledger-rob-added-kong:1",
+          "evt:r73-ledger-rob-added-kong:5"
+        ]
+      }
+    },
+    {
+      "type": "draw",
+      "envelope": {
+        "contractVersion": "tw16-pre-settlement/1.0.0",
+        "ruleRef": {
+          "profileId": "tw16-authoritative-scoring",
+          "ruleVersion": "experimental-v1"
+        },
+        "scoringRef": {
+          "profileId": "tw16-gametower-authoritative",
+          "version": "1.0.0-experimental"
+        },
+        "publicEventContractVersion": "tw16-rob-added-kong-public/1.0.0",
+        "gameId": "r73-ledger-draw",
+        "roundId": "r73-ledger-draw-round-0",
+        "sourceRevision": 5,
+        "settlementId": "r73-ledger-draw-round-0",
+        "reason": "exhaustive-draw",
+        "winType": null,
+        "payerSeats": [],
+        "evidence": null,
+        "evidenceEventIds": [
+          "evt:r73-ledger-draw:1",
+          "evt:r73-ledger-draw:5"
+        ],
+        "winningTileId": null
+      },
+      "ledger": {
+        "contractVersion": "tw16-scoring/1.0.0-experimental",
+        "scoringVersion": "tw16-gametower-authoritative@1.0.0-experimental",
+        "status": "experimental-not-rule-certified",
+        "unit": "abstract-points",
+        "reason": "exhaustive-draw",
+        "winnerSeat": null,
+        "sourceSeat": null,
+        "score": null,
+        "payments": [],
+        "playerTransferDeltas": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "fees": [],
+        "houseDelta": 0,
+        "playerDeltas": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "settlementId": "r73-ledger-draw-round-0",
+        "gameId": "r73-ledger-draw",
+        "roundId": "r73-ledger-draw-round-0",
+        "sourceRevision": 5,
+        "ruleRef": {
+          "profileId": "tw16-authoritative-scoring",
+          "ruleVersion": "experimental-v1"
+        },
+        "scoringRef": {
+          "profileId": "tw16-gametower-authoritative",
+          "version": "1.0.0-experimental"
+        },
+        "preSettlementContractVersion": "tw16-pre-settlement/1.0.0",
+        "publicEventContractVersion": "tw16-rob-added-kong-public/1.0.0",
+        "winType": null,
+        "evidenceEventIds": [
+          "evt:r73-ledger-draw:1",
+          "evt:r73-ledger-draw:5"
+        ]
+      }
+    }
+  ]
+}

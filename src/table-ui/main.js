@@ -1,7 +1,7 @@
 import { createSandboxSession, availableTableProfiles } from './session.js';
 import { createFullRoundSession, fullRoundCapability } from './full-round.js';
 import { createDailyPanel } from './daily.js';
-import { TableView, ReplayControls } from './view.js';
+import { TableView, ReplayControls, BotDifficultySelect } from './view.js';
 import { installTileFaceFallback } from '../tile-visuals.js';
 
 const root=document.querySelector('#full-table-root');
@@ -13,7 +13,9 @@ let session=null, daily=null, fullMode=false, selection=null;
 let busy=false,lastError='',activePage='academy',timeline=null,replayIndex=0;
 let replayFrame=null,replayBusy=false,botStatus='',storage=null;
 let dailyBoot='idle';
+let pendingAction=null,restartPending=false;
 const forceSandbox=new URLSearchParams(window.location.search).get('table')==='sandbox';
+const seededQA=new URLSearchParams(window.location.search).get('qa')==='seeded';
 
 
 function profilesList() {
@@ -37,6 +39,8 @@ function renderEmpty() {
     '</p></div></header><section class="table-empty"><h2>建立實驗牌桌</h2>'+
     '<label for="table-profile">明確選擇 RuleProfile</label>'+
     '<select id="table-profile">'+profiles()+'</select>'+
+    (fullMode?BotDifficultySelect('Beginner'):'')+
+    (fullMode&&seededQA?'<label for="table-fixed-seed">固定種子（實驗性重現；留空隨機）</label><input id="table-fixed-seed" maxlength="48" pattern="[A-Za-z0-9_\\-]+" autocomplete="off"><p class="table-muted">只使用 Rules 正式洗牌；每個固定種子請使用獨立測試瀏覽器工作階段。</p>':'')+
     '<button type="button" class="primary" data-start-new '+(!profilesList().length?'disabled':'')+'>'+
     (fullMode?'開始 R3 四人對局':'開始摸打 Sandbox')+'</button>'+
     (lastError?'<p role="alert" class="table-warning">'+safe(lastError)+'</p>':'')+
@@ -44,6 +48,7 @@ function renderEmpty() {
     '<button type="button" class="secondary" data-return-academy>返回課程</button></section>';
 }
 function activate(page,{focus=true}={}) {
+  if(page!==activePage){pendingAction=null;selection=null;restartPending=false;}
   activePage=page;
   document.body.dataset.tableView=page==='academy'?'none':page;
   if(root)root.hidden=page==='academy';
@@ -77,7 +82,7 @@ function draw() {
   }
   const snapshot=session?.snapshot();
   root.innerHTML=snapshot?TableView(snapshot,{selection,busy,error:lastError,
-    botStatus}):renderEmpty();
+    botStatus,confirmation:pendingAction,restartPending}):renderEmpty();
 }
 async function driveBots() {
   if(!session?.snapshot()||busy===false) return;
@@ -98,32 +103,64 @@ async function driveBots() {
 }
 async function startNew() {
   if(busy)return;
-  if(session.snapshot()&&!window.confirm('確定重新開局？目前對局會被取代。'))return;
   busy=true;
   try {
     const selected=root.querySelector('#table-profile')?.value??'';
-    const profile=profilesList().find(p=>p.profileId+'@'+p.ruleVersion===selected)??profilesList()[0];
+    const current=session.snapshot()?.profile;
+    const available=profilesList();
+    const profile=available.find(p=>p.profileId+'@'+p.ruleVersion===selected)??
+      available.find(p=>p.profileId===current?.profileId&&p.ruleVersion===current?.ruleVersion)??
+      available[0];
     if(!profile)throw new Error('沒有已註冊且可用的四人 RuleProfile');
-    session.start({profileId:profile.profileId,ruleVersion:profile.ruleVersion});
-    selection=null;lastError='';botStatus='';timeline=null;replayFrame=null;
+    const difficulty=root.querySelector('#table-bot-difficulty')?.value??session.snapshot()?.botDifficulty??'Beginner';
+    const fixedSeed=seededQA?(root.querySelector('#table-fixed-seed')?.value||null):null;
+    session.start({profileId:profile.profileId,ruleVersion:profile.ruleVersion,...(fullMode?{difficulty,fixedSeed}:{})});
+    selection=null;pendingAction=null;restartPending=false;
+    lastError='';botStatus='';timeline=null;replayFrame=null;
     activate('play',{focus:false});
     await driveBots();
   } catch(error) {
     lastError='建立對局失敗：'+error.message;
   } finally {busy=false;draw();}
 }
-async function submit(actionId) {
-  if(busy)return;
-  const previous=session.snapshot();
+function stageAction(actionId) {
+  const previous=session?.snapshot();
   const action=previous?.view?.legalActions?.find(a=>a.actionId===actionId);
   if(!action||action.actorSeat!==previous.view.audienceSeat||
       action.expectedRevision!==previous.view.asOfEventSeq){
-    lastError='原始動作已過期，已取消選擇。';selection=null;draw();return;
+    pendingAction=null;selection=null;
+    lastError='原始動作已過期或不合法，請重新選擇。';draw();return;
   }
-  if(action.kind!=='discard' &&
-      !window.confirm('確定執行 Rules 合法動作：'+action.kind+
-        '？宣告送出後無法撤銷。'))return;
-  busy=true;
+  if(action.kind==='discard'){
+    if(selection!==actionId){lastError='請先選取要捨出的合法手牌。';draw();return;}
+    pendingAction=null;
+    void submit(actionId);
+    return;
+  }
+  // Use an in-page, keyboard-accessible confirmation instead of window.confirm.
+  // No Rules action is submitted by opening or cancelling this panel.
+  pendingAction={actionId:action.actionId,actorSeat:action.actorSeat,
+    expectedRevision:action.expectedRevision,kind:action.kind};
+  restartPending=false;selection=null;lastError='';
+  draw();
+  root.querySelector('[data-confirm-action]')?.focus({preventScroll:true});
+}
+async function submit(actionId) {
+  if(busy)return;
+  const previous=session?.snapshot();
+  const action=previous?.view?.legalActions?.find(a=>a.actionId===actionId);
+  const valid=action&&action.actorSeat===previous.view.audienceSeat&&
+    action.expectedRevision===previous.view.asOfEventSeq;
+  const confirmed=(action?.kind==='discard'&&selection===actionId)||(pendingAction?.actionId===actionId&&
+    pendingAction?.actorSeat===action?.actorSeat&&
+    pendingAction?.expectedRevision===action?.expectedRevision&&
+    pendingAction?.kind===action?.kind);
+  if(!valid||!confirmed){
+    lastError='原始動作已過期或尚未確認，已取消選擇。';
+    selection=null;pendingAction=null;draw();return;
+  }
+  // Synchronously prevent duplicate submission before awaiting Controller/Bots.
+  busy=true;pendingAction=null;restartPending=false;
   try {
     await session.submit({actionId:action.actionId,actorSeat:action.actorSeat,
       expectedRevision:action.expectedRevision});
@@ -132,7 +169,9 @@ async function submit(actionId) {
   } catch(error) {
     selection=null;
     lastError='規則／Bot 動作未完成：'+error.message;
-  } finally {busy=false;botStatus='';draw();}
+  } finally {busy=false;botStatus='';draw();
+    if(activePage==='play')root.querySelector('.table-actions button:not(:disabled), .table-hand button:not(:disabled), #table-heading')?.focus({preventScroll:true});
+  }
 }
 async function loadReplayFrame(index) {
   if(!timeline?.verified||replayBusy)return;
@@ -178,6 +217,7 @@ async function dailyAction(kind) {
   // Read values before the progress indicator rerenders the form.
   const selectedMinutes=kind==='start'?
     Number(root.querySelector('#daily-minutes')?.value??30):null;
+  const selectedMode=kind==='start'?(root.querySelector('#daily-mode')?.value??'structural'):null;
   if(kind==='abort'&&!window.confirm(
     '結束今天的訓練？已保存的正式成績不會刪除。'))return;
   busy=true;lastError='';
@@ -191,7 +231,7 @@ async function dailyAction(kind) {
     // Invoke the panel method first: it sets loading/submitting synchronously.
     // Then paint that explicit state, while the official locked API is pending.
     let operation;
-    if(kind==='start')operation=daily.start(selectedMinutes);
+    if(kind==='start')operation=daily.start(selectedMinutes,selectedMode);
     else if(kind==='resume')operation=daily.resume();
     else if(kind==='submit')operation=daily.submit(root);
     else if(kind==='complete')operation=daily.finish();
@@ -208,6 +248,7 @@ function onClick(event) {
   const button=event.target.closest('button');
   if(!button)return;
   if(button.hasAttribute('data-pause-bots')){
+    pendingAction=null;selection=null;restartPending=false;
     session?.pause?.();botStatus='對局已暫停';draw();return;
   }
   if(button.hasAttribute('data-resume-bots')){
@@ -220,9 +261,36 @@ function onClick(event) {
     return;
   }
   if(busy)return;
+  if(button.hasAttribute('data-confirm-new')){
+    if(restartPending){restartPending=false;void startNew();}
+    return;
+  }
+  if(button.hasAttribute('data-cancel-new')){
+    restartPending=false;draw();root.querySelector('[data-start-new]')?.focus({preventScroll:true});return;
+  }
+  if(button.hasAttribute('data-cancel-action')){
+    const id=pendingAction?.actionId;
+    pendingAction=null;lastError='';draw();
+    const prior=Array.from(root.querySelectorAll('[data-submit-action]:not(:disabled)')).find(el=>el.dataset.submitAction===id);
+    (prior??root.querySelector('#table-heading'))?.focus({preventScroll:true});return;
+  }
+  if(button.hasAttribute('data-confirm-action')){
+    const actionId=button.dataset.confirmAction;
+    if(actionId!==pendingAction?.actionId){
+      pendingAction=null;selection=null;
+      lastError='確認動作已過期，請重新選擇。';draw();return;
+    }
+    return void submit(actionId);
+  }
   if(button.hasAttribute('data-return-academy'))return activate('academy');
   if(button.hasAttribute('data-return-table'))return activate('play');
-  if(button.hasAttribute('data-start-new'))return void startNew();
+  if(button.hasAttribute('data-start-new')){
+    if(session?.snapshot()){
+      pendingAction=null;restartPending=true;lastError='';draw();
+      root.querySelector('[data-confirm-new]')?.focus({preventScroll:true});
+    }else void startNew();
+    return;
+  }
   if(button.hasAttribute('data-show-replay'))return void openReplay();
   for(const kind of ['start','resume','submit','complete','abort','retry'])
     if(button.hasAttribute('data-daily-'+kind))return void dailyAction(kind);
@@ -232,6 +300,7 @@ function onClick(event) {
     });return;
   }
   if(button.hasAttribute('data-pick-action')){
+    pendingAction=null;restartPending=false;
     const actionId=button.dataset.pickAction;
     const view=session.snapshot()?.view;
     if(!view?.legalActions.some(a=>a.kind==='discard'&&
@@ -242,8 +311,11 @@ function onClick(event) {
     if(selection)root.querySelector('[data-submit-action]')?.focus({preventScroll:true});
     return;
   }
-  if(button.hasAttribute('data-clear-selection')){selection=null;draw();return;}
-  if(button.hasAttribute('data-submit-action'))return void submit(button.dataset.submitAction);
+  if(button.hasAttribute('data-clear-selection')){
+    const id=selection;selection=null;draw();
+    Array.from(root.querySelectorAll('[data-pick-action]:not(:disabled)')).find(el=>el.dataset.pickAction===id)?.focus({preventScroll:true});return;
+  }
+  if(button.hasAttribute('data-submit-action'))return stageAction(button.dataset.submitAction);
   if(button.hasAttribute('data-replay-first'))return void loadReplayFrame(0);
   if(button.hasAttribute('data-replay-prev'))return void loadReplayFrame(Math.max(0,replayIndex-1));
   if(button.hasAttribute('data-replay-next')){

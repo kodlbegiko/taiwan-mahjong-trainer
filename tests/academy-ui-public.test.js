@@ -89,3 +89,35 @@ test('Official UI bridge uses strict public Q shape and fails closed on answer k
   assert.equal(bridge.phase,'failed');
   assert.equal(bridge.result,null);
 });
+
+test('R7.4 diagnosis UI renders only versioned coherent public evidence, never mastery',async()=>{
+  const {renderSkillDiagnostics}=await import('../src/academy-ui/academy-live.js');
+  const at='2026-11-25T00:00:00Z';
+  const skills=[
+    {tagId:'efficiency.ukeire',attempts:8,meanScore:0.5,estimatedProficiency:0.5},
+    {tagId:'efficiency.shanten',attempts:6,meanScore:1,estimatedProficiency:null},
+    {tagId:'strategy.defense',attempts:0,meanScore:null,estimatedProficiency:null},
+    {tagId:'waits.enumeration',attempts:10,meanScore:0.9,estimatedProficiency:0.9},
+  ];
+  const rows=skills.map((s,i)=>({tagId:s.tagId,attempts:s.attempts,observedMean:s.meanScore,
+    uniqueQuestionCount:[4,1,0,8][i],status:['practice-priority','insufficient-evidence','unobserved','observed-high-score'][i]}));
+  const dashboard={durable:true,pendingRecovery:{remaining:0,results:[]},profile:{updatedAt:at,calibrationStatus:'uncalibrated',skills},
+    recommendation:{generatedAsOf:at,calibrationStatus:'uncalibrated',skillDiagnostics:rows,
+      diagnosticPolicy:{version:'observed-practice-priority/1.0.0',minAttempts:5,minUniqueQuestions:3,practiceScoreThreshold:0.8,calibratedMastery:false}}};
+  const html=renderSkillDiagnostics(dashboard);
+  for(const text of ['優先練習','證據不足','尚未評估','觀察表現良好','50%','100%','未經真人校準'])
+    assert.ok(html.includes(text),text);
+  assert.ok(html.includes('data-skill-diagnostics="verified"'));
+  for(const mutate of [
+    d=>{delete d.recommendation;},d=>{d.durable=false;},d=>{d.pendingRecovery={remaining:1,results:[{recovered:false}]};},
+    d=>{d.pendingRecovery=null;},d=>{d.pendingRecovery={remaining:0,results:[{recovered:false}]};},
+    d=>{d.recommendation.generatedAsOf='2026-11-24T00:00:00Z';},
+    d=>{d.recommendation.skillDiagnostics[0].observedMean=0.99;},
+    d=>{d.recommendation.skillDiagnostics[1].status='observed-high-score';},
+    d=>{d.recommendation.skillDiagnostics.push(d.recommendation.skillDiagnostics[0]);},
+    d=>{d.recommendation.diagnosticPolicy.calibratedMastery=true;},
+  ]){
+    const d=structuredClone(dashboard);mutate(d);
+    assert.match(renderSkillDiagnostics(d),/data-skill-diagnostics="unavailable"/);
+  }
+});

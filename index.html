@@ -14,6 +14,7 @@
   <link rel="stylesheet" href="./src/table-ui/table.css" />
   <script type="module" src="./src/app.js"></script>
   <script type="module" src="./src/academy-ui/main.js"></script>
+  <script type="module" src="./src/table-ui/a11y.js"></script>
   <script type="module" src="./src/table-ui/main.js"></script>
   <title>台麻練習所 · Taiwan Mahjong Trainer</title>
 </head>
@@ -40,6 +41,7 @@
       <span class="mode-tab is-locked"><span class="tab-index">04</span> 攻防與複盤 <span class="soon">未開放</span></span>
     </nav>
     <div class="pwa-bar"><p id="offline-status" role="status" aria-live="polite">離線功能初始化中；首次安裝需先連線。</p><div><button id="update-app" type="button" hidden>更新至最新版本</button><button id="install-app" type="button" hidden>安裝應用程式</button></div></div>
+    <details class="pwa-install-help"><summary>如何安裝至手機？</summary><p>iPhone／iPad Safari：點選分享選單，再選「加入主畫面」。Android Chrome：開啟瀏覽器選單，選擇「安裝應用程式」或「加入主畫面」。安裝前請先連線載入完整牌面；離線使用仍須另行驗證。</p></details>
     <main id="main">
       <section id="academy-root" class="academy-page" aria-label="台麻大師學院"></section>
       <section id="full-table-root" aria-label="四人台麻牌桌" hidden></section>

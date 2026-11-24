@@ -1,0 +1,375 @@
+{
+  "schemaVersion": 1,
+  "kind": "tw16-phase3-r71-integrated-acceptance",
+  "asOf": "2026-11-24",
+  "timeZone": "Asia/Taipei",
+  "repository": "https://github.com/kodlbegiko/taiwan-mahjong-trainer",
+  "branch": "integration/mahjong-r7-release-audit",
+  "pr": 53,
+  "baseSha": "a29bebfc01e05c05450b964a41ce34cbecf40365",
+  "applicationSha": "1b73e7565411ac2df9d93652c21f217c5fdf5d0d",
+  "sourceMergeSha": "78e6a18151993f53934303ed0c361a5fd4c26c1a",
+  "sourcePinMatrix": [
+    {
+      "pr": 51,
+      "module": "Rules",
+      "sha": "ff27c52526acfdf5fb905b4dd72a229289b8d734",
+      "base": "a29bebfc01e05c05450b964a41ce34cbecf40365",
+      "behind": 0,
+      "draft": true,
+      "changedPaths": 7,
+      "formalReviews": 0,
+      "inlineReviewThreads": 0,
+      "integrated": true,
+      "ci": {
+        "pass": 2,
+        "fail": 0,
+        "pending": 1,
+        "runIds": [
+          45320766991,
+          45320766928,
+          45320766948
+        ]
+      },
+      "url": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/51"
+    },
+    {
+      "pr": 52,
+      "module": "Scoring",
+      "sha": "1b27d5b9cf0c6e3bb7aff894288adfbf309c1b48",
+      "base": "a29bebfc01e05c05450b964a41ce34cbecf40365",
+      "behind": 0,
+      "draft": true,
+      "changedPaths": 11,
+      "formalReviews": 0,
+      "inlineReviewThreads": 0,
+      "integrated": true,
+      "ci": {
+        "pass": 0,
+        "fail": 0,
+        "pending": 1,
+        "runIds": [
+          45321936094
+        ]
+      },
+      "url": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/52"
+    },
+    {
+      "pr": 48,
+      "module": "Bot",
+      "sha": "2c98f31e51f5cd5d2f208d95210559976fc7854f",
+      "base": "a29bebfc01e05c05450b964a41ce34cbecf40365",
+      "behind": 0,
+      "draft": true,
+      "changedPaths": 8,
+      "formalReviews": 0,
+      "inlineReviewThreads": 0,
+      "integrated": true,
+      "ci": {
+        "pass": 0,
+        "fail": 0,
+        "pending": 3,
+        "runIds": [
+          45321034632,
+          45321034672,
+          45321034666
+        ]
+      },
+      "url": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/48"
+    },
+    {
+      "pr": 46,
+      "module": "Replay",
+      "sha": "deb0bfaafa1a50ad7b112aa3e53078a98b14d195",
+      "base": "a29bebfc01e05c05450b964a41ce34cbecf40365",
+      "behind": 0,
+      "draft": true,
+      "changedPaths": 7,
+      "formalReviews": 0,
+      "inlineReviewThreads": 0,
+      "integrated": true,
+      "ci": {
+        "pass": 0,
+        "fail": 0,
+        "pending": 2,
+        "runIds": [
+          45321197307,
+          45321197196
+        ]
+      },
+      "url": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/46"
+    },
+    {
+      "pr": 49,
+      "module": "Table UI",
+      "sha": "d471f020d673de0e8916ae44b83b8d4a1db0aa04",
+      "base": "a29bebfc01e05c05450b964a41ce34cbecf40365",
+      "behind": 0,
+      "draft": true,
+      "changedPaths": 7,
+      "formalReviews": 0,
+      "inlineReviewThreads": 0,
+      "integrated": true,
+      "ci": {
+        "pass": 1,
+        "fail": 0,
+        "pending": 3,
+        "runIds": [
+          45320742606,
+          45320742648,
+          45320742610,
+          45320742632
+        ]
+      },
+      "url": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/49"
+    },
+    {
+      "pr": 47,
+      "module": "Academy",
+      "sha": "0994b657868233ece711cb4403c0248ce260976f",
+      "base": "a29bebfc01e05c05450b964a41ce34cbecf40365",
+      "behind": 0,
+      "draft": true,
+      "changedPaths": 7,
+      "formalReviews": 0,
+      "inlineReviewThreads": 0,
+      "integrated": true,
+      "ci": {
+        "pass": 0,
+        "fail": 0,
+        "pending": 2,
+        "runIds": [
+          45321274698,
+          45321274700
+        ]
+      },
+      "url": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/47"
+    },
+    {
+      "pr": 50,
+      "module": "PWA",
+      "sha": "d02eb508a0c302997f5e10a4eaf01c85bf0e6fb7",
+      "base": "a29bebfc01e05c05450b964a41ce34cbecf40365",
+      "behind": 0,
+      "draft": true,
+      "changedPaths": 12,
+      "formalReviews": 0,
+      "inlineReviewThreads": 0,
+      "integrated": true,
+      "ci": {
+        "pass": 0,
+        "fail": 0,
+        "pending": 10,
+        "runIds": [
+          45320960549,
+          45320961093,
+          45320960542,
+          45320960531,
+          45320960512,
+          45320960626,
+          45320960514,
+          45320960584,
+          45320960540,
+          45320960544
+        ]
+      },
+      "url": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/50"
+    }
+  ],
+  "sourceCiTotals": {
+    "pass": 3,
+    "fail": 0,
+    "pending": 22,
+    "total": 25
+  },
+  "applicationCiSnapshot": [
+    {
+      "id": 45322717326,
+      "name": "Verify",
+      "sha": "1b73e7565411ac2df9d93652c21f217c5fdf5d0d",
+      "status": "queued",
+      "conclusion": null,
+      "url": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/45322717326"
+    },
+    {
+      "id": 45322717427,
+      "name": "R7 Mobile PWA Accessibility Regression",
+      "sha": "1b73e7565411ac2df9d93652c21f217c5fdf5d0d",
+      "status": "queued",
+      "conclusion": null,
+      "url": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/45322717427"
+    },
+    {
+      "id": 45322717501,
+      "name": "Master Academy UI",
+      "sha": "1b73e7565411ac2df9d93652c21f217c5fdf5d0d",
+      "status": "queued",
+      "conclusion": null,
+      "url": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/45322717501"
+    },
+    {
+      "id": 45322717247,
+      "name": "V0.2 Independent UI Release Gates",
+      "sha": "1b73e7565411ac2df9d93652c21f217c5fdf5d0d",
+      "status": "queued",
+      "conclusion": null,
+      "url": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/45322717247"
+    },
+    {
+      "id": 45322717181,
+      "name": "V0.2 Browser UI & PWA",
+      "sha": "1b73e7565411ac2df9d93652c21f217c5fdf5d0d",
+      "status": "queued",
+      "conclusion": null,
+      "url": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/45322717181"
+    },
+    {
+      "id": 45322717200,
+      "name": "V0.2 Realistic Tile Faces",
+      "sha": "1b73e7565411ac2df9d93652c21f217c5fdf5d0d",
+      "status": "queued",
+      "conclusion": null,
+      "url": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/45322717200"
+    },
+    {
+      "id": 45322717110,
+      "name": "Phase 3 Table UI",
+      "sha": "1b73e7565411ac2df9d93652c21f217c5fdf5d0d",
+      "status": "queued",
+      "conclusion": null,
+      "url": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/45322717110"
+    },
+    {
+      "id": 45322717480,
+      "name": "Phase 3 Real Full-Match Acceptance",
+      "sha": "1b73e7565411ac2df9d93652c21f217c5fdf5d0d",
+      "status": "queued",
+      "conclusion": null,
+      "url": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/45322717480"
+    },
+    {
+      "id": 45322717384,
+      "name": "R7 Runtime Precache Contract",
+      "sha": "1b73e7565411ac2df9d93652c21f217c5fdf5d0d",
+      "status": "queued",
+      "conclusion": null,
+      "url": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/45322717384"
+    },
+    {
+      "id": 45322717106,
+      "name": "Master Academy combined",
+      "sha": "1b73e7565411ac2df9d93652c21f217c5fdf5d0d",
+      "status": "queued",
+      "conclusion": null,
+      "url": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/45322717106"
+    }
+  ],
+  "tests": {
+    "total": null,
+    "passed": null,
+    "failed": null,
+    "skipped": null,
+    "status": "NOT_RUN",
+    "reason": "All ten application-SHA PR workflows queued at readback; no terminal result."
+  },
+  "staticPrecache": {
+    "status": "PASS",
+    "modules": 75,
+    "shellEntries": 121,
+    "duplicateEntries": 0,
+    "missingPaths": 0,
+    "cacheVersion": "tmt-v02-realistic-tiles-r7.1-integrated-78e6a1815199",
+    "scope": "Git tree inventory only, not AST/runtime/offline"
+  },
+  "issues": [
+    {
+      "id": "R7-001",
+      "status": "NOT_RUN",
+      "detail": "Canonical signed zero normalization present in latest Scoring settlement; S08 regression needs combined CI.",
+      "sourceFixPresent": true
+    },
+    {
+      "id": "R7-002",
+      "status": "NOT_RUN",
+      "detail": "Combined SW generated JS inventory regenerated from Git tree: 75 modules / 121 unique existing shell entries; AST graph and cold offline browser tests queued.",
+      "sourceFixPresent": true
+    },
+    {
+      "id": "R7-003",
+      "status": "NOT_RUN",
+      "detail": "Keyboard/AT click capture restores the same tile across DOM replacement; confirm/cancel focus retained. Full 375px regression not yet executed on integrated SHA.",
+      "sourceFixPresent": true
+    },
+    {
+      "id": "R7-004",
+      "status": "BLOCKED",
+      "detail": "Rules public event contract plus Scoring comparison adapter, Bot parser and Replay tests included; strict R7 tests scheduled. Public table still restricts profiles to legacy R3/R5 and minimal-tai. No formal rules certification.",
+      "sourceFixPresent": false
+    },
+    {
+      "id": "R7-005",
+      "status": "NOT_RUN",
+      "detail": "Table UI exposes persisted opt-in Bot difficulty; Beginner remains default, R5 compatibility retained by design. Benchmark and live difficulty selection require integrated tests.",
+      "sourceFixPresent": true
+    },
+    {
+      "id": "R7-006",
+      "status": "BLOCKED",
+      "detail": "20 standalone plans / 27 review questions per Academy delivery; 12 published, 8 validated, formal scored SkillTag coverage 10/20, no official scenario scorer. Blocks full Academy release, not scoped table preview.",
+      "sourceFixPresent": false
+    },
+    {
+      "id": "R7-007",
+      "status": "NOT_RUN",
+      "detail": "Only overlap view.js resolved by preserving #49 ActionBar/confirmation/revision/busy and common group ARIA; #50 focus helper and CSS retained. Browser confirmation and keyboard interaction pending.",
+      "sourceFixPresent": true
+    }
+  ],
+  "gates": {
+    "source_pin": "PASS",
+    "source_scope_and_tree_assembly": "PASS",
+    "source_review": "BLOCKED",
+    "source_ci": "NOT_RUN",
+    "integrated_application_commit": "PASS",
+    "actionbar_reconciliation_static": "PASS",
+    "precache_inventory_static": "PASS",
+    "precache_ast_graph": "NOT_RUN",
+    "r5_goldens": "NOT_RUN",
+    "strict_100_seed": "NOT_RUN",
+    "oracle_10k_a": "NOT_RUN",
+    "oracle_10k_b": "NOT_RUN",
+    "npm_check": "NOT_RUN",
+    "strict_r7_cross_module": "NOT_RUN",
+    "all_app_sha_workflows": "NOT_RUN",
+    "https_staging": "BLOCKED",
+    "public_win_draw_settlement_replay": "BLOCKED",
+    "daily_reload": "NOT_RUN",
+    "offline": "NOT_RUN",
+    "mobile_viewports": "NOT_RUN",
+    "physical_iphone_android": "NOT_RUN",
+    "voiceover_talkback_install_update": "NOT_RUN",
+    "legacy_profile_archive_compatibility": "NOT_RUN",
+    "privacy_and_performance": "NOT_RUN",
+    "full_rules_certification": "BLOCKED",
+    "full_academy": "BLOCKED"
+  },
+  "staging": {
+    "status": "BLOCKED",
+    "url": null,
+    "sha": "1b73e7565411ac2df9d93652c21f217c5fdf5d0d",
+    "reason": "Vercel create preview returned 402 payment_required api-deployments-free-per-day; no matching deployment returned. Local git clone DNS failure; vercel CLI absent."
+  },
+  "decisions": {
+    "EXPERIMENTAL_PREVIEW_GO": false,
+    "FULL_RULES_VERIFIED": false,
+    "FORMAL_RELEASE_GO": false
+  },
+  "changeControl": {
+    "mainUnchangedAtIntake": "25870862b6499f7e699967aa76429ae5dcfc5db4",
+    "sourcePrsClosed": false,
+    "productionPromoted": false,
+    "releaseCreated": false,
+    "forcePush": false
+  },
+  "note": "The later documentation-only commit is not the application SHA; its CI must not substitute for application-SHA evidence. Source owner claims and isolated tests are not integrated passes."
+}

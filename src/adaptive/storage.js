@@ -8,6 +8,7 @@ import {
 import { validateScoredRecord, makeRecordRef, normalizeRecordEntries } from './records.js';
 import { buildAbilityProfile } from './ability.js';
 import { buildReviewPlan } from './review.js';
+import { transitionTrainingSession } from './session.js';
 import { validateAbilityProfile, validateReviewPlan, validateTrainingSession } from './validate.js';
 import { createLearningProvenance, validateProvenanceLinks, validateLearningProvenance,
   validateProvenanceShape } from './provenance.js';
@@ -80,11 +81,26 @@ export function validateAcademyState(state, { validateAcademyDecisionRecord } = 
       throw new RangeError('Inconsistent derived profile and review plan');
     }
   }
-  const sessionIds = new Set();
+  const sessionIds = new Set(), assignedScenarioRecords=new Set();
   for (const session of state.trainingSessions) {
     validateTrainingSession(session);
     if (sessionIds.has(session.sessionId)) throw new RangeError('Duplicate TrainingSession ID');
     sessionIds.add(session.sessionId);
+    const scenarioQuestionKeys=new Set();
+    for(const ref of session.recordRefs.filter(r=>r.kind==='academy-v1')){
+      const record=state.academyRecords.find(r=>r.id===ref.id);
+      if(!record||assignedScenarioRecords.has(ref.id)||
+         canonicalJson(record.ruleRef)!==canonicalJson(session.ruleRef)||
+         !session.questionRefs.some(q=>canonicalJson(q)===canonicalJson(record.questionRef)))
+        throw new RangeError('Invalid or reused scenario session record');
+      const qkey=record.questionRef.questionId+'@'+record.questionRef.questionVersion;
+      if(scenarioQuestionKeys.has(qkey))throw new RangeError('Duplicate scenario session question');
+      scenarioQuestionKeys.add(qkey);assignedScenarioRecords.add(ref.id);
+    }
+    if(session.extensions?.['adaptive.daily']?.mode==='scenario'&&
+      (session.recordRefs.some(r=>r.kind!=='academy-v1')||
+       session.status==='completed'&&scenarioQuestionKeys.size!==session.questionRefs.length))
+      throw new RangeError('Incomplete or mixed scenario Daily session');
   }
   return true;
 }
@@ -217,8 +233,17 @@ export function createAcademyStore(storage, {
       records, registry, asOf, profileId, legacySessions: legacy.archive.legacySessions,
       assessmentRefs, validateAcademyDecisionRecord, provenanceLinks: verifiedLinks,
     });
+    // Restore historical scenario review from the immutable, revalidated stored
+    // public question, not a UI hint. A retired/unavailable version fails closed.
+    const catalog=new Map(questionCatalog.map(q=>[q.questionId+'@'+q.questionVersion,q]));
+    if(typeof validateAcademyQuestion==='function')for(const q of state.academyQuestions){
+      if(validateAcademyQuestion(q)!==true)continue;
+      const key=q.questionId+'@'+q.questionVersion;
+      if(!catalog.has(key))catalog.set(key,{questionId:q.questionId,questionVersion:q.questionVersion,
+        taskType:'scenario',questionSnapshot:q,available:true});
+    }
     const reviewPlan = buildReviewPlan({
-      profile, records, asOf, timezone, questionCatalog, reservedQuestionRefs,
+      profile, records, asOf, timezone, questionCatalog:[...catalog.values()], reservedQuestionRefs,
       provenanceLinks, learning, validateAcademyDecisionRecord, validateAcademyQuestion,
     });
     return { profile, reviewPlan, records };
@@ -231,12 +256,13 @@ export function createAcademyStore(storage, {
       ...before, revision: before.revision + 1, abilityProfile: profile, reviewPlan,
     });
   }
-  function persistScoredRecord(entry, { asOf, assessmentRefs = [], questionCatalog = [], reservedQuestionRefs = [] } = {}) {
+  function persistScoredRecord(entry, { asOf, assessmentRefs = [], questionCatalog = [], reservedQuestionRefs = [], sessionId } = {}) {
     requireUtc(asOf);
     const [validated] = normalizeRecordEntries([entry], { validateAcademyDecisionRecord });
     const ref = makeRecordRef(validated.kind, validated.record);
     let state = load();
     if (validated.kind === 'legacy-v3') {
+      if(sessionId!==undefined)throw new RangeError('Legacy session must use canonical v3 provenance flow');
       const legacy = readLegacy();
       const stored = legacy.archive.records.find(r => r.id === ref.id);
       if (!legacy.hasCanonicalV3 || !stored ||
@@ -255,9 +281,34 @@ export function createAcademyStore(storage, {
       if (stored && canonicalJson(stored) !== canonicalJson(validated.record)) {
         throw new RangeError('Conflicting Academy record ID');
       }
-      if (!stored || !storedQuestion) {
+      // The raw scenario record, immutable question and its session reference
+      // share one atomic sidecar write. No cross-store write-ahead is needed.
+      let sessions=state.trainingSessions;
+      if(sessionId!==undefined){
+        requireId(sessionId,'sessionId');
+        const session=sessions.find(s=>s.sessionId===sessionId);
+        if(!session||session.extensions?.['adaptive.daily']?.mode!=='scenario'||
+           canonicalJson(session.ruleRef)!==canonicalJson(validated.record.ruleRef)||
+           !session.questionRefs.some(q=>canonicalJson(q)===canonicalJson(validated.record.questionRef)))
+          throw new RangeError('Invalid scenario session reference');
+        const has=session.recordRefs.some(r=>r.kind==='academy-v1'&&r.id===ref.id);
+        if(stored&&!has)throw new RangeError('Cannot attach historical scenario attempt to a new session');
+        if(!has){
+          if(!['planned','active'].includes(session.status))throw new RangeError('Terminal scenario session');
+          if(session.recordRefs.some(r=>r.kind==='academy-v1'&&
+            canonicalJson(state.academyRecords.find(x=>x.id===r.id)?.questionRef)===canonicalJson(validated.record.questionRef)))
+            throw new RangeError('Scenario question already submitted in session');
+          let next=session.status==='planned'?transitionTrainingSession(session,'active',{at:asOf,recordRefs:[ref]}):
+            {...session,recordRefs:[...session.recordRefs,ref]};
+          if(next.recordRefs.length===next.questionRefs.length)next=transitionTrainingSession(next,'completed',{at:asOf});
+          sessions=sessions.map(s=>s.sessionId===sessionId?next:s);
+        }
+      } else if(stored&&sessions.some(s=>s.recordRefs.some(r=>r.kind==='academy-v1'&&r.id===ref.id))){
+        throw new RangeError('Scenario attempt already belongs to a session');
+      }
+      if (!stored || !storedQuestion || sessions!==state.trainingSessions) {
         const result = save({
-          ...state, revision: state.revision + 1,
+          ...state, revision: state.revision + 1,trainingSessions:sessions,
           academyRecords: stored ? state.academyRecords : [...state.academyRecords, validated.record],
           academyQuestions: storedQuestion ? state.academyQuestions : [...state.academyQuestions, question],
         });
@@ -431,7 +482,8 @@ export function createAcademyStore(storage, {
       const qref = p?.academyQuestionRef ??
         (ref.kind === 'legacy-v3'
           ? { questionId: legacy.archive.records.find(r => r.id === ref.id)?.exerciseId,
-            questionVersion: 'legacy-exercise-v3' } : null);
+            questionVersion: 'legacy-exercise-v3' } :
+            state.academyRecords.find(r=>r.id===ref.id)?.questionRef);
       if (!qref || !session.questionRefs.some(q => canonicalJson(q) === canonicalJson(qref))) {
         throw new RangeError('Session RecordRef is unrelated to planned question');
       }

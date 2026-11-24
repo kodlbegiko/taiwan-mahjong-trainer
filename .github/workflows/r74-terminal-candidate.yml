@@ -1,0 +1,109 @@
+name: R7.4 isolated terminal Replay acceptance
+on:
+  push:
+    branches: [integration/r74-terminal-replay-candidate]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  strict-native:
+    if: github.ref_name == 'integration/r74-terminal-replay-candidate'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      RULES_REQUIRE_R73_SCORING: '1'
+      SCORING_REQUIRE_R73_RULES: '1'
+      REPLAY_REQUIRE_R73_AUTHORITATIVE: '1'
+      REPLAY_REQUIRE_R7_RULES: '1'
+      REPLAY_REQUIRE_R7_SCORING: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Exact SHA and strict contracts
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          node --test tests/replay/r3-full-round.test.js tests/replay/r5-single-winner-replay.test.js tests/replay/r73-authoritative-ledger.test.js tests/replay/r73-authoritative-replay.test.js tests/replay/r73-historical-settlement.test.js tests/replay/r73-mixed-history.test.js tests/scoring/pre-settlement.test.js tests/scoring/r73-rules-integration.test.js tests/rules/r73-authoritative-settlement.test.js tests/browser/table-session.test.js | tee "$RUNNER_TEMP/terminal.tap"
+          grep -Fxq '# skipped 0' "$RUNNER_TEMP/terminal.tap"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r74-terminal-native
+          path: ${{ runner.temp }}/terminal.tap
+          retention-days: 14
+  r73-seeded-ui:
+    name: R7.3 fixed-seed real UI / ${{ matrix.difficulty }}
+    if: github.ref_name == 'integration/r74-terminal-replay-candidate'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 65
+    strategy:
+      fail-fast: false
+      matrix:
+        difficulty: [Beginner, Intermediate, Advanced]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install 'playwright==1.56.0'
+      - run: google-chrome --version
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Discover genuine deterministic Rules scenarios (not browser evidence)
+        run: |
+          node tests/browser/r73-seed-plans.mjs --difficulty "${{ matrix.difficulty }}" \
+            --limit 12 --output r73-seeded-evidence/discovery.json
+      - name: Explicit fixed seed via normal UI, independently replay all legal decisions
+        run: |
+          python tests/browser/r73-exact-origin-gate.py \
+            --difficulty "${{ matrix.difficulty }}" --plans r73-seeded-evidence/discovery.json \
+            --screenshots r73-seeded-evidence
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: r73-seeded-${{ matrix.difficulty }}
+          path: r73-seeded-evidence
+          if-no-files-found: error
+          retention-days: 14
+
+  r73-seeded-coverage:
+    name: R7.3 observed seeded coverage across all difficulties
+    if: always() && github.ref_name == 'integration/r74-terminal-replay-candidate'
+    needs: [r73-seeded-ui]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: r73-seeded-*
+          path: r73-matrix
+      - name: Require actual browser observations, never discovery-only results
+        run: |
+          python - <<'PY'
+          import json, pathlib
+          reports=[json.loads(p.read_text()) for p in pathlib.Path('r73-matrix').rglob('r73-acceptance.json')]
+          matches=[m for r in reports for m in r['matches'] if m['exactPlanVerified']]
+          kinds={k for m in matches for k in m['humanActionKinds']}
+          outcomes={m['outcome'] for m in matches}
+          difficulties={m['difficulty'] for m in matches}
+          missing=({'Beginner','Intermediate','Advanced'}-difficulties)|({'WIN','DRAW'}-outcomes)|({'replace_flower','chi','pong','kong','pass','win','discard','draw'}-kinds)
+          result={'difficulties':sorted(difficulties),'outcomes':sorted(outcomes),'observedHumanKinds':sorted(kinds),'missing':sorted(missing),'matches':len(matches)}
+          print('R73_MATRIX '+json.dumps(result))
+          pathlib.Path('r73-matrix/coverage.json').write_text(json.dumps(result,indent=2))
+          assert len(reports)==3 and not any(r['errors'] for r in reports) and not missing, 'Required real seeded coverage not observed: '+repr(missing)
+          PY
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: r73-seeded-coverage-summary
+          path: r73-matrix/coverage.json
+          if-no-files-found: warn
+          retention-days: 14
