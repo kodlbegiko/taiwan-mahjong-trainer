@@ -140,6 +140,24 @@ test('R7 schema-only proposal projection counts fourth physical copy once and re
    return v;
  };
  const responder=make(2),declarer=make(1);
+ const authority={profileId:'tw16-authoritative-scoring',ruleVersion:'experimental-v1'};
+ const retag=v=>{
+   const x=cp(v);x.ruleRef=cp(authority);
+   x.publicEvents.forEach(e=>e.ruleRef=cp(authority));
+   x.legalActions.forEach(a=>a.ruleRef=cp(authority));return x;
+ };
+ const auth=retag(responder);
+ assert.equal(isSupportedBotTableProfile(authority),true);
+ assert.equal(isSupportedBotTableProfile({...authority,ruleVersion:'experimental-v2'}),false);
+ assert.equal(readBotView(auth).counts[5],4);
+ for(const difficulty of levels){
+   const b=createBot({seat:2,difficulty,seed:'authority-schema-only'});
+   const d=chooseBotAction(b,auth);
+   assert.equal(d.actionId,'schema-win');
+   assert.equal(validateBotDecision(b,auth,d),true);
+ }
+ const forgedAuthority=cp(auth);forgedAuthority.publicEvents.at(-1).payload.privateClaimIntents=[1];
+ assert.throws(()=>readBotView(forgedAuthority));
  assert.equal(readBotView(responder).counts[5],4);
  assert.equal(readBotView(declarer).counts[5],4);
  for(const difficulty of levels){
@@ -224,4 +242,34 @@ test('R7 actual controller accepts WIN/PASS and fails closed on competing robber
  assert.deepEqual(state,before);
  assert.equal((await controller.tick()).status,'unsupported');
  assert.deepEqual(replayGame(state),state);
+});
+
+// Synthetic terminal DTO exercises the wire allowlist, not Rules acceptance.
+// The combined checkout must also pass the real Rules/Scoring archive gate.
+test('R7.4 authority terminal accounting is accepted only without private data',()=>{
+ const {before}=prepared(false,{profileId:'tw16-single-winner-interception',ruleVersion:'experimental-v1'});
+ const ref={profileId:'tw16-authoritative-scoring',ruleVersion:'experimental-v1'};
+ const v=cp(createPlayerView(before,2));
+ v.ruleRef=cp(ref);v.round.phase='settled';v.legalActions=[];
+ v.publicEvents.forEach(e=>{e.ruleRef=cp(ref);if(e.type==='claim'||e.type==='kong')delete e.causedByActionId;});
+ const last=v.publicEvents.at(-1),base={...last,ruleRef:cp(ref),visibility:'public'};
+ delete base.causedByActionId;delete base.actorSeat;
+ const draw={contractVersion:'tw16-pre-settlement/1.0.0',settlementId:v.round.roundId,
+   scoringVersion:'tw16-gametower-authoritative@1.0.0-experimental',
+   status:'experimental-not-rule-certified',unit:'abstract-points',reason:'exhaustive-draw',
+   winType:null,winnerSeat:null,sourceSeat:null,payerSeats:[],publicEvidenceEventIds:[],
+   tai:0,breakdown:[],payments:[],playerTransferDeltas:[0,0,0,0],playerDeltas:[0,0,0,0],fees:[],houseDelta:0};
+ v.asOfEventSeq++;v.round.lastPublicEventSeq=v.asOfEventSeq;v.round.scores=[0,0,0,0];
+ v.publicEvents.push({...base,eventId:'evt:fixture:terminal',seq:v.asOfEventSeq,type:'settle',payload:{settlement:draw}});
+ assert.equal(readSettledBotView(v).view.round.phase,'settled');
+ for(const mutate of [
+   x=>{x.publicEvents.at(-1).payload.settlement.privateLedger={};},
+   x=>{x.publicEvents.at(-1).payload.settlement.playerDeltas=[0,1,-1,0];},
+   x=>{x.publicEvents.at(-1).payload.settlement.sourceSeat=0;},
+   x=>{x.publicEvents.at(-1).payload.settlement.publicEvidenceEventIds=['private'];},
+   x=>{x.legalActions=[{kind:'draw'}];},
+   x=>{x.opponents[0].concealed=[];},
+ ]){
+   const x=cp(v);mutate(x);assert.throws(()=>readSettledBotView(x));
+ }
 });

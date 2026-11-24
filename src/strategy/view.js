@@ -121,10 +121,14 @@ function member(s, self = false) {
   array(s.flowers, 'flowers').forEach(t => identity(t, 'flower'));
 }
 
-/** Only the exact Rules #51 opt-in contract may disclose a proposed kong. */
-export function isRobAddedKongRuleRef(ref) {
-  return ref?.profileId==='tw16-rob-added-kong' &&
+/** Exactly the two reviewed opt-in profiles share this public robbery contract. */
+export function isAuthoritativeRuleRef(ref) {
+  return ref?.profileId==='tw16-authoritative-scoring' &&
     ref?.ruleVersion==='experimental-v1';
+}
+export function isRobAddedKongRuleRef(ref) {
+  return (ref?.profileId==='tw16-rob-added-kong' &&
+    ref?.ruleVersion==='experimental-v1') || isAuthoritativeRuleRef(ref);
 }
 export function validateRobKongPublicEvent(e, events, ref, terminal=false) {
   const p=e.payload;
@@ -173,7 +177,8 @@ export function validateRobKongPublicEvent(e, events, ref, terminal=false) {
   }
   if(!terminal||!['win','settle'].includes(e.type))
     throw new RangeError('R7 robbery result is terminal-only');
-  const keys=e.type==='win'?['seat','sourceSeat','robAddedKong']:['robAddedKong'];
+  const keys=e.type==='win'?['seat','sourceSeat','robAddedKong']:
+    isAuthoritativeRuleRef(ref)?['robAddedKong','settlement']:['robAddedKong'];
   object(p,'R7 terminal payload',keys,keys);
   const m=p.robAddedKong;
   object(m,'R7 robbery marker',['proposalEventId','fromSeat','tileId'],
