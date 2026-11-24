@@ -160,7 +160,18 @@ export function buildReviewPlan({
 }
 export function getTodayRecommendation(profile, reviewPlan, asOf) {
   requireV1(profile, 'AbilityProfile'); requireV1(reviewPlan, 'ReviewPlan');
-  const day = localDayKey(asOf, reviewPlan.settings.timezone);
+  const at = requireUtc(asOf);
+  if (profile.profileId !== reviewPlan.profileId ||
+      profile.calibrationStatus !== reviewPlan.calibrationStatus)
+    throw new RangeError('ReviewPlan belongs to a different ability profile');
+  if (Date.parse(profile.updatedAt) > Date.parse(at) ||
+      Date.parse(reviewPlan.generatedAsOf) > Date.parse(at) ||
+      Date.parse(reviewPlan.generatedAsOf) < Date.parse(profile.updatedAt))
+    throw new RangeError('ReviewPlan and ability snapshot time mismatch');
+  const sourceKeys = new Set(profile.sourceRecordRefs.map(recordKey));
+  if (reviewPlan.items.some(item => item.sourceRecordRefs.some(ref => !sourceKeys.has(recordKey(ref)))))
+    throw new RangeError('ReviewPlan refers to evidence absent from ability snapshot');
+  const day = localDayKey(at, reviewPlan.settings.timezone);
   const available = reviewPlan.items.filter(x =>
     !x.reasonCodes.some(r => r.startsWith('unavailable:')) &&
     localDayKey(x.dueAt, reviewPlan.settings.timezone) <= day);
@@ -168,8 +179,35 @@ export function getTodayRecommendation(profile, reviewPlan, asOf) {
   const weakSkills = profile.skills.filter(x => x.attempts > 0)
     .sort((a, b) => (a.estimatedProficiency ?? a.scoreSum / a.attempts) -
       (b.estimatedProficiency ?? b.scoreSum / b.attempts) || a.tagId.localeCompare(b.tagId));
+  // A descriptive learning signal, not a calibrated mastery probability.
+  // Keep the legacy weakSkillTags ordering for existing consumers.
+  const breakdown = new Map((profile.extensions?.['adaptive.evidence']?.skillBreakdown ?? [])
+    .map(row => [row.tagId, row]));
+  const diagnostics = profile.skills.map(skill => {
+    const evidence = breakdown.get(skill.tagId);
+    const uniqueQuestionCount = evidence?.uniqueQuestionCount ?? null;
+    const observedMean = skill.attempts ? skill.scoreSum / skill.attempts : null;
+    const sufficient = skill.attempts >= 5 && uniqueQuestionCount >= 3 &&
+      Number.isFinite(skill.estimatedProficiency);
+    return {
+      tagId: skill.tagId, attempts: skill.attempts, uniqueQuestionCount, observedMean,
+      practiceAttempts: evidence?.practiceAttempts ?? null,
+      unseenAssessmentAttempts: evidence?.unseenAssessmentAttempts ?? null,
+      contaminatedAssessmentAttempts: evidence?.contaminatedAssessmentAttempts ?? null,
+      status: !skill.attempts ? 'unobserved' : !sufficient ? 'insufficient-evidence' :
+        observedMean < 0.8 ? 'practice-priority' : 'observed-high-score',
+    };
+  }).sort((a,b)=>a.tagId.localeCompare(b.tagId));
   return {
-    ...V1, generatedAsOf: requireUtc(asOf),
+    ...V1, generatedAsOf: at,
+    diagnosticPolicy: { version: 'observed-practice-priority/1.0.0',
+      minAttempts: 5, minUniqueQuestions: 3, practiceScoreThreshold: 0.8,
+      calibratedMastery: false },
+    skillDiagnostics: diagnostics,
+    evidencePriorityTags: diagnostics.filter(x=>x.status==='practice-priority')
+      .sort((a,b)=>a.observedMean-b.observedMean||a.tagId.localeCompare(b.tagId)).map(x=>x.tagId),
+    samplingPriorityTags: diagnostics.filter(x=>['unobserved','insufficient-evidence'].includes(x.status))
+      .sort((a,b)=>a.attempts-b.attempts||a.tagId.localeCompare(b.tagId)).map(x=>x.tagId),
     dueQuestions: due.map(item => ({ ...item })),
     weakSkillTags: weakSkills.map(x => x.tagId),
     unknownSkillTags: profile.skills.filter(x => x.attempts === 0).map(x => x.tagId),
