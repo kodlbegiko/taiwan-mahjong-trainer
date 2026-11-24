@@ -45,7 +45,7 @@ const name={
   mixedSuit:'混一色',pureSuit:'清一色',allHonors:'字一色',
   smallDragons:'小三元',bigDragons:'大三元',smallWinds:'小四喜',bigWinds:'大四喜',
   concealedTriplets:'暗刻',openKong:'明槓',concealedKong:'暗槓',
-  noHonorsNoFlowers:'無字無花',
+  noHonorsNoFlowers:'無字無花',robAddedKong:'搶槓胡',
 };
 function validateEvidence(p,e){
   validateScoringProfile(p);
@@ -61,6 +61,19 @@ function validateEvidence(p,e){
   }
   if(e.via==='self-draw'&&e.winningTile!==undefined)
     assert(false,'discard winningTile must not accompany self-draw');
+  if(e.robAddedKong!==undefined){
+    const marker=e.robAddedKong;
+    assert(e.ruleRef.profileId==='tw16-rob-added-kong'&&
+      e.ruleRef.ruleVersion==='experimental-v1','rob-added-kong profile pin');
+    assert(e.via==='discard'&&e.winnerSeat!==e.sourceSeat,
+      'rob-added-kong must be a discard-liability win');
+    assert(marker&&typeof marker.proposalEventId==='string'&&
+      marker.proposalEventId.length>0&&seat(marker.fromSeat)&&
+      typeof marker.tileId==='string'&&
+      marker.fromSeat===e.sourceSeat&&marker.tileId===e.winningTile,
+      'rob-added-kong provenance/source/winning tile mismatch');
+    typeOf(marker.tileId);
+  }
   if(e.specialWin!==undefined&&e.specialWin!=='ordinary')
     throw new ScoringCapabilityError(e.specialWin);
   if(e.liability!==undefined&&e.liability!==null)
@@ -133,6 +146,10 @@ export function scoreWinningHand(profile,evidence){
     assert(roles.length>0,'winning tile has no legal decomposition role');
     for(const role of roles){
       const items=[];
+      if(evidence.robAddedKong)
+        add(items,'rob-added-kong','robAddedKong',
+          'public kong_proposed '+evidence.robAddedKong.proposalEventId+
+          ' / source seat '+evidence.sourceSeat+' / tile '+evidence.robAddedKong.tileId);
       if(allConcealed&&finalConcealed)add(items,'concealed-self-draw','concealedSelfDraw','no open meld and self-drawn');
       else{
         if(allConcealed)add(items,'concealed','concealed','no open meld');
@@ -217,7 +234,7 @@ export function scoreWinningHand(profile,evidence){
     decomposition:best.decomposition,via:evidence.via,
     winnerSeat:evidence.winnerSeat,sourceSeat:evidence.sourceSeat,
     ruleRef:{...evidence.ruleRef},excludedCapabilities:[
-      'special-wins','wait-shape','flat-hand','rob-kong','bao-pai','multi-winner',
+      'special-wins','wait-shape','flat-hand','bao-pai','multi-winner',
       'declared-ready','heaven-earth-wins'],
     sourceRefs:[...profile.sourceRefs]};
 }
