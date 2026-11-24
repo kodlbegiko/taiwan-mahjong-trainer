@@ -133,7 +133,7 @@ export function validateRobKongPublicEvent(e, events, ref, terminal=false) {
     // never appear on anonymous replies or their derived public events.
     if(e.type==='claim'&&e.actorSeat===undefined)
       object(p,'R7 anonymous reply',[],[]);
-    const prev=events.find(x=>x.seq===e.seq-1);
+    const prev=e.type==='settle'?events.find(x=>x.seq===e.seq-1):null;
     const privateTrigger=e.type==='claim'||
       (e.type==='kong'&&(p?.claimEventId!==undefined||p?.proposalEventId!==undefined))||
       (e.type==='win'&&(p?.robAddedKong!==undefined||p?.seat!==p?.sourceSeat))||

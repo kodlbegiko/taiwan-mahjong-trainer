@@ -22,8 +22,8 @@ const triplets=start=>Array.from({length:4},(_,t)=>
   Array.from({length:3},(_,i)=>'t:'+(start+t)+':'+i)).flat();
 const robber=(start,pair,i=0)=>[...triplets(start),'t:6:'+i,'t:7:'+i,
   't:'+pair+':0','t:'+pair+':1'];
-function fixtureDeck(tiles,live){
-  const all=createDeck(getRuleProfile(R7.profileId,R7.ruleVersion)),seen=new Set();
+function fixtureDeck(tiles,live,ref=R7){
+  const all=createDeck(getRuleProfile(ref.profileId,ref.ruleVersion)),seen=new Set();
   const hands=Array.from({length:4},(_,i)=>[...(tiles[i]||[])]);
   for(const id of [...hands.flat(),...live]){
     assert.ok(all.includes(id)&&!seen.has(id),'duplicate/unknown fixture '+id);seen.add(id);
@@ -45,12 +45,12 @@ function respond(s,kinds={}){
   for(const seat of listPendingClaimResponders(s))s=take(s,choose(s,seat,kinds[seat]||'pass'));
   return s;
 }
-function prepared(two=false){
+function prepared(two=false,ref=R7){
   const live=['t:31:3','t:32:3','t:33:3','t:5:2'];
   const seats={0:['t:5:3'],1:['t:5:0','t:5:1'],2:robber(9,27)};
   if(two)seats[3]=robber(18,28,1);
   let s=createGame({gameId:'r7-rob-'+(two?'multi':'one'),seed:'r7-seed',
-    fixtureDeck:fixtureDeck(seats,live),...R7});
+    fixtureDeck:fixtureDeck(seats,live,ref),...ref});
   s=take(s,choose(s,0,'discard','t:5:3'));
   s=respond(s,{1:'pong'});
   assert.equal(s.players[1].melds.at(-1).kind,'triplet');
@@ -103,6 +103,56 @@ test('R7 robbery public schema is exact-version and rejects hidden fields',()=>{
  const settle={...win,type:'settle',seq:9,eventId:'evt:fixture:9',payload:{robAddedKong:win.payload.robAddedKong}};
  assert.equal(validateRobKongPublicEvent(settle,[proposal,win,settle],R7,true),true);
  assert.throws(()=>validateRobKongPublicEvent({...settle,payload:{robAddedKong:{...settle.payload.robAddedKong,privateClaimIntents:[1]}}},[proposal,win],R7,true));
+});
+
+test('R7 schema-only proposal projection counts fourth physical copy once and rejects non-WIN/PASS',()=>{
+ // Existing R5 source prepares a real exposed triplet plus its fourth tile.
+ // Retag and append an explicitly synthetic wire projection ONLY to exercise
+ // the new parser before Rules #51 is integrated. No fake action is applied.
+ const R5={profileId:'tw16-single-winner-interception',ruleVersion:'experimental-v1'};
+ const {before,proposal}=prepared(false,R5);
+ const make=seat=>{
+   const v=cp(createPlayerView(before,seat));
+   v.ruleRef=cp(R7);v.asOfEventSeq++;v.viewId+='-r7-schema-fixture';
+   v.round.phase='claim_window';v.round.currentSeat=2;
+   v.round.lastPublicEventSeq=v.asOfEventSeq;
+   v.publicEvents=v.publicEvents.map(e=>{
+     e.ruleRef=cp(R7);
+     if(e.type==='claim'||(e.type==='kong'&&e.payload.claimEventId))
+       delete e.causedByActionId;
+     return e;
+   });
+   const q={schemaVersion:v.schemaVersion,contractVersion:v.contractVersion,
+     eventId:'fixture-proposal-'+v.asOfEventSeq,gameId:v.gameId,
+     seq:v.asOfEventSeq,ruleRef:cp(R7),actorSeat:1,type:'kong_proposed',
+     visibility:'public',payload:{kind:'ADDED_KONG',tileId:'t:5:2'},
+     previousEventId:v.publicEvents.at(-1).eventId,causedByActionId:proposal.actionId};
+   v.publicEvents.push(q);
+   v.knownUnavailableTypes=[...new Set([...v.knownUnavailableTypes,5])];
+   const a={...cp(proposal),actorSeat:seat,expectedRevision:v.asOfEventSeq,
+     ruleRef:cp(R7),claimEventId:q.eventId};
+   v.legalActions=seat===1?[]:[
+     {...a,actionId:'schema-pass',kind:'pass',tileIds:[],
+       legalityBasis:{...a.legalityBasis,reasonCodes:['CLAIM_WINDOW_PASS']}},
+     {...a,actionId:'schema-win',kind:'win',tileIds:['t:5:2'],
+       legalityBasis:{...a.legalityBasis,reasonCodes:['ROB_ADDED_KONG_WIN']}},
+   ];
+   return v;
+ };
+ const responder=make(2),declarer=make(1);
+ assert.equal(readBotView(responder).counts[5],4);
+ assert.equal(readBotView(declarer).counts[5],4);
+ for(const difficulty of levels){
+   const b=createBot({seat:2,difficulty,seed:'schema-only'});
+   const d=chooseBotAction(b,responder);
+   assert.equal(d.actionId,'schema-win');
+   assert.equal(validateBotDecision(b,responder,d),true);
+ }
+ const forged=cp(responder);forged.legalActions[1].kind='pong';
+ assert.throws(()=>readBotView(forged),/WIN\/PASS/);
+ const leaked=cp(responder);
+ leaked.publicEvents.at(-1).payload.privateClaimIntents=[1];
+ assert.throws(()=>readBotView(leaked));
 });
 test('R7 actual Rules proposal view, WIN/PASS and masked intent for every level',gate,()=>{
  assert.equal(getRuleCapabilities(R7).publicEventContractVersion,'tw16-rob-added-kong-public/1.0.0');
