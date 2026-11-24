@@ -140,8 +140,10 @@ export function createDailyTrainingController(storage, {
     const catalog=publishedCatalog(mode);
     const {session}=planDailyTraining({
       profile:state.abilityProfile,reviewPlan:state.reviewPlan,
-      records:adaptive.readLegacy().archive.records,
-      provenanceLinks:state.provenanceLinks??[],learning,registry,
+      // The published/unlocked catalog is already authoritative. Historical
+      // records influence the rebuilt profile and review plan above; do not
+      // reintroduce retired or conflicting historical candidates here.
+      records:[],provenanceLinks:[],learning,registry,
       validateAcademyDecisionRecord,
       validateAcademyQuestion:sourceVerified,
       questionCatalog:catalog,minutes,asOf:at,

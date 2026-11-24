@@ -145,6 +145,19 @@ export function createMasterAcademyFacade(storage) {
     },
     resolveReviewQuestion(item) { return adapter.resolveReviewQuestion(item); },
     getRecordProvenance(recordRef) {
+      if(recordRef?.kind==='academy-v1'){
+        const state=adapter.load(),record=state.academyRecords.find(r=>r.id===recordRef.id);
+        if(!record)return null;
+        const question=state.academyQuestions.find(q=>q.questionId===record.questionRef.questionId&&
+          q.questionVersion===record.questionRef.questionVersion);
+        if(!question||validateAcademyDecisionRecord(record,{question})!==true)throw new RangeError('Scenario proof invalid');
+        return {recordRef:clone(recordRef),questionRef:clone(record.questionRef),lessonRef:clone(question.lessonRef),
+          scoringEvidence:clone(record.scoringEvidence),scoringVersion:record.scoringVersion,
+          sourceViewRef:clone(record.sourceViewRef),skillTagIds:clone(record.skillTagIds),
+          abilityEvidence:state.abilityProfile?.sourceRecordRefs.some(r=>r.kind==='academy-v1'&&r.id===record.id)===true,
+          reviewEvidence:state.reviewPlan?.items.some(i=>i.questionId===record.questionRef.questionId&&
+            i.questionVersion===record.questionRef.questionVersion&&i.sourceRecordRefs.some(r=>r.kind==='academy-v1'&&r.id===record.id))===true};
+      }
       return verifiedLinks().find(x=>x.recordRef.kind===recordRef?.kind &&
         x.recordRef.id===recordRef?.id) ?? null;
     },

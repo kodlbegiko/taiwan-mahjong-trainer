@@ -165,28 +165,66 @@ export function createAcademyBridge(facade,storage,{now=()=>new Date().toISOStri
       }catch(e){this.warning='選課進度無法儲存；作答後需再次確認本機儲存狀態。';}
       return publicQ;
     },
+    scenarioRefs(lessonId){
+      if(fixtureOnly||facade.capabilities?.verifiedScenarioScorer!==true||
+         typeof facade.getScenarioQuestionRefs!=='function')return [];
+      return facade.getScenarioQuestionRefs({lessonId});
+    },
+    startScenario(lessonId,{questionRef=null}={}){
+      const lesson=this.lessons.find(l=>l.lessonId===lessonId);
+      assert(lesson&&this.canStart(lesson),'尚未完成先修課程');
+      const refs=this.scenarioRefs(lessonId);
+      const ref=questionRef?refs.find(r=>key(r)===key(questionRef)):refs[0];
+      assert(ref,'找不到正式情境題');
+      const q=facade.getPublicQuestion(ref);
+      assert(q?.schemaVersion===1&&q.contractVersion===ACADEMY_CONTRACT&&q.status==='validated'&&
+        q.taskType==='scenario'&&key(q)===key(ref)&&q.lessonRef?.lessonId===lessonId&&
+        q.lessonRef?.lessonVersion===lesson.lessonVersion&&!Object.hasOwn(q,'answerKey'),'正式情境題來源無效');
+      assert(Array.isArray(q.prompt?.options)&&q.prompt.options.length>0&&
+        q.prompt.options.every(id=>typeof id==='string'&&q.prompt.playerView.legalActions.some(a=>a.actionId===id)&&
+          typeof q.prompt.optionLabels[id]==='string'),'情境題合法動作無效');
+      this.selectedLessonId=lessonId;this.question=clone(q);this.choice=[];this.startedAt=Date.now();this.attemptId=null;
+      this.phase='answering';this.result=null;this.error=null;this.warning=null;
+      return q;
+    },
     select(tile){
       assert(this.phase==='answering'&&this.question,'沒有等待作答的正式題目');
       const options=this.question.prompt.options;
       assert(options.includes(tile),'不是合法的選擇');
-      if(this.question.taskType==='discard') this.choice=[tile];
+      if(['discard','scenario'].includes(this.question.taskType)) this.choice=[tile];
       else this.choice=this.choice.includes(tile)?this.choice.filter(x=>x!==tile):[...this.choice,tile].sort((a,b)=>a-b);
       return this.choice;
     },
     submit(){
       assert(this.phase==='answering'&&this.question,'此題不可再次提交');
-      assert(this.question.taskType!=='discard'||this.choice.length===1,'尚未選擇要捨棄的牌');
+      assert(!['discard','scenario'].includes(this.question.taskType)||this.choice.length===1,'尚未選擇合法動作');
       const ref={questionId:this.question.questionId,questionVersion:this.question.questionVersion};
-      const choice=this.question.taskType==='discard'?this.choice[0]:[...this.choice];
+      const scenario=this.question.taskType==='scenario';
+      const choice=scenario||this.question.taskType==='discard'?this.choice[0]:[...this.choice];
       const timestamp=now();
       this.attemptId=this.attemptId??('academy-ui-'+(globalThis.crypto?.randomUUID?.()??String(Date.now())+'-'+Math.floor(Math.random()*1e9)));
       let result;
       try {
-        result=facade.submitStructuralAnswer(ref,choice,{timestamp,
+        result=(scenario?facade.submitScenarioAnswer:facade.submitStructuralAnswer)(ref,choice,{timestamp,
           durationMs:Math.max(0,Date.now()-this.startedAt),attemptId:this.attemptId,asOf:timestamp});
       } catch(e) {
         this.phase='failed';this.error='官方提交或儲存失敗：'+e.message+'。請重新載入核對原始紀錄，勿連續重複送出。';
         return null;
+      }
+      if(scenario){
+        this.result=clone(result);
+        if(result?.recordRef?.kind!=='academy-v1'||result.recordRef.id!==this.attemptId||
+           result.gradingResult?.status!=='graded'||result.durable!==true){
+          this.phase='failed';this.error='情境原始紀錄尚未正式保存。';return result;
+        }
+        try{
+          this.refresh();
+          const proof=facade.getRecordProvenance(result.recordRef);
+          assert(proof&&key(proof.questionRef)===key(ref)&&proof.lessonRef.lessonId===this.selectedLessonId&&
+            proof.abilityEvidence&&proof.reviewEvidence,'情境紀錄或衍生證據未讀回');
+          this.phase='saved';this.warning=null;
+        }catch(e){this.phase='partial';this.warning='情境紀錄已保存，衍生證據需要恢復：'+e.message;}
+        return result;
       }
       // A valid score alone is not a durable submission.
       if(!result||!validRecordRef(result.recordRef)||result.recordRef.id!==this.attemptId
@@ -237,6 +275,12 @@ export function createAcademyBridge(facade,storage,{now=()=>new Date().toISOStri
     },
     reviewLink(item){
       if(!item||!validRef(item))return null;
+      if(!fixtureOnly&&item.sourceRecordRefs?.some(r=>r.kind==='academy-v1')){
+        const resolved=facade.resolveReviewQuestion(item);
+        if(resolved?.available&&resolved.source==='academy-scenario'&&
+           this.canStart(resolved.lesson))return {...resolved.questionRef,lessonId:resolved.lesson.lessonId,scenario:true};
+        return null;
+      }
       // Adaptive now emits academy-q-* for verified provenance, but imported
       // legacy v3 reviews may still use ex3-*; never guess the mapping.
       const matches=this.links.links.filter(l=>{
