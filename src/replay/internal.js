@@ -151,6 +151,100 @@ function verifyPinnedSettlement(state,version) {
       throw new ReplayError('INVALID_SETTLEMENT','Robbery settlement marker mismatch');
   }
 }
+
+// Exact Scoring #52 R7.3 host contract. These helpers validate the ledger
+// independently of the scorer. They never create a settlement or invoke a
+// latest/comparative policy. Rules remains the authority for legal action and
+// evidence provenance, and canonical replay must still reproduce every byte.
+export const AUTHORITATIVE_RULE_REF=Object.freeze({profileId:'tw16-authoritative-scoring',ruleVersion:'experimental-v1'});
+export const AUTHORITATIVE_SCORING_REF=Object.freeze({profileId:'tw16-gametower-authoritative',version:'1.0.0-experimental'});
+export const AUTHORITATIVE_SCORING_VERSION='tw16-gametower-authoritative@1.0.0-experimental';
+export const AUTHORITATIVE_PRE_SETTLEMENT='tw16-pre-settlement/1.0.0';
+const PUBLIC_ROBBERY_CONTRACT='tw16-rob-added-kong-public/1.0.0';
+const SCORE_CONTRACT='tw16-scoring/1.0.0-experimental';
+const validInt=n=>Number.isSafeInteger(n)&&!Object.is(n,-0);
+const validSeat=n=>validInt(n)&&n>=0&&n<4;
+const sumBig=values=>values.reduce((n,v)=>n+BigInt(v),0n);
+const fourInts=a=>Array.isArray(a)&&a.length===4&&a.every(validInt);
+function ledgerCheck(ok,message){
+  if(!ok)throw new ReplayError('INVALID_SETTLEMENT','Authoritative ledger: '+message);
+}
+function validItems(items,scope){
+  return Array.isArray(items)&&items.every(x=>x&&typeof x.code==='string'&&x.code&&
+    typeof x.name==='string'&&typeof x.source==='string'&&typeof x.evidence==='string'&&
+    x.ruleVersion===AUTHORITATIVE_SCORING_VERSION&&x.scope===scope&&validInt(x.tai)&&x.tai>=0)&&
+    new Set(items.map(x=>x.code)).size===items.length;
+}
+/**
+ * Private audit of the exact immutable Scoring #52 ledger. Context MUST be
+ * derived from canonical Rules events, never caller/UI facts. This check
+ * validates output accounting/binding; it does not certify winning-hand facts.
+ */
+export function verifyAuthoritativeLedger(ledger,{gameId,roundId,sourceRevision,events,reason,winnerSeat,sourceSeat,winType,robAddedKong}){
+  ledgerCheck(ledger&&ledger.contractVersion===SCORE_CONTRACT&&
+    ledger.scoringVersion===AUTHORITATIVE_SCORING_VERSION&&
+    ledger.preSettlementContractVersion===AUTHORITATIVE_PRE_SETTLEMENT&&
+    ledger.publicEventContractVersion===PUBLIC_ROBBERY_CONTRACT&&
+    same(ledger.ruleRef,AUTHORITATIVE_RULE_REF)&&same(ledger.scoringRef,AUTHORITATIVE_SCORING_REF)&&
+    ledger.status==='experimental-not-rule-certified'&&ledger.unit==='abstract-points',
+    'missing or incompatible version');
+  ledgerCheck(ledger.gameId===gameId&&ledger.roundId===roundId&&ledger.settlementId===roundId&&
+    validInt(sourceRevision)&&sourceRevision>=1&&ledger.sourceRevision===sourceRevision&&
+    ledger.reason===reason&&ledger.winType===winType,'round/source identity');
+  ledgerCheck(Array.isArray(events)&&Array.isArray(ledger.evidenceEventIds)&&ledger.evidenceEventIds.length>0,
+    'evidence references required');
+  let prior=0;
+  for(const id of ledger.evidenceEventIds){
+    const event=events.find(e=>e.eventId===id);
+    ledgerCheck(event&&event.gameId===gameId&&validInt(event.seq)&&event.seq>prior&&
+      event.seq<=sourceRevision&&id==='evt:'+gameId+':'+event.seq,'unknown/reordered source reference');
+    prior=event.seq;
+  }
+  ledgerCheck(prior===sourceRevision,'source revision not bound');
+  ledgerCheck(fourInts(ledger.playerTransferDeltas)&&fourInts(ledger.playerDeltas)&&
+    validInt(ledger.houseDelta)&&ledger.houseDelta===0&&Array.isArray(ledger.fees)&&ledger.fees.length===0&&
+    Array.isArray(ledger.payments),'fixed zero-fee ledger shape');
+  const transfers=[0n,0n,0n,0n];
+  if(reason==='exhaustive-draw'){
+    ledgerCheck(ledger.winnerSeat===null&&ledger.sourceSeat===null&&winnerSeat===null&&sourceSeat===null&&
+      winType===null&&ledger.score===null&&ledger.payments.length===0,'draw has winning evidence');
+  }else{
+    ledgerCheck(reason==='win'&&validSeat(winnerSeat)&&validSeat(sourceSeat)&&
+      ledger.winnerSeat===winnerSeat&&ledger.sourceSeat===sourceSeat,'winner/source');
+    const self=winType==='self-draw',ron=winType==='discard'||winType==='rob-added-kong';
+    ledgerCheck((self&&winnerSeat===sourceSeat)||(ron&&winnerSeat!==sourceSeat),'win type/source mismatch');
+    const score=ledger.score;
+    ledgerCheck(score&&score.contractVersion===SCORE_CONTRACT&&
+      score.scoringVersion===AUTHORITATIVE_SCORING_VERSION&&same(score.ruleRef,AUTHORITATIVE_RULE_REF)&&
+      score.status===ledger.status&&score.via===(self?'self-draw':'discard')&&
+      score.winnerSeat===winnerSeat&&score.sourceSeat===sourceSeat&&
+      validInt(score.tai)&&score.tai>=0&&validItems(score.breakdown,'hand')&&
+      sumBig(score.breakdown.map(x=>x.tai))===BigInt(score.tai),'score/breakdown mismatch');
+    if(winType==='rob-added-kong'){
+      const proposal=events.find(e=>e.eventId===robAddedKong?.proposalEventId);
+      ledgerCheck(robAddedKong&&robAddedKong.fromSeat===sourceSeat&&proposal?.type==='kong_proposed'&&
+        proposal.actorSeat===sourceSeat&&proposal.payload?.tileId===robAddedKong.tileId&&
+        ledger.evidenceEventIds.includes(proposal.eventId)&&
+        score.breakdown.some(x=>x.code==='rob-added-kong'),'robbery source/bonus');
+    }else ledgerCheck(robAddedKong===undefined&&!score.breakdown.some(x=>x.code==='rob-added-kong'),'unexpected robbery');
+    const payers=self?[0,1,2,3].filter(s=>s!==winnerSeat):[sourceSeat];
+    ledgerCheck(same(ledger.payments.map(p=>p?.payerSeat),payers),'payer responsibility');
+    for(const p of ledger.payments){
+      ledgerCheck(p&&p.payeeSeat===winnerSeat&&p.handTai===score.tai&&
+        validInt(p.appliedTai)&&p.appliedTai>=0&&validInt(p.points)&&p.points>=0&&
+        validItems(p.dealerItems,'payment')&&
+        BigInt(p.appliedTai)===BigInt(score.tai)+sumBig(p.dealerItems.map(x=>x.tai))&&
+        p.points===p.appliedTai,'payer amount/breakdown');
+      transfers[p.payerSeat]-=BigInt(p.points);
+      transfers[p.payeeSeat]+=BigInt(p.points);
+    }
+  }
+  ledgerCheck(transfers.every((n,i)=>n===BigInt(ledger.playerTransferDeltas[i])&&n===BigInt(ledger.playerDeltas[i]))&&
+    sumBig(ledger.playerTransferDeltas)===0n&&sumBig(ledger.playerDeltas)+BigInt(ledger.houseDelta)===0n,
+    'transfer/house conservation');
+  return true;
+}
+
 const replayConfig = (manifest, events) => ({
   gameId:manifest.gameId,seed:manifest.initialSeed,
   dealerSeat:manifest.dealerSeat,ruleRef:manifest.ruleRef,
