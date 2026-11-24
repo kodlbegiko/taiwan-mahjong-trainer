@@ -50,7 +50,51 @@ export function evidenceFromSettledRulesState(state,{seatWindType,prevailingWind
     });
     if(!matches)throw new RangeError('Kong lacks complete public event provenance');
   }
-  if(r.via==='discard'&&!events.some(e=>e.type==='discard'&&
+  // R7 Rules Agent opt-in: the proposal is NOT a discard event.
+  // Only the Rules-owned public proposal + private winning declaration +
+  // matching terminal win/settle markers authorize one robber, one payer.
+  let robAddedKong;
+  if(r.robAddedKong!==undefined){
+    const marker=r.robAddedKong;
+    const equalMarker=x=>x&&typeof x==='object'&&
+      Object.keys(x).length===3&&
+      x.proposalEventId===marker.proposalEventId&&
+      x.fromSeat===marker.fromSeat&&x.tileId===marker.tileId;
+    const proposal=events.find(e=>e.eventId===marker.proposalEventId);
+    const sourcePlayer=state.players?.[r.sourceSeat];
+    const claimed=events.filter(e=>e.visibility==='seat-private'&&
+      e.type==='claim'&&e.payload?.kind==='win'&&
+      e.payload?.claimEventId===marker.proposalEventId);
+    const type=id=>/^t:(0|[1-9]|[12][0-9]|3[0-3]):[0-3]$/.exec(id)?.[1];
+    if(state.ruleRef?.profileId!=='tw16-rob-added-kong'||
+      state.ruleRef?.ruleVersion!=='experimental-v1'||
+      r.via!=='discard'||r.winnerSeat===r.sourceSeat||
+      !Number.isInteger(r.sourceSeat)||r.sourceSeat<0||r.sourceSeat>3||
+      typeof marker?.proposalEventId!=='string'||!marker.proposalEventId||
+      !equalMarker(win[0].payload.robAddedKong)||
+      !equalMarker(settle[0].payload.robAddedKong)||
+      marker.fromSeat!==r.sourceSeat||
+      !type(marker.tileId)||marker.tileId!==r.winningTileId||
+      proposal?.type!=='kong_proposed'||proposal.visibility!=='public'||
+      proposal.actorSeat!==r.sourceSeat||
+      proposal.payload?.kind!=='ADDED_KONG'||
+      proposal.payload?.tileId!==marker.tileId||
+      proposal.seq>=win[0].seq||
+      claimed.length!==1||claimed[0].actorSeat!==r.winnerSeat||
+      claimed[0].seq<=proposal.seq||claimed[0].seq>=win[0].seq||
+      !sourcePlayer?.melds?.some(m=>m.kind==='triplet'&&m.open&&
+        type(m.tileIds?.[0])===type(marker.tileId))||
+      !sourcePlayer.river?.some(d=>d.tileId===marker.tileId&&
+        d.seq===proposal.seq&&!d.claimedByEventId)||
+      sourcePlayer.concealed?.includes(marker.tileId)||
+      events.some(e=>e.type==='kong'&&e.payload?.proposalEventId===marker.proposalEventId))
+      throw new RangeError('Invalid rob-added-kong event provenance or payer');
+    robAddedKong={proposalEventId:marker.proposalEventId,
+      fromSeat:marker.fromSeat,tileId:marker.tileId};
+  }else if(win[0].payload.robAddedKong!==undefined||
+    settle[0].payload.robAddedKong!==undefined)
+    throw new RangeError('Unpaired rob-added-kong terminal event markers');
+  if(r.via==='discard'&&!robAddedKong&&!events.some(e=>e.type==='discard'&&
       e.visibility==='public'&&e.actorSeat===r.sourceSeat&&
       e.payload?.tileId===r.winningTileId&&e.seq<win[0].seq))
     throw new RangeError('Discard-win lacks source event provenance');
@@ -72,6 +116,7 @@ export function evidenceFromSettledRulesState(state,{seatWindType,prevailingWind
     concealed:[...player.concealed],melds:player.melds.map(m=>({
       kind:m.kind,open:m.open,tileIds:[...m.tileIds]})),
     flowers:[...player.flowers],
+    ...(robAddedKong?{robAddedKong}:{}),
     ...(r.via==='discard'?{winningTile:r.winningTileId}:{}),
     ...(seatWindType===undefined?{}:{seatWindType}),
     prevailingWindType,dealerStreak,streakEvidence};
