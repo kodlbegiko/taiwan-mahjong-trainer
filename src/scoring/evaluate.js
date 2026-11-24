@@ -121,7 +121,7 @@ function validateEvidence(p,e){
   assert(counts.every(c=>c<=4),'more than four standard copies');
   if(typeof e.winningTile==='string'&&seenPhysical.includes(e.winningTile))
     assert(false,'winning tile previously owned');
-  if(melds.some(m=>m.type>=27)&&p.variants.wind==='round-and-seat'){
+  if(melds.some(m=>m.type>=27&&(p.profileId!=='tw16-gametower-authoritative'||m.type<=30))&&p.variants.wind==='round-and-seat'){
     assert(winds.includes(e.prevailingWindType)&&winds.includes(e.seatWindType),'round/seat wind proofs');
   }
   if(f.length&&p.variants.flower==='correct-and-sets')

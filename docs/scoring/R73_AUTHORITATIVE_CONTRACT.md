@@ -25,3 +25,36 @@ See `R7_1_RULE_COVERAGE.md` for existing source-attributed pattern matrix. New a
 ## Verification
 
 Preserve original 40 golden callbacks and 150 seeded legal wins. Add A01–A10 pure pre-settlement tests for registered identity, immutability, ron/selfdraw/robbery/draw, payer/dealer/streak/flower, negative refs and strict +0. Contract tests are not evidence of actual Rules commit or Replay archival; run exact cross-source LegalAction acceptance when #51/#46 publish their implementations. No main merge.
+
+## Additional authoritative coverage matrix (fixed table, not the two comparison presets)
+
+| Name | Tai | Qualification / evidence / precedence | Source |
+| --- | ---: | --- | --- |
+| 門清 | 1 | all melds concealed (concealed kongs permitted), not self-draw | GameTower |
+| 自摸 | 1 | actual own winning tile, other three pay; combined award supersedes | GameTower |
+| 門清自摸 | 3 | no open meld + actual own draw; replaces previous two | GameTower |
+| 莊家 | 1 | per payment only if winner or payer is dealer | GameTower |
+| 連莊 | 2 × streak | per dealer-involved payment, host-verified prior round chain, max 10 | GameTower |
+| 圈風 | 1 | prevailing wind triplet/kong, authenticated round fact | GameTower |
+| 門風 | 1 | opening-seat mapped wind triplet/kong; missing applicable fact rejects | GameTower |
+| 三元牌 | 1 each | dragon triplet/kong, superseded by small/big dragons | GameTower |
+| 小三元 / 大三元 | 4 / 8 | 2 dragon triplets + dragon eye / 3 dragon triplets | GameTower |
+| 小四喜 / 大四喜 | 8 / 16 | 3 wind triplets + wind eye / 4 wind triplets; big suppresses wind items, small retains them | GameTower / Orchid variants |
+| 正花 | 1 each | actual flower ID matches authenticated opening-seat wind | GameTower |
+| 春夏秋冬 / 梅蘭竹菊 | 2 each | full family, replaces corresponding correct flower in fixed conventional policy | GameTower / Orchid variants |
+| 明槓 / 暗槓 | 0 separate | no independent bonus in conventional profile; meld still contributes to structural/other tai | GameTower alternative mode distinction |
+| 碰碰胡 | 4 | all five groups triplet/kong; suppressed by 字一色 | GameTower / Orchid |
+| 混一色 / 清一色 / 字一色 | 4 / 8 / 8 | disjoint one suit+honors / one suit / honors-only | GameTower / Orchid |
+| 三暗刻 / 四暗刻 / 五暗刻 | 2 / 5 / 8 | highest concealed tier, ron-completed triplet not concealed | GameTower |
+| 平胡 | 2 | five sequences, suited eye, no honor/flower, ron sequence completion and two-sided proof | GameTower |
+| 全求人 | 2 | five open melds, one concealed eye tile before ron; suppresses 獨聽 | GameTower |
+| 獨聽 | 1 | all structural waits enumerated with own four-copy cap; exactly one type, no duplicate edge/middle/pair award; excludes 全求人/平胡 | GameTower / Orchid |
+| 搶槓胡 | 1 | authoritative proposal ID, physical tile, source/payer seat, host verified sole WIN and two PASS | GameTower |
+| 槓上開花 | 1 | host verified supplemental self-draw ancestry (concealed/added kong or supported flower chain) | GameTower |
+| 海底撈月 | 1 | actual last live draw at pinned reserve boundary; private proof | GameTower |
+
+GameTower source: https://www.gametower.com.tw/Games/Freeplay/MJ/Star31/Data/i_ingame-count.aspx . Structural single wait own-copy cap: https://mahjongorchid.com/zh-tw/tai/duting/ . Orchid's separate edge/middle/pair names are not additional GameTower awards. The fixed authority selects conventional rather than 見花見字; the two earlier configurable comparison profiles remain available.
+
+## Combined checkout test gate
+
+`SCORING_REQUIRE_R73_RULES=1 node --test tests/scoring/r73-rules-integration.test.js` is mandatory when combining #51/#52. It runs actual later-turn selfdraw, ron, robbery and exhaustive draw through Rules-issued LegalActions, requires the same complete canonical `scoringLedger` in terminal result and settle event, checks strict conservation and exact deterministic `replayGame` reconstruction. In a standalone Scoring checkout the missing Rules opt-in dependency is explicitly skipped, never counted as integration pass. The separate `pre-settlement.test.js` now includes a further 150 physical seeded authority cases, two-sided Pinghu, special event reference checks, and dragon-vs-wind missing proof distinction. Replay Agent's archive acceptance is a distinct gate.

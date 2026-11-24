@@ -118,3 +118,73 @@ test('A10 全求人 supersedes unique wait, physical types and duplicate ids are
   assert.throws(()=>evalWin({...x,winningTileId:'t:25:0',
     evidence:{...x.evidence,winningTile:'t:25:0'}}),/previously owned/);
 });
+
+test('A11 pinned authority seeded property: 150 physical legal hands, seat rotation and JSON equality',()=>{
+  let rng=0x357a97f5;
+  const next=n=>{rng=(Math.imul(rng,1664525)+1013904223)>>>0;return (rng>>>8)%n;};
+  for(let i=0;i<150;i++){
+    const counts=Array(34).fill(0),groups=[];
+    for(let g=0;g<5;g++){
+      let placed=false;
+      for(let retry=0;retry<300&&!placed;retry++){
+        const t=next(34),seq=t<27&&t%9<=6&&next(2)===0;
+        const ts=seq?[t,t+1,t+2]:[t,t,t];
+        if(!ts.every(x=>counts[x]+ts.filter(y=>x===y).length<=4))continue;
+        groups.push({kind:seq?'sequence':'triplet',open:true,tileIds:ts.map(x=>'t:'+x+':'+counts[x]++)});placed=true;
+      }
+      assert.ok(placed);
+    }
+    let pair;for(let tries=0;tries<100;tries++){let t=next(34);if(counts[t]<=2){pair=t;break;}}
+    assert.ok(pair!==undefined);
+    const fixed=next(4),melds=groups.slice(0,fixed);
+    const concealed=[...groups.slice(fixed).flatMap(m=>m.tileIds),'t:'+pair+':'+counts[pair]++,'t:'+pair+':'+counts[pair]++];
+    const via=next(2)===0?'self-draw':'discard';
+    const tile=concealed.at(-1);
+    if(via==='discard')concealed.pop();
+    const winnerSeat=next(4),sourceSeat=via==='self-draw'?winnerSeat:(winnerSeat+1)%4, dealerSeat=next(4);
+    const payers=(w,s)=>via==='self-draw'?[0,1,2,3].filter(x=>x!==w):[s];
+    const evidence={ruleRef,winnerSeat,sourceSeat,dealerSeat,dealerStreak:0,via,
+      concealed,melds,flowers:[],seatWindType:28,prevailingWindType:27,
+      ...(via==='discard'?{winningTile:tile}:{})};
+    const x=fixture({winType:via,payerSeats:payers(winnerSeat,sourceSeat),evidence,winningTileId:tile});
+    const l=evalWin(x);
+    assert.equal(assertLedgerConservation(l),true);
+    assert.deepEqual(evalWin(JSON.parse(JSON.stringify(x))),l);
+    assert.deepEqual(JSON.parse(JSON.stringify(l)),l);
+    assert.ok(l.playerDeltas.every(v=>!Object.is(v,-0)));
+    const rotate=s=>(s+1)%4;
+    const rotated=evalWin({...x,payerSeats:payers(rotate(winnerSeat),rotate(sourceSeat)),
+      evidence:{...evidence,winnerSeat:rotate(winnerSeat),sourceSeat:rotate(sourceSeat),dealerSeat:rotate(dealerSeat)}});
+    for(let s=0;s<4;s++)assert.equal(rotated.playerDeltas[rotate(s)],l.playerDeltas[s]);
+  }
+});
+test('A12 actual winning tile structural two-sided Pinghu excludes the unique-wait bonus',()=>{
+  const x=fixture();
+  const ts=[0,1,2,3,4,5,9,10,11,12,13,14,21,22,25,25];
+  const counts=Array(34).fill(0);
+  x.evidence={...x.evidence,concealed:ts.map(t=>'t:'+t+':'+counts[t]++),
+    melds:[],winningTile:'t:23:0'};
+  x.winningTileId='t:23:0';
+  const score=evalWin(x).score;
+  assert.equal(score.breakdown.find(i=>i.code==='pinghu')?.tai,2);
+  assert.ok(!score.breakdown.some(i=>i.code==='unique-wait'));
+});
+test('A13 special draw proof references must belong to the same pre-terminal prefix',()=>{
+  const x=fixture();x.winType='self-draw';x.payerSeats=[0,2,3];
+  x.evidence={...x.evidence,via:'self-draw',sourceSeat:1,concealed:[...hand,winTile],
+    specialDraw:{kind:'kong-bloom',sourceEventId:'evt:auth:1',drawEventId:'evt:auth:5'}};
+  delete x.evidence.winningTile;
+  assert.equal(evalWin(x).score.breakdown.find(i=>i.code==='kong-bloom')?.tai,1);
+  x.evidence.specialDraw={kind:'sea-bottom',sourceEventId:'evt:auth:5',drawEventId:'evt:auth:5'};
+  assert.equal(evalWin(x).score.breakdown.find(i=>i.code==='sea-bottom')?.tai,1);
+  x.evidence.specialDraw.drawEventId='evt:auth:4';
+  assert.throws(()=>evalWin(x),/source links/);
+});
+test('A14 exposed dragon does not require nonexistent seat wind proof, but exposed wind does',()=>{
+  const x=fixture();
+  x.evidence={...x.evidence,melds:[{kind:'triplet',open:true,tileIds:['t:31:0','t:31:1','t:31:2']}]};
+  const l=evalWin(x);
+  assert.equal(l.score.breakdown.find(i=>i.code==='dragon:31')?.tai,1);
+  x.evidence.melds=[{kind:'triplet',open:true,tileIds:['t:28:0','t:28:1','t:28:2']}];
+  assert.throws(()=>evalWin(x),/wind proofs/);
+});
