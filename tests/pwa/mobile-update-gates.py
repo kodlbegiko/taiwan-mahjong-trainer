@@ -4,6 +4,7 @@ import importlib.util
 import json
 import re
 import sys
+from time import monotonic
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'browser'))
@@ -12,6 +13,31 @@ from _release_site import served_site
 def require(value, why):
     if not value:
         raise AssertionError(why)
+
+def wait_resolved_true(page, predicate, *, label, timeout=30000):
+    # Evaluate awaits the Promise and returns its resolved value. Never
+    # advance a lifecycle gate on a truthy Promise or JSHandle.
+    deadline=monotonic()+timeout/1000
+    last=None
+    polls=0
+    while monotonic()<deadline:
+        polls+=1
+        last=page.evaluate(predicate)
+        if last is True:
+            print('WAIT_RESOLVED',label,polls,flush=True)
+            return
+        page.wait_for_timeout(100)
+    raise AssertionError(f'{label}: timeout after {polls} polls, last={last!r}')
+
+
+def quiesce_registration(page):
+    wait_resolved_true(page, """async()=>{
+      const reg=await navigator.serviceWorker.getRegistration();
+      return !!reg && !reg.installing && !reg.waiting &&
+        reg.active===navigator.serviceWorker.controller &&
+        reg.active?.state==='activated';
+    }""",label='registration-quiescent')
+
 
 def shell_names(page):
     return page.evaluate("async () => (await caches.keys()).filter(n => n.startsWith('tmt-shell-'))")
@@ -42,18 +68,22 @@ def install_observer(page):
       const events=[];
       window.__r7Events=events;
       window.__r7OldController=navigator.serviceWorker.controller;
-      window.__r7Observer=()=>{
-        const worker=reg.installing;
-        if(!worker)return;
+      const seen=new WeakSet();
+      const observe=worker=>{
+        if(!worker||worker===window.__r7OldController||seen.has(worker))return;
+        seen.add(worker);
         const record=()=>{
           const state=worker.state, at=performance.timeOrigin+performance.now();
           const item={state,at,controllerUnchanged:navigator.serviceWorker.controller===window.__r7OldController};
           events.push(item);
           caches.keys().then(names=>{item.names=names;});
         };
-        record();worker.addEventListener('statechange',record);
+        worker.addEventListener('statechange',record);
+        record();
       };
+      window.__r7Observer=()=>{observe(reg.installing);observe(reg.waiting);};
       reg.addEventListener('updatefound',window.__r7Observer);
+      window.__r7Observer();
     }""")
 
 
@@ -82,7 +112,7 @@ def reject_update(page, peer, before, label, evidence):
             label+' broke an existing tab')
     # Separate candidates only after the registration itself is quiescent;
     # the strict immediate rollback assertion above is deliberately not polled.
-    page.wait_for_function("""async()=>{const reg=await navigator.serviceWorker.getRegistration();return !reg.installing && !reg.waiting;}""")
+    quiesce_registration(page)
 
 
 def history_snapshot(page):
@@ -227,7 +257,12 @@ def main():
                 # are still published; do not open a tab after publishing a bad worker.
                 peer.evaluate('async()=>{const r=await navigator.serviceWorker.getRegistration();await r.update()}')
                 page.evaluate('async()=>{const r=await navigator.serviceWorker.getRegistration();await r.update()}')
-                page.wait_for_function('async()=>{const r=await navigator.serviceWorker.getRegistration();return !r.installing && !r.waiting;}')
+                quiesce_registration(page)
+                page.evaluate('() => { window.__r7WaitProbe=0; }')
+                wait_resolved_true(page, 'async()=>{await Promise.resolve();return ++window.__r7WaitProbe===3;}',
+                                   label='async-predicate-regression',timeout=5000)
+                require(page.evaluate('window.__r7WaitProbe')==3,'async wait advanced before true')
+                page.evaluate('delete window.__r7WaitProbe')
                 page.evaluate("""async()=>{const c=await caches.open('r7-unrelated-cache');await c.put('./unrelated',new Response('keep'));}""")
                 page.evaluate("localStorage.setItem('r7-upgrade-sentinel','preserve-me')")
                 before=cache_snapshot(page)
@@ -277,11 +312,23 @@ def main():
                 css.write_text(old_css + '\n/* r7-upgrade-css-byte-marker */\n', encoding='utf-8')
                 sw.write_text(original_sw.replace(version, version + '-upgraded'), encoding='utf-8')
                 install_observer(page)
-                page.evaluate("""() => { window.__r7Update = navigator.serviceWorker.getRegistration().then(r=>r.update()); }""")
-                peer.evaluate("""async () => { const r=await navigator.serviceWorker.getRegistration(); await r.update(); }""")
-                page.evaluate('window.__r7Update')
+                # One explicit update per registration; the peer shares it.
+                # Capture the current candidate even if updatefound was delivered
+                # after installing changed to waiting.
+                page.evaluate("""async () => {
+                  const r=await navigator.serviceWorker.getRegistration();
+                  await r.update();
+                  window.__r7Observer();
+                }""")
+                wait_resolved_true(page, """async()=>{
+                  const r=await navigator.serviceWorker.getRegistration();
+                  window.__r7Observer();
+                  return !!r.waiting && r.waiting.state==='installed' &&
+                    r.active===window.__r7OldController &&
+                    navigator.serviceWorker.controller===window.__r7OldController &&
+                    window.__r7Events.some(e=>e.state==='installed');
+                }""",label='candidate-installed-and-waiting')
                 page.locator('#update-app:visible').wait_for(timeout=30000)
-                page.wait_for_function("window.__r7Events.some(e=>e.state==='installed')", timeout=30000)
                 lifecycle.append({'case':'successful-staging','before':before,'after':cache_snapshot(page),'states':page.evaluate('window.__r7Events')})
                 # No automatic swap while a page is open. User must opt in.
                 require(shell_names(page) == [old[0], 'tmt-shell-' + version + '-upgraded'],
@@ -293,6 +340,8 @@ def main():
                 peer.wait_for_load_state('domcontentloaded')
                 page.wait_for_function("navigator.serviceWorker.controller?.state==='activated'")
                 peer.wait_for_function("navigator.serviceWorker.controller?.state==='activated'")
+                quiesce_registration(page)
+                quiesce_registration(peer)
                 new_names = shell_names(page)
                 require(new_names == ['tmt-shell-' + version + '-upgraded'],
                         f'new release should have only one shell: {new_names}')
