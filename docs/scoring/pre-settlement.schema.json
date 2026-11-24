@@ -1,0 +1,585 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "R7.3 private Rules-host pre-settlement facts",
+  "description": "Never public; Rules owns raw event verification. Runtime enforces cross-field and profile config checks beyond JSON Schema.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contractVersion",
+    "ruleRef",
+    "scoringRef",
+    "publicEventContractVersion",
+    "gameId",
+    "roundId",
+    "sourceRevision",
+    "settlementId",
+    "reason",
+    "winType",
+    "payerSeats",
+    "evidence",
+    "evidenceEventIds",
+    "winningTileId"
+  ],
+  "properties": {
+    "contractVersion": {
+      "const": "tw16-pre-settlement/1.0.0"
+    },
+    "ruleRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profileId",
+        "ruleVersion"
+      ],
+      "properties": {
+        "profileId": {
+          "const": "tw16-authoritative-scoring"
+        },
+        "ruleVersion": {
+          "const": "experimental-v1"
+        }
+      }
+    },
+    "scoringRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profileId",
+        "version"
+      ],
+      "properties": {
+        "profileId": {
+          "const": "tw16-gametower-authoritative"
+        },
+        "version": {
+          "const": "1.0.0-experimental"
+        }
+      }
+    },
+    "publicEventContractVersion": {
+      "const": "tw16-rob-added-kong-public/1.0.0"
+    },
+    "gameId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]+$"
+    },
+    "roundId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sourceRevision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "settlementId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "reason": {
+      "enum": [
+        "win",
+        "exhaustive-draw"
+      ]
+    },
+    "winType": {
+      "enum": [
+        "self-draw",
+        "discard",
+        "rob-added-kong",
+        null
+      ]
+    },
+    "payerSeats": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 3
+      },
+      "maxItems": 3
+    },
+    "evidence": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "ruleRef",
+            "winnerSeat",
+            "sourceSeat",
+            "via",
+            "dealerSeat",
+            "dealerStreak",
+            "concealed",
+            "melds",
+            "flowers",
+            "prevailingWindType"
+          ],
+          "properties": {
+            "ruleRef": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "profileId",
+                "ruleVersion"
+              ],
+              "properties": {
+                "profileId": {
+                  "const": "tw16-authoritative-scoring"
+                },
+                "ruleVersion": {
+                  "const": "experimental-v1"
+                }
+              }
+            },
+            "winnerSeat": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 3
+            },
+            "sourceSeat": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 3
+            },
+            "via": {
+              "enum": [
+                "self-draw",
+                "discard"
+              ]
+            },
+            "dealerSeat": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 3
+            },
+            "dealerStreak": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10
+            },
+            "concealed": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^t:(0|[1-9]|[12][0-9]|3[0-3]):[0-3]$"
+              },
+              "uniqueItems": true,
+              "maxItems": 17
+            },
+            "melds": {
+              "type": "array",
+              "maxItems": 5,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "open",
+                  "tileIds"
+                ],
+                "properties": {
+                  "kind": {
+                    "enum": [
+                      "sequence",
+                      "triplet",
+                      "kong"
+                    ]
+                  },
+                  "open": {
+                    "type": "boolean"
+                  },
+                  "tileIds": {
+                    "type": "array",
+                    "minItems": 3,
+                    "maxItems": 4,
+                    "uniqueItems": true,
+                    "items": {
+                      "type": "string",
+                      "pattern": "^t:(0|[1-9]|[12][0-9]|3[0-3]):[0-3]$"
+                    }
+                  }
+                }
+              }
+            },
+            "flowers": {
+              "type": "array",
+              "uniqueItems": true,
+              "maxItems": 7,
+              "items": {
+                "type": "string",
+                "pattern": "^f:(season-(spring|summer|autumn|winter)|plant-(plum|orchid|bamboo|chrysanthemum)):0$"
+              }
+            },
+            "prevailingWindType": {
+              "enum": [
+                27,
+                28,
+                29,
+                30
+              ]
+            },
+            "seatWindType": {
+              "enum": [
+                27,
+                28,
+                29,
+                30
+              ]
+            },
+            "winningTile": {
+              "type": "string",
+              "pattern": "^t:(0|[1-9]|[12][0-9]|3[0-3]):[0-3]$"
+            },
+            "streakEvidence": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "roundRefs"
+              ],
+              "properties": {
+                "roundRefs": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            },
+            "robAddedKong": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "proposalEventId",
+                "fromSeat",
+                "tileId"
+              ],
+              "properties": {
+                "proposalEventId": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "fromSeat": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 3
+                },
+                "tileId": {
+                  "type": "string",
+                  "pattern": "^t:(0|[1-9]|[12][0-9]|3[0-3]):[0-3]$"
+                }
+              }
+            },
+            "specialDraw": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "drawEventId",
+                "sourceEventId"
+              ],
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "kong-bloom",
+                    "sea-bottom"
+                  ]
+                },
+                "drawEventId": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "sourceEventId": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "specialWin": {
+              "const": "ordinary"
+            },
+            "liability": {
+              "type": "null"
+            }
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "evidenceEventIds": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "winningTileId": {
+      "oneOf": [
+        {
+          "type": "string",
+          "pattern": "^t:(0|[1-9]|[12][0-9]|3[0-3]):[0-3]$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "reason": {
+            "const": "exhaustive-draw"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "evidence": {
+            "type": "null"
+          },
+          "winType": {
+            "type": "null"
+          },
+          "winningTileId": {
+            "type": "null"
+          },
+          "payerSeats": {
+            "maxItems": 0
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "evidence": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "ruleRef",
+              "winnerSeat",
+              "sourceSeat",
+              "via",
+              "dealerSeat",
+              "dealerStreak",
+              "concealed",
+              "melds",
+              "flowers",
+              "prevailingWindType"
+            ],
+            "properties": {
+              "ruleRef": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "profileId",
+                  "ruleVersion"
+                ],
+                "properties": {
+                  "profileId": {
+                    "const": "tw16-authoritative-scoring"
+                  },
+                  "ruleVersion": {
+                    "const": "experimental-v1"
+                  }
+                }
+              },
+              "winnerSeat": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 3
+              },
+              "sourceSeat": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 3
+              },
+              "via": {
+                "enum": [
+                  "self-draw",
+                  "discard"
+                ]
+              },
+              "dealerSeat": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 3
+              },
+              "dealerStreak": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10
+              },
+              "concealed": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^t:(0|[1-9]|[12][0-9]|3[0-3]):[0-3]$"
+                },
+                "uniqueItems": true,
+                "maxItems": 17
+              },
+              "melds": {
+                "type": "array",
+                "maxItems": 5,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "kind",
+                    "open",
+                    "tileIds"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "enum": [
+                        "sequence",
+                        "triplet",
+                        "kong"
+                      ]
+                    },
+                    "open": {
+                      "type": "boolean"
+                    },
+                    "tileIds": {
+                      "type": "array",
+                      "minItems": 3,
+                      "maxItems": 4,
+                      "uniqueItems": true,
+                      "items": {
+                        "type": "string",
+                        "pattern": "^t:(0|[1-9]|[12][0-9]|3[0-3]):[0-3]$"
+                      }
+                    }
+                  }
+                }
+              },
+              "flowers": {
+                "type": "array",
+                "uniqueItems": true,
+                "maxItems": 7,
+                "items": {
+                  "type": "string",
+                  "pattern": "^f:(season-(spring|summer|autumn|winter)|plant-(plum|orchid|bamboo|chrysanthemum)):0$"
+                }
+              },
+              "prevailingWindType": {
+                "enum": [
+                  27,
+                  28,
+                  29,
+                  30
+                ]
+              },
+              "seatWindType": {
+                "enum": [
+                  27,
+                  28,
+                  29,
+                  30
+                ]
+              },
+              "winningTile": {
+                "type": "string",
+                "pattern": "^t:(0|[1-9]|[12][0-9]|3[0-3]):[0-3]$"
+              },
+              "streakEvidence": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "roundRefs"
+                ],
+                "properties": {
+                  "roundRefs": {
+                    "type": "array",
+                    "uniqueItems": true,
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                }
+              },
+              "robAddedKong": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "proposalEventId",
+                  "fromSeat",
+                  "tileId"
+                ],
+                "properties": {
+                  "proposalEventId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "fromSeat": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 3
+                  },
+                  "tileId": {
+                    "type": "string",
+                    "pattern": "^t:(0|[1-9]|[12][0-9]|3[0-3]):[0-3]$"
+                  }
+                }
+              },
+              "specialDraw": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "drawEventId",
+                  "sourceEventId"
+                ],
+                "properties": {
+                  "kind": {
+                    "enum": [
+                      "kong-bloom",
+                      "sea-bottom"
+                    ]
+                  },
+                  "drawEventId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "sourceEventId": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              },
+              "specialWin": {
+                "const": "ordinary"
+              },
+              "liability": {
+                "type": "null"
+              }
+            }
+          },
+          "winType": {
+            "enum": [
+              "self-draw",
+              "discard",
+              "rob-added-kong"
+            ]
+          },
+          "winningTileId": {
+            "type": "string",
+            "pattern": "^t:(0|[1-9]|[12][0-9]|3[0-3]):[0-3]$"
+          },
+          "payerSeats": {
+            "minItems": 1
+          }
+        }
+      }
+    }
+  ]
+}
