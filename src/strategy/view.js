@@ -128,6 +128,21 @@ export function isRobAddedKongRuleRef(ref) {
 }
 export function validateRobKongPublicEvent(e, events, ref, terminal=false) {
   const p=e.payload;
+  if(isRobAddedKongRuleRef(ref)){
+    // Rules R7.1 publicEventContractVersion: private triggering actionIds
+    // never appear on anonymous replies or their derived public events.
+    if(e.type==='claim'&&e.actorSeat===undefined)
+      object(p,'R7 anonymous reply',[],[]);
+    const prev=events.find(x=>x.seq===e.seq-1);
+    const privateTrigger=e.type==='claim'||
+      (e.type==='kong'&&(p?.claimEventId!==undefined||p?.proposalEventId!==undefined))||
+      (e.type==='win'&&(p?.robAddedKong!==undefined||p?.seat!==p?.sourceSeat))||
+      (e.type==='settle'&&(p?.robAddedKong!==undefined||
+        (prev?.type==='claim'&&prev.actorSeat===undefined)||
+        (prev?.type==='win'&&prev.payload?.seat!==prev.payload?.sourceSeat)));
+    if(privateTrigger&&Object.hasOwn(e,'causedByActionId'))
+      throw new RangeError('R7 private trigger actionId is not public');
+  }
   if(e.type!=='kong_proposed' &&
     !(p&&(Object.hasOwn(p,'proposalEventId')||Object.hasOwn(p,'robAddedKong'))))return false;
   if(!isRobAddedKongRuleRef(ref)||e.visibility!=='public')

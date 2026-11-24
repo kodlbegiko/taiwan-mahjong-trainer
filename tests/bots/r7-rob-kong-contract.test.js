@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
- createGame,createDeck,getRuleProfile,listLegalActions,listPendingClaimResponders,
+ createGame,createDeck,getRuleProfile,getRuleCapabilities,listLegalActions,listPendingClaimResponders,
  applyAction,createPlayerView,replayGame
 } from '../../src/rules/index.js';
 import {createBot,chooseBotAction,validateBotDecision,createBotController} from '../../src/bots/index.js';
@@ -89,6 +89,12 @@ test('R7 robbery public schema is exact-version and rejects hidden fields',()=>{
  const committed={...proposal,type:'kong',seq:8,eventId:'evt:fixture:8',
   payload:{kind:'ADDED_KONG',tileIds:['t:5:2'],proposalEventId:proposal.eventId}};
  assert.equal(validateRobKongPublicEvent(committed,[proposal,committed],R7),true);
+ assert.throws(()=>validateRobKongPublicEvent({...committed,causedByActionId:'private-pass-action'},[proposal,committed],R7),/private trigger/);
+ const masked={...proposal,type:'claim',actorSeat:undefined,seq:5,eventId:'evt:fixture:5',payload:{}};
+ delete masked.actorSeat;
+ assert.equal(validateRobKongPublicEvent(masked,[proposal,masked],R7),false);
+ assert.throws(()=>validateRobKongPublicEvent({...masked,causedByActionId:'private-win-action'},[proposal,masked],R7),/private trigger/);
+ assert.throws(()=>validateRobKongPublicEvent({...masked,payload:{kind:'win'}},[proposal,masked],R7));
  assert.throws(()=>validateRobKongPublicEvent({...committed,payload:{...committed.payload,tileIds:['t:5:1']}},[proposal],R7));
  const win={...proposal,type:'win',actorSeat:2,seq:8,eventId:'evt:fixture:8',
   payload:{seat:2,sourceSeat:1,robAddedKong:{proposalEventId:proposal.eventId,fromSeat:1,tileId:'t:5:2'}}};
@@ -99,6 +105,7 @@ test('R7 robbery public schema is exact-version and rejects hidden fields',()=>{
  assert.throws(()=>validateRobKongPublicEvent({...settle,payload:{robAddedKong:{...settle.payload.robAddedKong,privateClaimIntents:[1]}}},[proposal,win],R7,true));
 });
 test('R7 actual Rules proposal view, WIN/PASS and masked intent for every level',gate,()=>{
+ assert.equal(getRuleCapabilities(R7).publicEventContractVersion,'tw16-rob-added-kong-public/1.0.0');
  const {open}=prepared();
  for(const seat of [2,3,0]){
    const view=createPlayerView(open,seat),parsed=readBotView(view);
@@ -141,4 +148,30 @@ test('R7 actual robbery terminal and all-PASS commit are accepted by Bot adapter
  assert.equal(v.legalActions.find(a=>a.actionId===d.actionId).kind,'draw');
  noRob=take(noRob,choose(noRob,1,'draw'));
  assert.deepEqual(replayGame(noRob),noRob);
+});
+
+test('R7 actual controller accepts WIN/PASS and fails closed on competing robbers',gate,async()=>{
+ let {open:state}=prepared(true);
+ const bots=[1,2,3].map(seat=>createBot({seat,difficulty:'Intermediate',seed:'r7-rob-controller-'+seat}));
+ const controller=createBotController({
+   bots,humanSeat:0,getActingSeat:()=>listPendingClaimResponders(state)[0]??state.round.currentSeat,
+   getPendingClaimResponders:()=>listPendingClaimResponders(state),
+   getPlayerView:seat=>createPlayerView(state,seat),
+   submitAction:submission=>{state=applyAction(state,submission).state;},
+   yieldControl:async()=>{},
+ });
+ for(const seat of [2,3]){
+   const next=await controller.tick();
+   assert.equal(next.status,'acted');
+   assert.equal(next.seat,seat);
+   assert.equal(next.decision.reasonCodes[0],'ENGINE_LEGAL_WIN');
+ }
+ assert.equal((await controller.tick()).status,'human-turn');
+ const pass=choose(state,0,'pass'),before=cp(state);
+ const rejected=await controller.submitHumanAction({actionId:pass.actionId,expectedRevision:pass.expectedRevision});
+ assert.equal(rejected.status,'unsupported');
+ assert.equal(rejected.capability,'multiple_winners');
+ assert.deepEqual(state,before);
+ assert.equal((await controller.tick()).status,'unsupported');
+ assert.deepEqual(replayGame(state),state);
 });
