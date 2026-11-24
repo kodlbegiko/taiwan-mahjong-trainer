@@ -128,20 +128,27 @@ def readback(page, fixture, key, raw, *, authoritative):
     return result
 
 def update_worker(page, url, old_generation, new_generation):
-    # Existing app opts out of forced skipWaiting; explicitly acknowledge the
-    # update in the controlled test browser, as a user would.
+    # Capture the old controller before publishing/acknowledging the update.
+    # The application's update listener can also acknowledge a waiting worker.
+    # Checking waiting and posting in separate Playwright calls races activation.
     page.evaluate("""async () => {
-      const registration=await navigator.serviceWorker.ready;
+      const registration=await navigator.serviceWorker.getRegistration();
+      if(!registration || !window.__replayOldController) throw Error('Missing old controller');
+      window.__replayAcknowledged=null;
       await registration.update();
     }""")
     page.wait_for_function("""async () => {
       const r=await navigator.serviceWorker.getRegistration();
-      return !!r.waiting;
+      if(!r) throw Error('Registration lost during upgrade');
+      const waiting=r.waiting;
+      if(waiting && waiting!==window.__replayAcknowledged){
+        window.__replayAcknowledged=waiting;
+        waiting.postMessage({type:'SKIP_WAITING'});
+      }
+      const controller=navigator.serviceWorker.controller;
+      return !!controller && controller!==window.__replayOldController &&
+        controller.state==='activated' && r.active===controller;
     }""", timeout=30000)
-    page.evaluate("""async () => {
-      const r=await navigator.serviceWorker.getRegistration();
-      r.waiting.postMessage({type:'SKIP_WAITING'});
-    }""")
     page.wait_for_function("""async ({oldName,newName}) => {
       const names=await caches.keys();
       return names.includes(newName)&&!names.includes(oldName);
@@ -161,7 +168,7 @@ def run(engine, previous_tree=None):
         browser = getattr(pw, engine).launch(headless=True)
         try:
             for label, fixture, authority, scores in cases:
-                with served_site() as (url, tree):
+                with served_site(fresh_sw=True) as (url, tree):
                     context = browser.new_context(service_workers='allow')
                     try:
                         page = context.new_page()
@@ -183,6 +190,10 @@ def run(engine, previous_tree=None):
                               if(meta.scoringVersion!=='tw16-minimal-tai-v1'||localStorage.getItem(key)!==raw)
                                 throw Error('Old runtime cannot read historical archive');
                             }""", {'id': fixture['manifest']['replayId'], 'key': key, 'raw': raw})
+                            page.evaluate("""() => {
+                              window.__replayOldController=navigator.serviceWorker.controller;
+                              if(!window.__replayOldController)throw Error('Missing baseline controller');
+                            }""")
                             copy_release(ROOT, tree)
                             update_worker(page, url, previous_generation, generation)
                         else:
