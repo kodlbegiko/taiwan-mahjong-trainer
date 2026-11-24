@@ -61,3 +61,12 @@ The bundled comparative profile is anchored primarily in [GameTower](https://www
 - [ ] UI/Replay/real-table end-to-end integrator acceptance
 
 **Do not merge into main or replace R5 until the remaining integration gates pass.**
+
+
+## Latest CI evidence / independent deployment warning (R7.1)
+
+- Historical failing exact SHA \`202e007d\`: 384 tests, 382 PASS, 1 FAIL (S08 signed zero), 1 SKIP.
+- Post-accounting-fix SHA \`11c76c3\`: GitHub Verify completed **SUCCESS**. This confirms the corrected R7-001 implementation at that SHA, **not** the later scoring expansions.
+- Latest code and documentation SHAs have new Verify runs; until one concludes SUCCESS at **the final PR HEAD**, the source PR retains the CI gate unchecked, regardless of isolated 40/40 Golden outcomes.
+- Vercel may report a separate deployment failure whose GitHub target is \`https://vercel.com/sign2?upgradeToPro=build-rate-limit\`: provider build rate quota, NOT demonstrated application or Scoring logic failure. Treat deployment as its own unresolved gate; do not change unrelated deployment configuration in this Scoring PR.
+- Agent 2 current public event contract version: \`tw16-rob-added-kong-public/1.0.0\`. The scoring adapter rejects robbery if this capability is not provided by the trusted Rules host. Versioned public projections exclude private trigger action IDs. Combined Replay/UI validation remains out of scope.

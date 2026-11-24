@@ -162,6 +162,10 @@
           "pattern": "^t:(0|[1-9]|[12][0-9]|3[0-3]):[0-3]$"
         }
       }
+    },
+    "publicEventContractVersion": {
+      "type": "string",
+      "const": "tw16-rob-added-kong-public/1.0.0"
     }
   },
   "allOf": [
@@ -187,7 +191,8 @@
       },
       "then": {
         "required": [
-          "winningTileId"
+          "winningTileId",
+          "publicEventContractVersion"
         ],
         "properties": {
           "via": {

@@ -79,3 +79,23 @@ private WIN intents, the remaining wall or hidden hands in the public envelope.
 **This contract is unmerged and its own branch can change.** Integration must
 pin exact Rules/Scoring commit SHAs and test original event replay before
 enabling it in a production RuleProfile.
+
+
+### R7.1 capability-version negotiation (Agent 2 updated head ff27c525)
+
+Before enabling the opt-in robbery scoring adapter, the **trusted Rules host**
+MUST obtain \`getRuleCapabilities(RuleRef).publicEventContractVersion\`
+and pass its unchanged value as
+\`evidenceFromSettledRulesState(state,{publicEventContractVersion})\` or
+\`settleRulesState(profile,state,{publicEventContractVersion})\`.
+The only accepted value is \`tw16-rob-added-kong-public/1.0.0\`.
+An omitted or different version fails closed with
+\`ScoringCapabilityError('unnegotiated-r7-public-event-contract')\`.
+R5 Rules profiles do not publish this field; they retain their old behavior.
+
+Normative Rules schema and privacy restrictions:
+https://github.com/kodlbegiko/taiwan-mahjong-trainer/blob/feat/r7-rules-completeness/docs/rules/R7_PUBLIC_EVENT_CONTRACT_V1.md
+
+The proposed \`tw16-scoring-facts/1.0.0-proposal\` DTO is **not** a Rules
+emitted event. Its \`publicEventContractVersion\` is a host-provided
+negotiated fact, never something trusted from UI or a user-supplied payload.

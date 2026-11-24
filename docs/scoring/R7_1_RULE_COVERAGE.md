@@ -48,3 +48,15 @@
 \`settleExhaustiveDraw(profile)\` returns no win payments. Optional external fixed fees create \`fees[]\` and \`houseDelta\` separate from player-to-player transfers; \`assertLedgerConservation\` checks each entry, integer overflow, canonical signed zero, transfer reconstruction, \`sum(playerTransferDeltas)=0\` and \`sum(playerDeltas)+houseDelta=0\`. Arrays and values remain stable under JSON serialization.
 
 This is **not** monetary settlement and cannot replace \`tw16-minimal-tai-v1\` until independent full-match and Replay integration passes.
+
+
+## R7.1 cross-owner negotiation
+
+Only \`getRuleCapabilities({profileId:'tw16-rob-added-kong',
+ruleVersion:'experimental-v1'}).publicEventContractVersion\` from the
+authorized Rules host supplies \`tw16-rob-added-kong-public/1.0.0\`.
+\`settleRulesState\` fails closed if the version is absent or mismatched.
+This marker does **not** authorize public access to private WIN declarations
+or new RuleProfile defaults. The exact R7.1 Rules public projection redacts
+triggering private response action IDs; Scoring reads the Rules-owned raw
+ledger, not the public replay frame.
