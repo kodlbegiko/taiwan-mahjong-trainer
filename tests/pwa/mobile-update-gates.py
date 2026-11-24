@@ -39,7 +39,8 @@ def install_observer(page):
     page.evaluate("""async () => {
       const reg=await navigator.serviceWorker.getRegistration();
       if(window.__r7Observer)reg.removeEventListener('updatefound',window.__r7Observer);
-      window.__r7Events=[];
+      const events=[];
+      window.__r7Events=events;
       window.__r7OldController=navigator.serviceWorker.controller;
       window.__r7Observer=()=>{
         const worker=reg.installing;
@@ -47,7 +48,7 @@ def install_observer(page):
         const record=()=>{
           const state=worker.state, at=performance.timeOrigin+performance.now();
           const item={state,at,controllerUnchanged:navigator.serviceWorker.controller===window.__r7OldController};
-          window.__r7Events.push(item);
+          events.push(item);
           caches.keys().then(names=>{item.names=names;});
         };
         record();worker.addEventListener('statechange',record);
@@ -79,6 +80,9 @@ def reject_update(page, peer, before, label, evidence):
     require(peer.evaluate('navigator.serviceWorker.controller!==null'), 'peer lost controller')
     require(page.locator('#hand button').count()==17 and peer.locator('#hand button').count()==17,
             label+' broke an existing tab')
+    # Separate candidates only after the registration itself is quiescent;
+    # the strict immediate rollback assertion above is deliberately not polled.
+    page.wait_for_function("""async()=>{const reg=await navigator.serviceWorker.getRegistration();return !reg.installing && !reg.waiting;}""")
 
 
 def history_snapshot(page):
@@ -125,7 +129,9 @@ def main():
     results = []
     lifecycle = []
     cdp_events = []
-    with served_site() as (url, app):
+    http_events = []
+    faults = {}
+    with served_site(fresh_sw=not bool(args.baseline_sw),faults=faults,update_http=http_events) as (url, app):
         if args.baseline_sw:
             (app / 'sw.js').write_bytes(args.baseline_sw.read_bytes())
         with sync_playwright() as pw:
@@ -135,7 +141,8 @@ def main():
             page = context.new_page()
             context.tracing.start(screenshots=True, snapshots=True, sources=True)
             session = context.new_cdp_session(page)
-            session.on('ServiceWorker.workerVersionUpdated', lambda event: cdp_events.append(event))
+            session.on('ServiceWorker.workerVersionUpdated', lambda event: cdp_events.append({'event':'version',**event}))
+            session.on('ServiceWorker.workerErrorReported', lambda event: cdp_events.append({'event':'error',**event}))
             session.send('ServiceWorker.enable')
             try:
                 page.goto(url + '?academy=training', wait_until='networkidle')
@@ -216,6 +223,11 @@ def main():
                 peer = context.new_page()
                 peer.goto(url + '?academy=training', wait_until='networkidle')
                 peer.wait_for_function('navigator.serviceWorker.controller!==null')
+                # Complete initial unchanged-script updates while the original bytes
+                # are still published; do not open a tab after publishing a bad worker.
+                peer.evaluate('async()=>{const r=await navigator.serviceWorker.getRegistration();await r.update()}')
+                page.evaluate('async()=>{const r=await navigator.serviceWorker.getRegistration();await r.update()}')
+                page.wait_for_function('async()=>{const r=await navigator.serviceWorker.getRegistration();return !r.installing && !r.waiting;}')
                 page.evaluate("""async()=>{const c=await caches.open('r7-unrelated-cache');await c.put('./unrelated',new Response('keep'));}""")
                 page.evaluate("localStorage.setItem('r7-upgrade-sentinel','preserve-me')")
                 before=cache_snapshot(page)
@@ -234,19 +246,27 @@ def main():
                 # candidate script (not production source or localStorage).
                 fault_scripts = [
                     ('reused-version', original_sw + '\n// repeated same cache version\n'),
-                    ('network-disconnect', original_sw.replace(version,version+'-network') +
-                     "\n{const real=fetch;self.fetch=(url,opts)=>String(url).endsWith('/src/academy-ui/academy.css')?Promise.reject(new TypeError('injected network disconnect')):real(url,opts);}\n"),
+                    ('network-disconnect', original_sw.replace(version,version+'-network')),
+                    ('truncated-http-body', original_sw.replace(version,version+'-truncated')),
                     ('cache-write-failure', original_sw.replace(version,version+'-quota') +
                      "\n{const put=Cache.prototype.put;let n=0;Cache.prototype.put=function(...args){if(++n===3)return Promise.reject(new DOMException('injected write failure','QuotaExceededError'));return put.apply(this,args);};}\n"),
                     ('repeat-broken-install', original_sw.replace(version,version+'-broken')+'\n// retry\n'),
                 ]
                 for name, script in fault_scripts:
                     if name=='repeat-broken-install': missing.unlink()
+                    fault_path='/taiwan-mahjong-trainer/src/academy-ui/academy.css'
+                    if name=='network-disconnect': faults[fault_path]='disconnect'
+                    if name=='truncated-http-body': faults[fault_path]='truncated'
+                    http_start=len(http_events)
                     try:
                         sw.write_text(script,encoding='utf-8')
                         reject_update(page, peer, before, name, lifecycle)
+                        if name in ('network-disconnect','truncated-http-body'):
+                            require(any(e.get('path')==fault_path and e.get('fault')==faults[fault_path]
+                                        for e in http_events[http_start:]), 'real HTTP fault was not exercised')
                         results.append({'case':name,'status':'PASS'})
                     finally:
+                        faults.pop(fault_path,None)
                         if not missing.exists(): missing.write_bytes(previous_css)
 
                 core = app / 'src/core/efficiency.js'
@@ -320,6 +340,7 @@ def main():
                     'results': results}, ensure_ascii=False, indent=2), encoding='utf-8')
                 (args.evidence / 'cache-lifecycle.json').write_text(json.dumps(lifecycle,indent=2),encoding='utf-8')
                 (args.evidence / 'cdp-worker-lifecycle.json').write_text(json.dumps(cdp_events,indent=2),encoding='utf-8')
+                (args.evidence / 'update-http.json').write_text(json.dumps(http_events,indent=2),encoding='utf-8')
                 context.tracing.stop(path=str(args.evidence / 'pwa-update.trace.zip'))
                 context.close()
                 browser.close()

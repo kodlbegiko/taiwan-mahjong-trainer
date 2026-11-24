@@ -98,11 +98,11 @@ jobs:
           git cat-file -e "$integrated^{commit}" || git fetch --no-tags origin "$integrated"
           git checkout --detach "$integrated"
           # Apply only SW/test/contract changes from this PR; preserve R7.2 game code.
-          git checkout "$fix_sha" -- scripts/runtime-precache.mjs tests/pwa/mobile-update-gates.py tests/pwa/sw-transaction.test.js
+          git checkout "$fix_sha" -- scripts/runtime-precache.mjs tests/pwa/mobile-update-gates.py tests/pwa/sw-transaction.test.js tests/browser/_release_site.py
           # SW is owned by PR50; restore its implementation, then regenerate the
           # complete integrated inventory/version from the actual composed tree.
           git checkout "$fix_sha" -- sw.js
-          git add sw.js scripts/runtime-precache.mjs tests/pwa
+          git add sw.js scripts/runtime-precache.mjs tests/pwa tests/browser/_release_site.py
           node scripts/runtime-precache.mjs --write > r7-combined-evidence/runtime-graph.json
           git add sw.js
           git commit -m "R7.3 isolated transaction candidate"
