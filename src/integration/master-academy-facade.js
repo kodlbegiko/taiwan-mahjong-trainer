@@ -8,6 +8,7 @@ import {
   listLessons, listQuestionRefs, toPublicQuestion, submitAcademyAnswer,
   getLessonPublic, validateAcademyDecisionRecord, validateTaxonomy,
   createAcademyProvenance, validateAcademyProvenance,
+  listScenarioQuestionRefs, validateScenarioQuestion,
 } from '../academy/index.js';
 import {
   createAdaptiveLearningAdapter, validateLearningProvenance,
@@ -20,7 +21,7 @@ import { analyzePlayerView } from '../strategy/index.js';
 export const INTEGRATION_CONTRACT_VERSION = 'master-academy/1.0.0';
 const clone = value => JSON.parse(JSON.stringify(value));
 const callbacks = Object.freeze({
-  submitAcademyAnswer, toPublicQuestion, getLessonPublic,
+  submitAcademyAnswer, toPublicQuestion, getLessonPublic, validateScenarioQuestion,
 });
 export const APPROVED_LEGACY_REGISTRY = Object.freeze({
   skills: SKILL_TAGS,
@@ -99,6 +100,7 @@ export function createMasterAcademyFacade(storage) {
     getLessons: () => listLessons(),
     getQuestionRefs: filter => listQuestionRefs(filter),
     getPublicQuestion: ref => toPublicQuestion(ref),
+    getScenarioQuestionRefs: filter=>listScenarioQuestionRefs(filter),
 
     submitStructuralAnswer(ref,choice,{timestamp,durationMs,attemptId,asOf,sessionId}={}) {
       const at=asOfUtc(asOf);
@@ -160,8 +162,20 @@ export function createMasterAcademyFacade(storage) {
       return {playerView,analysis,verificationScope:'experimental-draw-discard-only'};
     },
 
-    submitScenarioAnswer() {
-      throw new RangeError('Scenario scoring unavailable: no independently verified scorer');
+    submitScenarioAnswer(ref,choice,{timestamp,durationMs,attemptId,asOf,sessionId}={}) {
+      if(!ref?.questionId?.startsWith('academy-scenario-'))throw new RangeError('Scenario scoring unavailable for unknown question');
+      const at=asOfUtc(asOf);
+      const result=adapter.submitAnswer(ref,choice,{timestamp,durationMs,attemptId,asOf:at,sessionId});
+      if(result.recordRef?.kind!=='academy-v1'||result.gradingResult?.status!=='graded')
+        throw new RangeError('No official AcademyDecisionRecord result');
+      if(result.durable){
+        const stored=adapter.load();
+        const record=stored.academyRecords.find(r=>r.id===result.recordRef.id);
+        const question=stored.academyQuestions.find(q=>q.questionId===ref.questionId&&q.questionVersion===ref.questionVersion);
+        if(!record||!question||validateAcademyDecisionRecord(record,{question})!==true)
+          throw new RangeError('Scenario durable readback failed');
+      }
+      return result;
     },
   });
 }
