@@ -198,3 +198,8 @@ body[data-table-view="daily"] .roadmap { display:none !important; }
    Both status and help text must meet 4.5:1 even when mobile makes titles 16px. */
 .table-felt strong { color: #ffe8ac; }
 .table-felt small { color: #e7f0dd; }
+
+/* R7.1: Agent 1 owns confirmation markup and submission guards. */
+.table-confirmation { border: 1px solid #e8c982; border-radius: 10px; padding: 12px; margin: 12px 0; }
+.table-confirmation p { flex: 1 1 100%; margin: 0; overflow-wrap: anywhere; }
+.table-confirmation button { min-height: 44px; min-width: 44px; }

@@ -1,0 +1,36 @@
+name: R7 Runtime Precache Contract
+on:
+  pull_request:
+    branches: [integration/mahjong-full-game]
+    paths:
+      - 'src/**'
+      - 'public/**'
+      - 'data/**'
+      - 'index.html'
+      - 'sw.js'
+      - 'scripts/runtime-precache.mjs'
+      - '.github/workflows/r7-runtime-precache.yml'
+  push:
+    branches: [integration/mahjong-full-game]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  graph:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-save --package-lock=false --ignore-scripts acorn@8.15.0
+      - name: Audit actual checkout ESM graph and complete cache inventory
+        run: |
+          mkdir -p r7-graph
+          git rev-parse HEAD > r7-graph/tested-sha.txt
+          node scripts/runtime-precache.mjs > r7-graph/runtime-graph.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r7-runtime-graph
+          path: r7-graph

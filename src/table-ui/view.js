@@ -97,7 +97,7 @@ export function ActionBar(legalActions, selectedId, busy) {
   const declarationActions = legalActions.filter(a => a.kind !== 'discard');
   return '<section class="table-actions" aria-label="合法動作"><div class="table-actions-heading">' +
     '<h3>可操作動作</h3><span>僅顯示 Rules Engine 回傳的 LegalAction</span></div>' +
-    (chosen ? '<div class="table-selected"><span role="status" aria-live="polite">已選：' + escapeHtml(actionName(chosen)) +
+    (chosen ? '<div class="table-selected"><span>已選：' + escapeHtml(actionName(chosen)) +
       '</span><button type="button" data-submit-action="' + escapeHtml(chosen.actionId) +
       '" class="primary" ' + (busy ? 'disabled' : '') + '>確認捨牌</button>' +
       '<button type="button" data-clear-selection class="secondary">取消</button></div>'

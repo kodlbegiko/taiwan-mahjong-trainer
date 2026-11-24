@@ -13,7 +13,7 @@ def require(ok, message):
         raise AssertionError(message)
 
 def verify_felt_contrast(page, label):
-    values = page.evaluate("""() => {
+    values = page.evaluate(r"""() => {
       const lightest = [0x29, 0x6e, 0x58]; // gradient center #296e58
       const linear = v => {
         v /= 255;
@@ -38,7 +38,7 @@ def audit(page, label):
     results = page.evaluate("""() => {
       const root = document.querySelector('#full-table-root');
       const buttons = [...root.querySelectorAll('.table-hand button[data-pick-action]')];
-      const controls = [...root.querySelectorAll('.table-actions button:not(:disabled), #full-table-navigation button:not(:disabled)')];
+      const controls = [...document.querySelectorAll('#full-table-root .table-actions button:not(:disabled), #full-table-navigation button:not(:disabled)')];
       const undersized = [...buttons, ...controls].flatMap(b => {
         const r = b.getBoundingClientRect();
         return r.width < 44 || r.height < 44 ? [b.outerHTML.slice(0, 180) + ' ' + r.width + 'x' + r.height] : [];
@@ -99,11 +99,17 @@ def main():
                         page.screenshot(path=str(args.evidence / f'mobile-{label}.png'), full_page=True)
                         if width == 375:
                             button = page.locator('.table-hand button[data-pick-action]').first
+                            action_id = button.get_attribute('data-pick-action')
+                            revision = page.locator('.table-version').inner_text()
                             button.focus()
                             button.press('Enter')
                             page.locator('[data-submit-action]').first.wait_for()
                             page.wait_for_function(
                                 "() => document.activeElement?.matches('.table-hand button[data-pick-action]')")
+                            require(page.evaluate("() => document.activeElement.dataset.pickAction") == action_id,
+                                    'focus restored to a different tile/action')
+                            require(page.locator('.table-version').inner_text() == revision,
+                                    'keyboard selection submitted or mutated the game')
                             require(page.locator('.table-hand button[aria-pressed="true"]').count() == 1,
                                     'selection accessibility state not exposed')
                             require(page.locator('.table-hand button').first.evaluate(
@@ -135,7 +141,8 @@ def main():
                         matrix.append({'viewport': label, 'status': 'PASS', **measured})
                         print('PASS', label, 'touch/overflow/svg/aria/keyboard baseline')
                     except Exception as exc:
-                        matrix.append({'viewport': label, 'status': 'FAIL', 'reason': str(exc)})
+                        matrix.append({'viewport': label, 'status': 'FAIL', 'reason': str(exc),
+                                       'focus': page.evaluate("() => document.activeElement?.outerHTML?.slice(0, 500)")})
                         page.screenshot(path=str(args.evidence / f'mobile-{label}-failure.png'), full_page=True)
                         raise
                     finally:

@@ -14,6 +14,8 @@ on:
       - 'tests/browser/mobile-pwa-a11y-gates.py'
       - 'tests/pwa/mobile-update-gates.py'
       - 'docs/quality/R7_MOBILE_PWA_A11Y.md'
+      - 'scripts/runtime-precache.mjs'
+      - '.github/workflows/r7-runtime-precache.yml'
   workflow_dispatch:
 permissions:
   contents: read
@@ -36,7 +38,7 @@ jobs:
           git fetch origin integration/mahjong-full-game
           while IFS= read -r file; do
             case "$file" in
-              index.html|style.css|sw.js|public/manifest.webmanifest|src/table-ui/table.css|src/table-ui/view.js|src/table-ui/a11y.js|tests/browser/mobile-pwa-a11y-gates.py|tests/pwa/mobile-update-gates.py|docs/quality/R7_MOBILE_PWA_A11Y.md|.github/workflows/r7-mobile-pwa-a11y.yml) ;;
+              index.html|style.css|sw.js|public/manifest.webmanifest|src/table-ui/table.css|src/table-ui/view.js|src/table-ui/a11y.js|tests/browser/mobile-pwa-a11y-gates.py|tests/pwa/mobile-update-gates.py|docs/quality/R7_MOBILE_PWA_A11Y.md|.github/workflows/r7-mobile-pwa-a11y.yml|scripts/runtime-precache.mjs|.github/workflows/r7-runtime-precache.yml) ;;
               *) echo "::error::Out-of-scope file changed: $file"; exit 1 ;;
             esac
           done < <(git diff --name-only origin/integration/mahjong-full-game...HEAD)
@@ -66,6 +68,7 @@ jobs:
       - name: Six viewports, landscape, keyboard and legacy contract
         run: python tests/browser/mobile-pwa-a11y-gates.py --evidence r7-mobile-evidence
       - name: Cold offline, broken update rollback and explicit upgrade
+        if: always()
         run: python tests/pwa/mobile-update-gates.py --evidence r7-mobile-evidence
       - name: Upload PASS/FAIL evidence and screenshots (not real-device certification)
         if: always()
