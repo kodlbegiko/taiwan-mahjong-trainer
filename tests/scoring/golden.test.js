@@ -393,6 +393,7 @@ test('R7-001 ledger rejects forged signed-zero amounts rather than hiding them i
 
 
 const ROB_REF={profileId:'tw16-rob-added-kong',ruleVersion:'experimental-v1'};
+const R7_CAPS={publicEventContractVersion:'tw16-rob-added-kong-public/1.0.0'};
 function robAddedKongEvidence(){
   return fixture({ruleRef:ROB_REF,winningTile:'t:27:3',
     robAddedKong:{proposalEventId:'evt:r7-rob:5',fromSeat:0,tileId:'t:27:3'}});
@@ -450,12 +451,13 @@ test('R7.1 robbery is opt-in: forged/unsupported markers cannot alter R5 settlem
 });
 test('R7.1 real Rules Agent marker contract: ordered public proposal and single private winner',()=>{
   const snapshot=robAddedKongSettledSnapshot(),before=JSON.stringify(snapshot);
-  const evidence=evidenceFromSettledRulesState(snapshot);
+  assert.throws(()=>evidenceFromSettledRulesState(snapshot),ScoringCapabilityError);
+  const evidence=evidenceFromSettledRulesState(snapshot,R7_CAPS);
   assert.deepEqual(evidence.robAddedKong,{proposalEventId:'evt:r7-rob:5',
     fromSeat:0,tileId:'t:27:3'});
   assert.equal(evidence.winningTile,'t:27:3');
   assert.equal(evidence.via,'discard');
-  const ledger=settleRulesState(p,snapshot);
+  const ledger=settleRulesState(p,snapshot,R7_CAPS);
   assert.deepEqual(ledger.playerTransferDeltas,[-1,1,0,0]);
   assert.equal(assertLedgerConservation(ledger),true);
   assert.equal(JSON.stringify(snapshot),before,'read-only adapter must not change Rules state');
@@ -479,7 +481,7 @@ test('R7.1 robbery adapter rejects missing/tampered proposal, claim, marker, til
   ];
   for(const attack of attacks){
     const snapshot=robAddedKongSettledSnapshot();attack(snapshot);
-    assert.throws(()=>evidenceFromSettledRulesState(snapshot),
+    assert.throws(()=>evidenceFromSettledRulesState(snapshot,R7_CAPS),
       /provenance|linkage|payer|terminal/i);
   }
 });
