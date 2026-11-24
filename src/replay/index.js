@@ -104,7 +104,24 @@ function frameFrom(archive,seq,settlementRuntime) {
           state.extensions.tw16.result.settlement)))
       throw new ReplayError('VIEW_FORBIDDEN','Authoritative historical projection contains private evidence or an incorrect summary');
   }
-  if(!strategyUnavailableReason(view))readPlayerView(view);
+  // R5 discard-win terminal views carry the Rules-owned claimResolution,
+  // a deliberately unsupported payload in the pre-settlement Strategy parser.
+  // Validate the exact canonical terminal projection instead of dropping data
+  // or weakening Strategy's live decision contract.
+  const r5Terminal=m.ruleRef.profileId==='tw16-single-winner-interception'&&
+    m.ruleRef.ruleVersion==='experimental-v1'&&state.round.phase==='settled'&&
+    state.extensions.tw16.result?.claimResolution!==undefined;
+  if(r5Terminal){
+    const result=state.extensions.tw16.result;
+    const disclosed=view.publicEvents.filter(e=>Object.hasOwn(e.payload,'claimResolution'));
+    const win=disclosed[0],terminal=view.publicEvents.at(-1);
+    if(view.round.phase!=='settled'||view.legalActions.length!==0||
+       disclosed.length!==1||win.type!=='win'||win.actorSeat!==result.winnerSeat||
+       win.payload.seat!==result.winnerSeat||win.payload.sourceSeat!==result.sourceSeat||
+       !same(win.payload.claimResolution,result.claimResolution)||
+       terminal?.type!=='settle'||terminal.seq!==seq)
+      throw new ReplayError('VIEW_FORBIDDEN','R5 terminal claim resolution differs from canonical Rules result');
+  }else if(!strategyUnavailableReason(view))readPlayerView(view);
   return {...V1,frameVersion:FRAME_VERSION,replayId:m.replayId,
     perspective:'player-at-time',asOfEventSeq:seq,
     playerView:clone(view),publicEvent:clone(view.publicEvents.at(-1)),
