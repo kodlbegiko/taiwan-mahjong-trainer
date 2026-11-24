@@ -231,23 +231,52 @@ export function AuthoritativeSettlement(summary){
     typeof x.ruleVersion==='string'&&typeof x.source==='string'&&
     ['hand','payment'].includes(x.scope)&&Number.isInteger(x.tai)&&x.tai>=0;
   const seat=x=>Number.isInteger(x)&&x>=0&&x<4;
-  const delta=x=>Array.isArray(x)&&x.length===4&&x.every(Number.isInteger);
+  const nonnegative=n=>Number.isSafeInteger(n)&&n>=0&&!Object.is(n,-0);
+  const delta=x=>Array.isArray(x)&&x.length===4&&x.every(n=>Number.isSafeInteger(n)&&!Object.is(n,-0));
   if(summary.contractVersion!=='tw16-pre-settlement/1.0.0'||
     summary.scoringVersion!==PUBLIC_SETTLEMENT_VERSION||
     summary.status!=='experimental-not-rule-certified'||summary.unit!=='abstract-points'||
     typeof summary.settlementId!=='string'||!summary.settlementId||
     !['win','exhaustive-draw'].includes(summary.reason)||
-    !Number.isInteger(summary.tai)||summary.tai<0||
+    !nonnegative(summary.tai)||
     !Array.isArray(summary.breakdown)||!summary.breakdown.every(item)||
     !delta(summary.playerDeltas)||!delta(summary.playerTransferDeltas)||
     !Array.isArray(summary.payerSeats)||!summary.payerSeats.every(seat)||
     !Array.isArray(summary.payments)||!summary.payments.every(p=>p&&seat(p.payerSeat)&&
-      seat(p.payeeSeat)&&['points','handTai','appliedTai'].every(k=>Number.isInteger(p[k])&&p[k]>=0)&&
+      seat(p.payeeSeat)&&['points','handTai','appliedTai'].every(k=>nonnegative(p[k]))&&
       Array.isArray(p.dealerItems)&&p.dealerItems.every(item))||
     !Array.isArray(summary.fees)||summary.fees.length!==0||summary.houseDelta!==0||
     (summary.reason==='win'?(!seat(summary.winnerSeat)||!['self-draw','discard','rob-added-kong'].includes(summary.winType)):
       (summary.winnerSeat!==null||summary.winType!==null||summary.payments.length!==0||summary.payerSeats.length!==0)))
     return '<section role="alert" data-authority-unavailable>權威結算契約不相容，無法顯示計分。</section>';
+  // Validate public accounting invariants without deriving any scoring decision.
+  // All paid amounts and tai remain Rules-owned; inconsistent DTOs never render.
+  const bad=()=>'<section role="alert" data-authority-unavailable>權威結算契約不相容，無法顯示計分。</section>';
+  const same=(a,b)=>a.length===b.length&&a.every((x,i)=>x===b[i]);
+  const sum=a=>a.reduce((s,n)=>s+BigInt(n),0n);
+  if(!summary.breakdown.every(x=>nonnegative(x.tai))||
+     sum(summary.breakdown.map(x=>x.tai))!==BigInt(summary.tai)||
+     !same(summary.playerDeltas,summary.playerTransferDeltas)||
+     sum(summary.playerDeltas)!==0n)return bad();
+  if(summary.reason==='exhaustive-draw'){
+    if(summary.sourceSeat!==null||summary.tai!==0||summary.breakdown.length||
+       summary.playerDeltas.some(n=>n!==0))return bad();
+  }else{
+    const winner=summary.winnerSeat;
+    if(!seat(summary.sourceSeat))return bad();
+    const self=summary.winType==='self-draw';
+    if(self!==(summary.sourceSeat===winner))return bad();
+    const expected=self?[0,1,2,3].filter(s=>s!==winner):[summary.sourceSeat];
+    if(!same(summary.payerSeats,expected)||!same(summary.payments.map(p=>p.payerSeat),expected))return bad();
+    const balances=[0n,0n,0n,0n];
+    for(const p of summary.payments){
+      if(p.payeeSeat!==winner||p.handTai!==summary.tai||
+         !p.dealerItems.every(x=>nonnegative(x.tai))||
+         BigInt(p.appliedTai)!==BigInt(p.handTai)+sum(p.dealerItems.map(x=>x.tai)))return bad();
+      balances[p.payerSeat]-=BigInt(p.points);balances[p.payeeSeat]+=BigInt(p.points);
+    }
+    if(!balances.every((n,i)=>n===BigInt(summary.playerDeltas[i])))return bad();
+  }
   const line=x=>'<li>'+escapeHtml(x.name)+'（'+escapeHtml(x.code)+'）：'+x.tai+
     ' 台 · '+escapeHtml(x.ruleVersion)+' · '+escapeHtml(x.source)+' · '+escapeHtml(x.scope)+'</li>';
   return '<section class="table-round-summary" data-authoritative-settlement aria-label="Rules 權威結算">'+

@@ -57,11 +57,26 @@ def final_replay(page,expected,dest):
     page.locator('[data-table-nav="replay"]').click()
     page.wait_for_selector('.table-replay',timeout=45000)
     jump=page.locator('[data-replay-jump]')
-    count=jump.locator('option').count()
+    options=jump.locator('option').all_text_contents()
+    count=len(options)
     require(count>=2,'Replay has no event boundaries')
-    jump.select_option(str(count-1))
-    page.wait_for_function('''n=>document.querySelector('.table-replay')?.innerText.includes('事件 '+n+' / '+n)''',
-                           arg=expected['eventCount'],timeout=45000)
+    target='#'+str(expected['eventCount'])
+    require(options[-1].strip()==target,'Final Replay boundary differs from Rules terminal event: '+repr(options[-5:]))
+    jump.select_option(label=target)
+    try:
+        page.wait_for_function("""n=>{
+          const root=document.querySelector('#full-table-root');
+          return !!root?.querySelector('[role=alert]') ||
+            root?.querySelector('.table-replay')?.innerText.includes('事件 '+n+' / '+n);
+        }""",arg=expected['eventCount'],timeout=45000)
+    except Exception as exc:
+        (dest/'replay-terminal-diagnostic.json').write_text(json.dumps({
+            'expectedEventCount':expected['eventCount'],'lastBoundaries':options[-5:],
+            'rootText':page.locator('#full-table-root').inner_text()[-3000:],
+        },ensure_ascii=False,indent=2),encoding='utf-8')
+        raise AssertionError('Terminal Replay did not render; see replay-terminal-diagnostic.json') from exc
+    alert=page.locator('#full-table-root [role=alert]')
+    require(alert.count()==0,'Replay rejected terminal frame: '+(alert.first.inner_text() if alert.count() else ''))
     require(page.locator('.table-replay').inner_text().find('無合法選項')>=0,'Settled Replay has legal actions')
     page.screenshot(path=str(dest/'replay-final.png'),full_page=True)
     return count

@@ -272,6 +272,25 @@ test('R7.3 authority renderer consumes only exact public DTO, fails closed on un
   assert.ok(!html.includes('NEVER_RENDER_THIS'));
   assert.match(AuthoritativeSettlement({...summary,scoringVersion:'unknown'}),/data-authority-unavailable/);
   assert.match(AuthoritativeSettlement({...summary,playerDeltas:[0,1]}),/data-authority-unavailable/);
+  for(const mutate of [
+    s=>s.playerDeltas=[0,-6,7,0],
+    s=>s.playerTransferDeltas=[0,-5,5,0],
+    s=>s.payerSeats=[1,1],
+    s=>s.payments[0].payeeSeat=0,
+    s=>s.payments[0].points=8,
+    s=>s.payments[0].appliedTai=8,
+    s=>s.sourceSeat=2,
+    s=>s.tai=8,
+    s=>s.playerDeltas=[-0,-7,7,0],
+    s=>s.payments[0].points=Number.MAX_SAFE_INTEGER+1,
+  ]){
+    const forged=JSON.parse(JSON.stringify(summary));mutate(forged);
+    assert.match(AuthoritativeSettlement(forged),/data-authority-unavailable/);
+  }
+  const draw={...summary,reason:'exhaustive-draw',winType:null,winnerSeat:null,sourceSeat:null,
+    tai:0,breakdown:[],payerSeats:[],payments:[],playerDeltas:[0,0,0,0],playerTransferDeltas:[0,0,0,0]};
+  assert.match(AuthoritativeSettlement(draw),/data-authoritative-settlement/);
+  assert.match(AuthoritativeSettlement({...draw,sourceSeat:0}),/data-authority-unavailable/);
 });
 
 test('R7.3 public robbery proposal is pending, exact linked WIN/PASS only',()=>{
