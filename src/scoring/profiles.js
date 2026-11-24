@@ -11,7 +11,7 @@ function freeze(x){if(x&&typeof x==='object'){Object.values(x).forEach(freeze);O
 const tai={
   concealed:1,selfDraw:1,concealedSelfDraw:3,
   roundWind:1,seatWind:1,dragon:1,correctFlower:1,flowerSet:2,
-  allPongs:4,allExposed:2,pinghu:2,mixedSuit:4,pureSuit:8,allHonors:8,
+  allPongs:4,allExposed:2,pinghu:2,kongBloom:1,seaBottom:1,mixedSuit:4,pureSuit:8,allHonors:8,
   smallDragons:4,bigDragons:8,smallWinds:8,bigWinds:16,
   concealedTriplets:{3:2,4:5,5:8},
   openKong:0,concealedKong:0,noHonorsNoFlowers:0,robAddedKong:1,dealer:1,dealerStreakEach:2,
