@@ -109,3 +109,7 @@ No Scoring, Bot, Replay, Academy or UI module is changed by this PR.
 
 These are comparative interpretations. The new R7 rules are experimental
 **software policy**, not legal/official certification.
+
+## R7.3 — additional authoritative scoring profile
+
+See [R73_SETTLEMENT_CONTRACT.md](./R73_SETTLEMENT_CONTRACT.md) and public settlement schema. R3/R5/R7.1 policies remain pinned. Only `tw16-authoritative-scoring@experimental-v1` calls `settlePreSettlement` with the exact opt-in `tw16-gametower-authoritative@1.0.0-experimental` ScoringProfile. Ordinary later-orbit self-draw/discard, sole robbery and exhaustive draw supported experimentally; first-orbit timing, unknown required seat wind, non-genesis streak chain, multiwinner, special liability, open-kong replacement variant, exhausted mandatory replacement, special hands and regional variants remain fail-closed or not implemented. New ledger is private with a safe public accounting summary. Combined strict Rules/Scoring/Replay tests, source-owner CI, PWA graph and real UI acceptance remain required before exposure.

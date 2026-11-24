@@ -46,7 +46,7 @@ const name={
   smallDragons:'小三元',bigDragons:'大三元',smallWinds:'小四喜',bigWinds:'大四喜',
   concealedTriplets:'暗刻',openKong:'明槓',concealedKong:'暗槓',
   noHonorsNoFlowers:'無字無花',robAddedKong:'搶槓胡',
-  pinghu:'平胡',allExposed:'全求人',kongBloom:'槓上開花',seaBottom:'海底撈月',
+  pinghu:'平胡',allExposed:'全求人',kongBloom:'槓上開花',seaBottom:'海底撈月',uniqueWait:'獨聽',
 };
 function validateEvidence(p,e){
   validateScoringProfile(p);
@@ -72,7 +72,7 @@ function validateEvidence(p,e){
   }
   if(e.robAddedKong!==undefined){
     const marker=e.robAddedKong;
-    assert(e.ruleRef.profileId==='tw16-rob-added-kong'&&
+    assert(['tw16-rob-added-kong','tw16-authoritative-scoring'].includes(e.ruleRef.profileId)&&
       e.ruleRef.ruleVersion==='experimental-v1','rob-added-kong profile pin');
     assert(e.via==='discard'&&e.winnerSeat!==e.sourceSeat,
       'rob-added-kong must be a discard-liability win');
@@ -121,7 +121,7 @@ function validateEvidence(p,e){
   assert(counts.every(c=>c<=4),'more than four standard copies');
   if(typeof e.winningTile==='string'&&seenPhysical.includes(e.winningTile))
     assert(false,'winning tile previously owned');
-  if(melds.some(m=>m.type>=27)&&p.variants.wind==='round-and-seat'){
+  if(melds.some(m=>m.type>=27&&(p.profileId!=='tw16-gametower-authoritative'||m.type<=30))&&p.variants.wind==='round-and-seat'){
     assert(winds.includes(e.prevailingWindType)&&winds.includes(e.seatWindType),'round/seat wind proofs');
   }
   if(f.length&&p.variants.flower==='correct-and-sets')
@@ -136,6 +136,27 @@ export function scoreWinningHand(profile,evidence){
     if(tai>0)items.push({code,name:name[key]||key,tai,
       evidence:detail,ruleVersion:ver,source,scope:'hand'});
   };
+  const authoritative=profile.profileId==='tw16-gametower-authoritative'&&
+    profile.version==='1.0.0-experimental';
+  let uniqueWait=false;
+  if(authoritative){
+    // The trusted pre-settlement adapter supplies the *actual* physical draw
+    // for self-draw; for ron the winning tile is external to concealed.
+    const actual=evidence.via==='discard'?evidence.winningTile:evidence.selfDrawTile;
+    assert(typeof actual==='string','authoritative physical winning tile');
+    const actualType=typeOf(actual),pre=[...concealed];
+    if(evidence.via==='self-draw'){
+      assert(evidence.concealed.includes(actual),'self-draw tile ownership');
+      pre.splice(evidence.concealed.indexOf(actual),1);
+    }
+    const owned=Array(34).fill(0);
+    for(const t of [...pre,...melds.flatMap(m=>m.types)])owned[t]++;
+    const waits=[];
+    for(let t=0;t<34;t++)if(owned[t]<4&&combinations([...pre,t],5-melds.length).length)
+      waits.push(t);
+    assert(waits.includes(actualType),'winning type in pre-win structural waits');
+    uniqueWait=waits.length===1;
+  }
   const allConcealed=melds.every(m=>!m.open);
   const finalConcealed=evidence.via==='self-draw';
   const exposed=!allConcealed;
@@ -190,7 +211,8 @@ export function scoreWinningHand(profile,evidence){
         return combinations([...concealed,alternate],5-melds.length)
           .some(other=>other.pair<27&&other.groups.every(x=>x.kind==='sequence'));
       });
-      const pinghu=evidence.via==='discard'&&flowers.length===0&&
+      const pinghu=evidence.via==='discard'&&(!authoritative||role==='sequence')&&
+        (!authoritative||!uniqueWait)&&flowers.length===0&&
         !honors&&dec.pair<27&&all.every(g=>g.kind==='sequence')&&twoSided;
       if(pinghu)
         add(items,'pinghu','pinghu',
@@ -208,6 +230,9 @@ export function scoreWinningHand(profile,evidence){
         evidence.via==='discard'&&role==='pair')
         add(items,'all-exposed','allExposed',
           'five open claimed melds, one concealed tile before discard win; excludes pair wait tai');
+      if(authoritative&&uniqueWait&&!(melds.length===5&&melds.every(m=>m.open)&&
+        evidence.via==='discard'&&role==='pair'))
+        add(items,'unique-wait','uniqueWait','exactly one structural winning tile type before the actual winning tile; excludes 全求人');
       if(all.every(g=>g.kind!=='sequence')&&
         !(suits.size===0&&profile.variants.allHonorsSuppressAllPongs))
         add(items,'all-pongs','allPongs','five triplets/kongs and one pair');
@@ -276,7 +301,7 @@ export function scoreWinningHand(profile,evidence){
     decomposition:best.decomposition,via:evidence.via,
     winnerSeat:evidence.winnerSeat,sourceSeat:evidence.sourceSeat,
     ruleRef:{...evidence.ruleRef},excludedCapabilities:[
-      'flower-only-wins','unverified-wait-shapes-except-pinghu','bao-pai','multi-winner',
+      'flower-only-wins',authoritative?'unverified-specific-wait-bonuses':'unverified-wait-shapes-except-pinghu','bao-pai','multi-winner',
       'declared-ready','heaven-earth-wins'],
     sourceRefs:[...profile.sourceRefs]};
 }

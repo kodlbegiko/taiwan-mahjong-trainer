@@ -97,7 +97,7 @@ test('R7.1 canonical SHA matches Node SHA-256, JSON and key-order invariance',()
   assert.equal(validateReplayArchive(copy),true);
   assert.deepEqual(replayIntegrityHashes(copy.manifest,copy.events,copy.decisions,reverse(state)),archive.manifest.integrity.sha256);
   copy.manifest.scoringVersion='tw16-gametower-comparative@1.0.0-experimental';
-  code(()=>validateReplayArchive(copy),'CORRUPT_REPLAY');
+  code(()=>validateReplayArchive(copy),'UNSUPPORTED_SCORING_PROFILE');
 });
 function legacySettled(){
   const ref={profileId:'tw16-single-winner-interception',ruleVersion:'experimental-v1'};
@@ -269,6 +269,6 @@ test('R7.1 opt-in comparison scoring never replaces historical Rules results, ev
     assert.deepEqual(service.getReplayFrame(meta.replayId,1,{perspective:'postgame'}).postgameDisclosure.outcome.delta,result.delta);
     const forged=cp(archive);
     forged.manifest.scoringVersion=comparison.scoringVersion;
-    code(()=>validateReplayArchive(forged),'CORRUPT_REPLAY');
+    code(()=>validateReplayArchive(forged),'UNSUPPORTED_SCORING_PROFILE');
   }
 });

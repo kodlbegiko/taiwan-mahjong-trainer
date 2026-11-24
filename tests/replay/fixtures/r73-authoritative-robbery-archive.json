@@ -1,0 +1,2073 @@
+{
+  "provenance": {
+    "replayCommit": "86632d0353ca44cc6ee8d088d1d13f57bfffbfc4",
+    "rulesCommit": "7b03057180194064826832759472bd87de49ea42",
+    "scoringCommit": "aa2535499377f4e3fc625506f1150f493191b791",
+    "description": "Real Rules-issued LegalAction robbery through trusted Scoring runtime and Replay archive; synthetic fixture; isolated ECMAScript execution."
+  },
+  "type": "rob-added-kong",
+  "archive": {
+    "schemaVersion": 1,
+    "contractVersion": "master-academy/1.0.0",
+    "replayVersion": "tw16-replay/1.0.0",
+    "manifest": {
+      "schemaVersion": 1,
+      "contractVersion": "master-academy/1.0.0",
+      "replayVersion": "tw16-replay/1.0.0",
+      "replayId": "replay:r7-rob-one",
+      "gameId": "r7-rob-one",
+      "ownerSeat": 0,
+      "ruleRef": {
+        "profileId": "tw16-authoritative-scoring",
+        "ruleVersion": "experimental-v1"
+      },
+      "ruleProfileSnapshot": {
+        "schemaVersion": 1,
+        "contractVersion": "master-academy/1.0.0",
+        "profileId": "tw16-authoritative-scoring",
+        "ruleVersion": "experimental-v1",
+        "status": "experimental",
+        "scope": "four-player",
+        "sourceRefs": [
+          "docs/rules/R73_SETTLEMENT_CONTRACT.md"
+        ],
+        "tileSet": {
+          "standardTypes": 34,
+          "copiesPerType": 4,
+          "flowers": {
+            "enabled": true,
+            "codes": [
+              {
+                "code": "season-spring",
+                "copies": 1
+              },
+              {
+                "code": "season-summer",
+                "copies": 1
+              },
+              {
+                "code": "season-autumn",
+                "copies": 1
+              },
+              {
+                "code": "season-winter",
+                "copies": 1
+              },
+              {
+                "code": "plant-plum",
+                "copies": 1
+              },
+              {
+                "code": "plant-orchid",
+                "copies": 1
+              },
+              {
+                "code": "plant-bamboo",
+                "copies": 1
+              },
+              {
+                "code": "plant-chrysanthemum",
+                "copies": 1
+              }
+            ]
+          }
+        },
+        "handShape": {
+          "base": 16,
+          "drawn": 17,
+          "winningMelds": 5,
+          "eyes": 1
+        },
+        "turnPolicy": {
+          "claimPriority": "configured",
+          "replacementDraw": "configured"
+        },
+        "winningPolicy": {
+          "mode": "configured",
+          "configRef": "tw16-win-five-melds-v1"
+        },
+        "scoringPolicy": {
+          "mode": "configured",
+          "configRef": "tw16-gametower-authoritative@1.0.0-experimental"
+        },
+        "extensions": {
+          "tw16": {
+            "housePolicyVersion": "tw16-authoritative-scoring/1.0.0",
+            "startingPrevailingWind": "east",
+            "windAdvancePolicy": "explicit",
+            "claimOrder": [
+              "win",
+              "kong",
+              "pong",
+              "chi"
+            ],
+            "singleWinner": true,
+            "multipleDiscardWins": "unsupported",
+            "chiFromPreviousSeatOnly": true,
+            "passWinLock": "until-own-discard",
+            "reserveTail": 16,
+            "replacementFromTail": true,
+            "robAddedKong": true,
+            "specialHands": [],
+            "scoring": {
+              "basePoints": 100,
+              "pointsPerTai": 20,
+              "concealedTai": 1,
+              "selfDrawTai": 1,
+              "concealedSelfDrawBonusTai": 1,
+              "dealerInteractionTai": 1
+            },
+            "dealerRetentionOnDraw": true,
+            "robAddedKongSettlement": "authoritative-single-declarer",
+            "robAddedKongPriority": "win-only-legacy-multiwinner-fail-closed",
+            "verificationStatus": "experimental",
+            "settlementEvidenceContractVersion": "tw16-pre-settlement/1.0.0",
+            "scoringPolicy": "tw16-gametower-authoritative@1.0.0-experimental"
+          }
+        }
+      },
+      "initialSeed": "r7-seed",
+      "dealerSeat": 0,
+      "engineVersion": "rules-engine/0.2.0-experimental",
+      "strategyVersion": "advanced-strategy/1.0.0",
+      "scoringVersion": "tw16-gametower-authoritative@1.0.0-experimental",
+      "decisionVersion": "tw16-player-decision/1.0.0",
+      "completionStatus": "settled-experimental",
+      "verificationScope": "experimental-r3-full-round",
+      "postgameDisclosurePolicy": "settled-public-only",
+      "eventCount": 32,
+      "gameRef": {
+        "gameId": "r7-rob-one",
+        "roundId": "r7-rob-one-round-0"
+      },
+      "ruleProfileVersion": "experimental-v1",
+      "initialSeedRef": "private:ReplayManifest.initialSeed",
+      "roundConfig": {
+        "handIndex": 0,
+        "prevailingWind": "east"
+      },
+      "settlementResultRef": {
+        "eventSeq": 32,
+        "type": "SettlementResult",
+        "access": "private-storage"
+      },
+      "settlementResultChecksum": "b89048c6",
+      "disclosurePolicy": "settled-public-only",
+      "scoringRef": {
+        "profileId": "tw16-gametower-authoritative",
+        "version": "1.0.0-experimental"
+      },
+      "preSettlementContractVersion": "tw16-pre-settlement/1.0.0",
+      "publicEventContractVersion": "tw16-rob-added-kong-public/1.0.0",
+      "scoringProfileSnapshot": {
+        "contractVersion": "tw16-scoring/1.0.0-experimental",
+        "profileId": "tw16-gametower-authoritative",
+        "version": "1.0.0-experimental",
+        "status": "experimental",
+        "claim": "Pinned experimental Rules-host settlement; not a Taiwan-wide certification",
+        "sourceRefs": [
+          "https://www.gametower.com.tw/Games/Freeplay/MJ/Star31/Data/i_ingame-count.aspx",
+          "https://mahjongorchid.com/zh-tw/tai/"
+        ],
+        "ruleRefs": [
+          {
+            "profileId": "tw16-authoritative-scoring",
+            "ruleVersion": "experimental-v1"
+          }
+        ],
+        "points": {
+          "base": 0,
+          "perTai": 1,
+          "unit": "abstract-points"
+        },
+        "settlement": {
+          "discard": "discarder-only",
+          "selfDraw": "all-other-three",
+          "liability": "unsupported",
+          "fee": {
+            "mode": "none",
+            "points": 0
+          }
+        },
+        "variants": {
+          "wind": "round-and-seat",
+          "flower": "correct-and-sets",
+          "kong": "none",
+          "flowerSetsReplaceCorrect": true,
+          "smallWindRetainsWind": true,
+          "allHonorsSuppressAllPongs": true,
+          "pinghuSuppressNoHonorsNoFlowers": true
+        },
+        "tai": {
+          "concealed": 1,
+          "selfDraw": 1,
+          "concealedSelfDraw": 3,
+          "roundWind": 1,
+          "seatWind": 1,
+          "dragon": 1,
+          "correctFlower": 1,
+          "flowerSet": 2,
+          "allPongs": 4,
+          "allExposed": 2,
+          "pinghu": 2,
+          "kongBloom": 1,
+          "seaBottom": 1,
+          "mixedSuit": 4,
+          "pureSuit": 8,
+          "allHonors": 8,
+          "smallDragons": 4,
+          "bigDragons": 8,
+          "smallWinds": 8,
+          "bigWinds": 16,
+          "concealedTriplets": {
+            "3": 2,
+            "4": 5,
+            "5": 8
+          },
+          "openKong": 0,
+          "concealedKong": 0,
+          "noHonorsNoFlowers": 0,
+          "robAddedKong": 1,
+          "dealer": 1,
+          "dealerStreakEach": 2,
+          "uniqueWait": 1
+        }
+      },
+      "actionCount": 28,
+      "integrity": {
+        "algorithm": "fnv1a-32-canonical-checksum-not-signature",
+        "eventsChecksum": "cb6fa733",
+        "decisionChecksum": "6d7ccf23",
+        "finalStateChecksum": "c0e370a1",
+        "sha256": {
+          "version": "tw16-replay-chain-sha256/1.0.0",
+          "eventChain": "3dd08be59cb11750c297f3c041bbe47d3e2641e60c7d5e5aa40af90dd0302819",
+          "decisions": "3c0db57f8f0599b7e99e38a20e8fda114f6768b6115aa77f6b479d3681b9e775",
+          "finalState": "1ccde6cc2f9fcac1e72444ba7d52ed0b3a27f4be3c32db2acdb3827cdf27302e"
+        }
+      }
+    },
+    "events": [
+      {
+        "schemaVersion": 1,
+        "contractVersion": "master-academy/1.0.0",
+        "replayEventVersion": "tw16-replay/1.0.0",
+        "seq": 1,
+        "turnEvent": {
+          "schemaVersion": 1,
+          "contractVersion": "master-academy/1.0.0",
+          "eventId": "evt:r7-rob-one:1",
+          "gameId": "r7-rob-one",
+          "seq": 1,
+          "ruleRef": {
+            "profileId": "tw16-authoritative-scoring",
+            "ruleVersion": "experimental-v1"
+          },
+          "type": "deal",
+          "visibility": "system-private",
+          "payload": {
+            "dealerSeat": 0,
+            "countsBySeat": [
+              17,
+              16,
+              16,
+              16
+            ],
+            "fixtureDeck": [
+              "t:5:3",
+              "t:0:0",
+              "t:0:1",
+              "t:0:2",
+              "t:0:3",
+              "t:1:0",
+              "t:1:1",
+              "t:1:2",
+              "t:1:3",
+              "t:2:0",
+              "t:2:1",
+              "t:2:2",
+              "t:2:3",
+              "t:3:0",
+              "t:3:1",
+              "t:3:2",
+              "t:5:0",
+              "t:5:1",
+              "t:4:0",
+              "t:4:1",
+              "t:4:2",
+              "t:4:3",
+              "t:6:1",
+              "t:6:2",
+              "t:6:3",
+              "t:7:1",
+              "t:7:2",
+              "t:7:3",
+              "t:8:0",
+              "t:8:1",
+              "t:8:2",
+              "t:8:3",
+              "t:9:0",
+              "t:9:1",
+              "t:9:2",
+              "t:10:0",
+              "t:10:1",
+              "t:10:2",
+              "t:11:0",
+              "t:11:1",
+              "t:11:2",
+              "t:12:0",
+              "t:12:1",
+              "t:12:2",
+              "t:6:0",
+              "t:7:0",
+              "t:27:0",
+              "t:27:1",
+              "t:9:3",
+              "t:10:3",
+              "t:11:3",
+              "t:12:3",
+              "t:13:0",
+              "t:13:1",
+              "t:13:2",
+              "t:13:3",
+              "t:14:0",
+              "t:14:1",
+              "t:14:2",
+              "t:14:3",
+              "t:15:0",
+              "t:15:1",
+              "t:15:2",
+              "t:15:3",
+              "t:3:3",
+              "t:31:3",
+              "t:32:3",
+              "t:33:3",
+              "t:5:2",
+              "t:16:0",
+              "t:16:1",
+              "t:16:2",
+              "t:16:3",
+              "t:17:0",
+              "t:17:1",
+              "t:17:2",
+              "t:17:3",
+              "t:18:0",
+              "t:18:1",
+              "t:18:2",
+              "t:18:3",
+              "t:19:0",
+              "t:19:1",
+              "t:19:2",
+              "t:19:3",
+              "t:20:0",
+              "t:20:1",
+              "t:20:2",
+              "t:20:3",
+              "t:21:0",
+              "t:21:1",
+              "t:21:2",
+              "t:21:3",
+              "t:22:0",
+              "t:22:1",
+              "t:22:2",
+              "t:22:3",
+              "t:23:0",
+              "t:23:1",
+              "t:23:2",
+              "t:23:3",
+              "t:24:0",
+              "t:24:1",
+              "t:24:2",
+              "t:24:3",
+              "t:25:0",
+              "t:25:1",
+              "t:25:2",
+              "t:25:3",
+              "t:26:0",
+              "t:26:1",
+              "t:26:2",
+              "t:26:3",
+              "t:27:2",
+              "t:27:3",
+              "t:28:0",
+              "t:28:1",
+              "t:28:2",
+              "t:28:3",
+              "t:29:0",
+              "t:29:1",
+              "t:29:2",
+              "t:29:3",
+              "t:30:0",
+              "t:30:1",
+              "t:30:2",
+              "t:30:3",
+              "t:31:0",
+              "t:31:1",
+              "t:31:2",
+              "t:32:0",
+              "t:32:1",
+              "t:32:2",
+              "t:33:0",
+              "t:33:1",
+              "t:33:2",
+              "f:season-spring:0",
+              "f:season-summer:0",
+              "f:season-autumn:0",
+              "f:season-winter:0",
+              "f:plant-plum:0",
+              "f:plant-orchid:0",
+              "f:plant-bamboo:0",
+              "f:plant-chrysanthemum:0"
+            ]
+          }
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "contractVersion": "master-academy/1.0.0",
+        "replayEventVersion": "tw16-replay/1.0.0",
+        "seq": 2,
+        "turnEvent": {
+          "schemaVersion": 1,
+          "contractVersion": "master-academy/1.0.0",
+          "eventId": "evt:r7-rob-one:2",
+          "gameId": "r7-rob-one",
+          "seq": 2,
+          "ruleRef": {
+            "profileId": "tw16-authoritative-scoring",
+            "ruleVersion": "experimental-v1"
+          },
+          "actorSeat": 0,
+          "type": "discard",
+          "visibility": "public",
+          "payload": {
+            "tileId": "t:5:3"
+          },
+          "causedByActionId": "act:r7-rob-one:1:0:discard:OWN_DISCARD:t:5:3",
+          "previousEventId": "evt:r7-rob-one:1"
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "contractVersion": "master-academy/1.0.0",
+        "replayEventVersion": "tw16-replay/1.0.0",
+        "seq": 3,
+        "turnEvent": {
+          "schemaVersion": 1,
+          "contractVersion": "master-academy/1.0.0",
+          "eventId": "evt:r7-rob-one:3",
+          "gameId": "r7-rob-one",
+          "seq": 3,
+          "ruleRef": {
+            "profileId": "tw16-authoritative-scoring",
+            "ruleVersion": "experimental-v1"
+          },
+          "actorSeat": 1,
+          "type": "claim",
+          "visibility": "seat-private",
+          "payload": {
+            "kind": "pong",
+            "claimEventId": "evt:r7-rob-one:2",
+            "tileIds": [
+              "t:5:0",
+              "t:5:1",
+              "t:5:3"
+            ]
+          },
+          "causedByActionId": "act:r7-rob-one:2:1:pong:OPEN_PONG:evt:r7-rob-one:2:t:5:0:t:5:1:t:5:3",
+          "previousEventId": "evt:r7-rob-one:2"
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "contractVersion": "master-academy/1.0.0",
+        "replayEventVersion": "tw16-replay/1.0.0",
+        "seq": 4,
+        "turnEvent": {
+          "schemaVersion": 1,
+          "contractVersion": "master-academy/1.0.0",
+          "eventId": "evt:r7-rob-one:4",
+          "gameId": "r7-rob-one",
+          "seq": 4,
+          "ruleRef": {
+            "profileId": "tw16-authoritative-scoring",
+            "ruleVersion": "experimental-v1"
+          },
+          "actorSeat": 2,
+          "type": "pass",
+          "visibility": "seat-private",
+          "payload": {
+            "kind": "pass",
+            "claimEventId": "evt:r7-rob-one:2"
+          },
+          "causedByActionId": "act:r7-rob-one:3:2:pass:CLAIM_WINDOW_PASS:evt:r7-rob-one:2",
+          "previousEventId": "evt:r7-rob-one:3"
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "contractVersion": "master-academy/1.0.0",
+        "replayEventVersion": "tw16-replay/1.0.0",
+        "seq": 5,
+        "turnEvent": {
+          "schemaVersion": 1,
+          "contractVersion": "master-academy/1.0.0",
+          "eventId": "evt:r7-rob-one:5",
+          "gameId": "r7-rob-one",
+          "seq": 5,
+          "ruleRef": {
+            "profileId": "tw16-authoritative-scoring",
+            "ruleVersion": "experimental-v1"
+          },
+          "actorSeat": 3,
+          "type": "pass",
+          "visibility": "seat-private",
+          "payload": {
+            "kind": "pass",
+            "claimEventId": "evt:r7-rob-one:2"
+          },
+          "causedByActionId": "act:r7-rob-one:4:3:pass:CLAIM_WINDOW_PASS:evt:r7-rob-one:2",
+          "previousEventId": "evt:r7-rob-one:4"
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "contractVersion": "master-academy/1.0.0",
+        "replayEventVersion": "tw16-replay/1.0.0",
+        "seq": 6,
+        "turnEvent": {
+          "schemaVersion": 1,
+          "contractVersion": "master-academy/1.0.0",
+          "eventId": "evt:r7-rob-one:6",
+          "gameId": "r7-rob-one",
+          "seq": 6,
+          "ruleRef": {
+            "profileId": "tw16-authoritative-scoring",
+            "ruleVersion": "experimental-v1"
+          },
+          "actorSeat": 1,
+          "type": "claim",
+          "visibility": "public",
+          "payload": {
+            "kind": "pong",
+            "sourceSeat": 0,
+            "claimEventId": "evt:r7-rob-one:2",
+            "tileIds": [
+              "t:5:0",
+              "t:5:1",
+              "t:5:3"
+            ]
+          },
+          "causedByActionId": "act:r7-rob-one:4:3:pass:CLAIM_WINDOW_PASS:evt:r7-rob-one:2",
+          "previousEventId": "evt:r7-rob-one:5"
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "contractVersion": "master-academy/1.0.0",
+        "replayEventVersion": "tw16-replay/1.0.0",
+        "seq": 7,
+        "turnEvent": {
+          "schemaVersion": 1,
+          "contractVersion": "master-academy/1.0.0",
+          "eventId": "evt:r7-rob-one:7",
+          "gameId": "r7-rob-one",
+          "seq": 7,
+          "ruleRef": {
+            "profileId": "tw16-authoritative-scoring",
+            "ruleVersion": "experimental-v1"
+          },
+          "actorSeat": 1,
+          "type": "discard",
+          "visibility": "public",
+          "payload": {
+            "tileId": "t:4:0"
+          },
+          "causedByActionId": "act:r7-rob-one:6:1:discard:OWN_DISCARD:t:4:0",
+          "previousEventId": "evt:r7-rob-one:6"
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "contractVersion": "master-academy/1.0.0",
+        "replayEventVersion": "tw16-replay/1.0.0",
+        "seq": 8,
+        "turnEvent": {
+          "schemaVersion": 1,
+          "contractVersion": "master-academy/1.0.0",
+          "eventId": "evt:r7-rob-one:8",
+          "gameId": "r7-rob-one",
+          "seq": 8,
+          "ruleRef": {
+            "profileId": "tw16-authoritative-scoring",
+            "ruleVersion": "experimental-v1"
+          },
+          "actorSeat": 2,
+          "type": "pass",
+          "visibility": "seat-private",
+          "payload": {
+            "kind": "pass",
+            "claimEventId": "evt:r7-rob-one:7"
+          },
+          "causedByActionId": "act:r7-rob-one:7:2:pass:CLAIM_WINDOW_PASS:evt:r7-rob-one:7",
+          "previousEventId": "evt:r7-rob-one:7"
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "contractVersion": "master-academy/1.0.0",
+        "replayEventVersion": "tw16-replay/1.0.0",
+        "seq": 9,
+        "turnEvent": {
+          "schemaVersion": 1,
+          "contractVersion": "master-academy/1.0.0",
+          "eventId": "evt:r7-rob-one:9",
+          "gameId": "r7-rob-one",
+          "seq": 9,
+          "ruleRef": {
+            "profileId": "tw16-authoritative-scoring",
+            "ruleVersion": "experimental-v1"
+          },
+          "actorSeat": 3,
+          "type": "pass",
+          "visibility": "seat-private",
+          "payload": {
+            "kind": "pass",
+            "claimEventId": "evt:r7-rob-one:7"
+          },
+          "causedByActionId": "act:r7-rob-one:8:3:pass:CLAIM_WINDOW_PASS:evt:r7-rob-one:7",
+          "previousEventId": "evt:r7-rob-one:8"
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "contractVersion": "master-academy/1.0.0",
+        "replayEventVersion": "tw16-replay/1.0.0",
+        "seq": 10,
+        "turnEvent": {
+          "schemaVersion": 1,
+          "contractVersion": "master-academy/1.0.0",
+          "eventId": "evt:r7-rob-one:10",
+          "gameId": "r7-rob-one",
+          "seq": 10,
+          "ruleRef": {
+            "profileId": "tw16-authoritative-scoring",
+            "ruleVersion": "experimental-v1"
+          },
+          "actorSeat": 0,
+          "type": "pass",
+          "visibility": "seat-private",
+          "payload": {
+            "kind": "pass",
+            "claimEventId": "evt:r7-rob-one:7"
+          },
+          "causedByActionId": "act:r7-rob-one:9:0:pass:CLAIM_WINDOW_PASS:evt:r7-rob-one:7",
+          "previousEventId": "evt:r7-rob-one:9"
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "contractVersion": "master-academy/1.0.0",
+        "replayEventVersion": "tw16-replay/1.0.0",
+        "seq": 11,
+        "turnEvent": {
+          "schemaVersion": 1,
+          "contractVersion": "master-academy/1.0.0",
+          "eventId": "evt:r7-rob-one:11",
+          "gameId": "r7-rob-one",
+          "seq": 11,
+          "ruleRef": {
+            "profileId": "tw16-authoritative-scoring",
+            "ruleVersion": "experimental-v1"
+          },
+          "actorSeat": 2,
+          "type": "draw",
+          "visibility": "seat-private",
+          "payload": {
+            "tileId": "t:31:3",
+            "source": "live"
+          },
+          "causedByActionId": "act:r7-rob-one:10:2:draw:LIVE_WALL_DRAW",
+          "previousEventId": "evt:r7-rob-one:10"
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "contractVersion": "master-academy/1.0.0",
+        "replayEventVersion": "tw16-replay/1.0.0",
+        "seq": 12,
+        "turnEvent": {
+          "schemaVersion": 1,
+          "contractVersion": "master-academy/1.0.0",
+          "eventId": "evt:r7-rob-one:12",
+          "gameId": "r7-rob-one",
+          "seq": 12,
+          "ruleRef": {
+            "profileId": "tw16-authoritative-scoring",
+            "ruleVersion": "experimental-v1"
+          },
+          "actorSeat": 2,
+          "type": "discard",
+          "visibility": "public",
+          "payload": {
+            "tileId": "t:31:3"
+          },
+          "causedByActionId": "act:r7-rob-one:11:2:discard:OWN_DISCARD:t:31:3",
+          "previousEventId": "evt:r7-rob-one:11"
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "contractVersion": "master-academy/1.0.0",
+        "replayEventVersion": "tw16-replay/1.0.0",
+        "seq": 13,
+        "turnEvent": {
+          "schemaVersion": 1,
+          "contractVersion": "master-academy/1.0.0",
+          "eventId": "evt:r7-rob-one:13",
+          "gameId": "r7-rob-one",
+          "seq": 13,
+          "ruleRef": {
+            "profileId": "tw16-authoritative-scoring",
+            "ruleVersion": "experimental-v1"
+          },
+          "actorSeat": 3,
+          "type": "pass",
+          "visibility": "seat-private",
+          "payload": {
+            "kind": "pass",
+            "claimEventId": "evt:r7-rob-one:12"
+          },
+          "causedByActionId": "act:r7-rob-one:12:3:pass:CLAIM_WINDOW_PASS:evt:r7-rob-one:12",
+          "previousEventId": "evt:r7-rob-one:12"
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "contractVersion": "master-academy/1.0.0",
+        "replayEventVersion": "tw16-replay/1.0.0",
+        "seq": 14,
+        "turnEvent": {
+          "schemaVersion": 1,
+          "contractVersion": "master-academy/1.0.0",
+          "eventId": "evt:r7-rob-one:14",
+          "gameId": "r7-rob-one",
+          "seq": 14,
+          "ruleRef": {
+            "profileId": "tw16-authoritative-scoring",
+            "ruleVersion": "experimental-v1"
+          },
+          "actorSeat": 0,
+          "type": "pass",
+          "visibility": "seat-private",
+          "payload": {
+            "kind": "pass",
+            "claimEventId": "evt:r7-rob-one:12"
+          },
+          "causedByActionId": "act:r7-rob-one:13:0:pass:CLAIM_WINDOW_PASS:evt:r7-rob-one:12",
+          "previousEventId": "evt:r7-rob-one:13"
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "contractVersion": "master-academy/1.0.0",
+        "replayEventVersion": "tw16-replay/1.0.0",
+        "seq": 15,
+        "turnEvent": {
+          "schemaVersion": 1,
+          "contractVersion": "master-academy/1.0.0",
+          "eventId": "evt:r7-rob-one:15",
+          "gameId": "r7-rob-one",
+          "seq": 15,
+          "ruleRef": {
+            "profileId": "tw16-authoritative-scoring",
+            "ruleVersion": "experimental-v1"
+          },
+          "actorSeat": 1,
+          "type": "pass",
+          "visibility": "seat-private",
+          "payload": {
+            "kind": "pass",
+            "claimEventId": "evt:r7-rob-one:12"
+          },
+          "causedByActionId": "act:r7-rob-one:14:1:pass:CLAIM_WINDOW_PASS:evt:r7-rob-one:12",
+          "previousEventId": "evt:r7-rob-one:14"
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "contractVersion": "master-academy/1.0.0",
+        "replayEventVersion": "tw16-replay/1.0.0",
+        "seq": 16,
+        "turnEvent": {
+          "schemaVersion": 1,
+          "contractVersion": "master-academy/1.0.0",
+          "eventId": "evt:r7-rob-one:16",
+          "gameId": "r7-rob-one",
+          "seq": 16,
+          "ruleRef": {
+            "profileId": "tw16-authoritative-scoring",
+            "ruleVersion": "experimental-v1"
+          },
+          "actorSeat": 3,
+          "type": "draw",
+          "visibility": "seat-private",
+          "payload": {
+            "tileId": "t:32:3",
+            "source": "live"
+          },
+          "causedByActionId": "act:r7-rob-one:15:3:draw:LIVE_WALL_DRAW",
+          "previousEventId": "evt:r7-rob-one:15"
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "contractVersion": "master-academy/1.0.0",
+        "replayEventVersion": "tw16-replay/1.0.0",
+        "seq": 17,
+        "turnEvent": {
+          "schemaVersion": 1,
+          "contractVersion": "master-academy/1.0.0",
+          "eventId": "evt:r7-rob-one:17",
+          "gameId": "r7-rob-one",
+          "seq": 17,
+          "ruleRef": {
+            "profileId": "tw16-authoritative-scoring",
+            "ruleVersion": "experimental-v1"
+          },
+          "actorSeat": 3,
+          "type": "discard",
+          "visibility": "public",
+          "payload": {
+            "tileId": "t:32:3"
+          },
+          "causedByActionId": "act:r7-rob-one:16:3:discard:OWN_DISCARD:t:32:3",
+          "previousEventId": "evt:r7-rob-one:16"
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "contractVersion": "master-academy/1.0.0",
+        "replayEventVersion": "tw16-replay/1.0.0",
+        "seq": 18,
+        "turnEvent": {
+          "schemaVersion": 1,
+          "contractVersion": "master-academy/1.0.0",
+          "eventId": "evt:r7-rob-one:18",
+          "gameId": "r7-rob-one",
+          "seq": 18,
+          "ruleRef": {
+            "profileId": "tw16-authoritative-scoring",
+            "ruleVersion": "experimental-v1"
+          },
+          "actorSeat": 0,
+          "type": "pass",
+          "visibility": "seat-private",
+          "payload": {
+            "kind": "pass",
+            "claimEventId": "evt:r7-rob-one:17"
+          },
+          "causedByActionId": "act:r7-rob-one:17:0:pass:CLAIM_WINDOW_PASS:evt:r7-rob-one:17",
+          "previousEventId": "evt:r7-rob-one:17"
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "contractVersion": "master-academy/1.0.0",
+        "replayEventVersion": "tw16-replay/1.0.0",
+        "seq": 19,
+        "turnEvent": {
+          "schemaVersion": 1,
+          "contractVersion": "master-academy/1.0.0",
+          "eventId": "evt:r7-rob-one:19",
+          "gameId": "r7-rob-one",
+          "seq": 19,
+          "ruleRef": {
+            "profileId": "tw16-authoritative-scoring",
+            "ruleVersion": "experimental-v1"
+          },
+          "actorSeat": 1,
+          "type": "pass",
+          "visibility": "seat-private",
+          "payload": {
+            "kind": "pass",
+            "claimEventId": "evt:r7-rob-one:17"
+          },
+          "causedByActionId": "act:r7-rob-one:18:1:pass:CLAIM_WINDOW_PASS:evt:r7-rob-one:17",
+          "previousEventId": "evt:r7-rob-one:18"
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "contractVersion": "master-academy/1.0.0",
+        "replayEventVersion": "tw16-replay/1.0.0",
+        "seq": 20,
+        "turnEvent": {
+          "schemaVersion": 1,
+          "contractVersion": "master-academy/1.0.0",
+          "eventId": "evt:r7-rob-one:20",
+          "gameId": "r7-rob-one",
+          "seq": 20,
+          "ruleRef": {
+            "profileId": "tw16-authoritative-scoring",
+            "ruleVersion": "experimental-v1"
+          },
+          "actorSeat": 2,
+          "type": "pass",
+          "visibility": "seat-private",
+          "payload": {
+            "kind": "pass",
+            "claimEventId": "evt:r7-rob-one:17"
+          },
+          "causedByActionId": "act:r7-rob-one:19:2:pass:CLAIM_WINDOW_PASS:evt:r7-rob-one:17",
+          "previousEventId": "evt:r7-rob-one:19"
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "contractVersion": "master-academy/1.0.0",
+        "replayEventVersion": "tw16-replay/1.0.0",
+        "seq": 21,
+        "turnEvent": {
+          "schemaVersion": 1,
+          "contractVersion": "master-academy/1.0.0",
+          "eventId": "evt:r7-rob-one:21",
+          "gameId": "r7-rob-one",
+          "seq": 21,
+          "ruleRef": {
+            "profileId": "tw16-authoritative-scoring",
+            "ruleVersion": "experimental-v1"
+          },
+          "actorSeat": 0,
+          "type": "draw",
+          "visibility": "seat-private",
+          "payload": {
+            "tileId": "t:33:3",
+            "source": "live"
+          },
+          "causedByActionId": "act:r7-rob-one:20:0:draw:LIVE_WALL_DRAW",
+          "previousEventId": "evt:r7-rob-one:20"
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "contractVersion": "master-academy/1.0.0",
+        "replayEventVersion": "tw16-replay/1.0.0",
+        "seq": 22,
+        "turnEvent": {
+          "schemaVersion": 1,
+          "contractVersion": "master-academy/1.0.0",
+          "eventId": "evt:r7-rob-one:22",
+          "gameId": "r7-rob-one",
+          "seq": 22,
+          "ruleRef": {
+            "profileId": "tw16-authoritative-scoring",
+            "ruleVersion": "experimental-v1"
+          },
+          "actorSeat": 0,
+          "type": "discard",
+          "visibility": "public",
+          "payload": {
+            "tileId": "t:33:3"
+          },
+          "causedByActionId": "act:r7-rob-one:21:0:discard:OWN_DISCARD:t:33:3",
+          "previousEventId": "evt:r7-rob-one:21"
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "contractVersion": "master-academy/1.0.0",
+        "replayEventVersion": "tw16-replay/1.0.0",
+        "seq": 23,
+        "turnEvent": {
+          "schemaVersion": 1,
+          "contractVersion": "master-academy/1.0.0",
+          "eventId": "evt:r7-rob-one:23",
+          "gameId": "r7-rob-one",
+          "seq": 23,
+          "ruleRef": {
+            "profileId": "tw16-authoritative-scoring",
+            "ruleVersion": "experimental-v1"
+          },
+          "actorSeat": 1,
+          "type": "pass",
+          "visibility": "seat-private",
+          "payload": {
+            "kind": "pass",
+            "claimEventId": "evt:r7-rob-one:22"
+          },
+          "causedByActionId": "act:r7-rob-one:22:1:pass:CLAIM_WINDOW_PASS:evt:r7-rob-one:22",
+          "previousEventId": "evt:r7-rob-one:22"
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "contractVersion": "master-academy/1.0.0",
+        "replayEventVersion": "tw16-replay/1.0.0",
+        "seq": 24,
+        "turnEvent": {
+          "schemaVersion": 1,
+          "contractVersion": "master-academy/1.0.0",
+          "eventId": "evt:r7-rob-one:24",
+          "gameId": "r7-rob-one",
+          "seq": 24,
+          "ruleRef": {
+            "profileId": "tw16-authoritative-scoring",
+            "ruleVersion": "experimental-v1"
+          },
+          "actorSeat": 2,
+          "type": "pass",
+          "visibility": "seat-private",
+          "payload": {
+            "kind": "pass",
+            "claimEventId": "evt:r7-rob-one:22"
+          },
+          "causedByActionId": "act:r7-rob-one:23:2:pass:CLAIM_WINDOW_PASS:evt:r7-rob-one:22",
+          "previousEventId": "evt:r7-rob-one:23"
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "contractVersion": "master-academy/1.0.0",
+        "replayEventVersion": "tw16-replay/1.0.0",
+        "seq": 25,
+        "turnEvent": {
+          "schemaVersion": 1,
+          "contractVersion": "master-academy/1.0.0",
+          "eventId": "evt:r7-rob-one:25",
+          "gameId": "r7-rob-one",
+          "seq": 25,
+          "ruleRef": {
+            "profileId": "tw16-authoritative-scoring",
+            "ruleVersion": "experimental-v1"
+          },
+          "actorSeat": 3,
+          "type": "pass",
+          "visibility": "seat-private",
+          "payload": {
+            "kind": "pass",
+            "claimEventId": "evt:r7-rob-one:22"
+          },
+          "causedByActionId": "act:r7-rob-one:24:3:pass:CLAIM_WINDOW_PASS:evt:r7-rob-one:22",
+          "previousEventId": "evt:r7-rob-one:24"
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "contractVersion": "master-academy/1.0.0",
+        "replayEventVersion": "tw16-replay/1.0.0",
+        "seq": 26,
+        "turnEvent": {
+          "schemaVersion": 1,
+          "contractVersion": "master-academy/1.0.0",
+          "eventId": "evt:r7-rob-one:26",
+          "gameId": "r7-rob-one",
+          "seq": 26,
+          "ruleRef": {
+            "profileId": "tw16-authoritative-scoring",
+            "ruleVersion": "experimental-v1"
+          },
+          "actorSeat": 1,
+          "type": "draw",
+          "visibility": "seat-private",
+          "payload": {
+            "tileId": "t:5:2",
+            "source": "live"
+          },
+          "causedByActionId": "act:r7-rob-one:25:1:draw:LIVE_WALL_DRAW",
+          "previousEventId": "evt:r7-rob-one:25"
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "contractVersion": "master-academy/1.0.0",
+        "replayEventVersion": "tw16-replay/1.0.0",
+        "seq": 27,
+        "turnEvent": {
+          "schemaVersion": 1,
+          "contractVersion": "master-academy/1.0.0",
+          "eventId": "evt:r7-rob-one:27",
+          "gameId": "r7-rob-one",
+          "seq": 27,
+          "ruleRef": {
+            "profileId": "tw16-authoritative-scoring",
+            "ruleVersion": "experimental-v1"
+          },
+          "actorSeat": 1,
+          "type": "kong_proposed",
+          "visibility": "public",
+          "payload": {
+            "kind": "ADDED_KONG",
+            "tileId": "t:5:2"
+          },
+          "causedByActionId": "act:r7-rob-one:26:1:kong:ADDED_KONG:t:5:2",
+          "previousEventId": "evt:r7-rob-one:26"
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "contractVersion": "master-academy/1.0.0",
+        "replayEventVersion": "tw16-replay/1.0.0",
+        "seq": 28,
+        "turnEvent": {
+          "schemaVersion": 1,
+          "contractVersion": "master-academy/1.0.0",
+          "eventId": "evt:r7-rob-one:28",
+          "gameId": "r7-rob-one",
+          "seq": 28,
+          "ruleRef": {
+            "profileId": "tw16-authoritative-scoring",
+            "ruleVersion": "experimental-v1"
+          },
+          "actorSeat": 2,
+          "type": "claim",
+          "visibility": "seat-private",
+          "payload": {
+            "kind": "win",
+            "claimEventId": "evt:r7-rob-one:27",
+            "tileIds": [
+              "t:5:2"
+            ]
+          },
+          "causedByActionId": "act:r7-rob-one:27:2:win:ROB_ADDED_KONG_WIN:evt:r7-rob-one:27:t:5:2",
+          "previousEventId": "evt:r7-rob-one:27"
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "contractVersion": "master-academy/1.0.0",
+        "replayEventVersion": "tw16-replay/1.0.0",
+        "seq": 29,
+        "turnEvent": {
+          "schemaVersion": 1,
+          "contractVersion": "master-academy/1.0.0",
+          "eventId": "evt:r7-rob-one:29",
+          "gameId": "r7-rob-one",
+          "seq": 29,
+          "ruleRef": {
+            "profileId": "tw16-authoritative-scoring",
+            "ruleVersion": "experimental-v1"
+          },
+          "actorSeat": 3,
+          "type": "pass",
+          "visibility": "seat-private",
+          "payload": {
+            "kind": "pass",
+            "claimEventId": "evt:r7-rob-one:27"
+          },
+          "causedByActionId": "act:r7-rob-one:28:3:pass:CLAIM_WINDOW_PASS:evt:r7-rob-one:27",
+          "previousEventId": "evt:r7-rob-one:28"
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "contractVersion": "master-academy/1.0.0",
+        "replayEventVersion": "tw16-replay/1.0.0",
+        "seq": 30,
+        "turnEvent": {
+          "schemaVersion": 1,
+          "contractVersion": "master-academy/1.0.0",
+          "eventId": "evt:r7-rob-one:30",
+          "gameId": "r7-rob-one",
+          "seq": 30,
+          "ruleRef": {
+            "profileId": "tw16-authoritative-scoring",
+            "ruleVersion": "experimental-v1"
+          },
+          "actorSeat": 0,
+          "type": "pass",
+          "visibility": "seat-private",
+          "payload": {
+            "kind": "pass",
+            "claimEventId": "evt:r7-rob-one:27"
+          },
+          "causedByActionId": "act:r7-rob-one:29:0:pass:CLAIM_WINDOW_PASS:evt:r7-rob-one:27",
+          "previousEventId": "evt:r7-rob-one:29"
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "contractVersion": "master-academy/1.0.0",
+        "replayEventVersion": "tw16-replay/1.0.0",
+        "seq": 31,
+        "turnEvent": {
+          "schemaVersion": 1,
+          "contractVersion": "master-academy/1.0.0",
+          "eventId": "evt:r7-rob-one:31",
+          "gameId": "r7-rob-one",
+          "seq": 31,
+          "ruleRef": {
+            "profileId": "tw16-authoritative-scoring",
+            "ruleVersion": "experimental-v1"
+          },
+          "actorSeat": 2,
+          "type": "win",
+          "visibility": "public",
+          "payload": {
+            "via": "discard",
+            "sourceSeat": 1,
+            "winnerSeat": 2,
+            "robAddedKong": {
+              "proposalEventId": "evt:r7-rob-one:27",
+              "fromSeat": 1,
+              "tileId": "t:5:2"
+            }
+          },
+          "causedByActionId": "act:r7-rob-one:29:0:pass:CLAIM_WINDOW_PASS:evt:r7-rob-one:27",
+          "previousEventId": "evt:r7-rob-one:30"
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "contractVersion": "master-academy/1.0.0",
+        "replayEventVersion": "tw16-replay/1.0.0",
+        "seq": 32,
+        "turnEvent": {
+          "schemaVersion": 1,
+          "contractVersion": "master-academy/1.0.0",
+          "eventId": "evt:r7-rob-one:32",
+          "gameId": "r7-rob-one",
+          "seq": 32,
+          "ruleRef": {
+            "profileId": "tw16-authoritative-scoring",
+            "ruleVersion": "experimental-v1"
+          },
+          "actorSeat": 2,
+          "type": "settle",
+          "visibility": "public",
+          "payload": {
+            "reason": "win",
+            "winnerSeat": 2,
+            "tai": 7,
+            "delta": [
+              0,
+              -7,
+              7,
+              0
+            ],
+            "scoringVersion": "tw16-gametower-authoritative@1.0.0-experimental",
+            "settlement": {
+              "contractVersion": "tw16-pre-settlement/1.0.0",
+              "settlementId": "r7-rob-one-round-0",
+              "scoringVersion": "tw16-gametower-authoritative@1.0.0-experimental",
+              "status": "experimental-not-rule-certified",
+              "unit": "abstract-points",
+              "reason": "win",
+              "winType": "rob-added-kong",
+              "winnerSeat": 2,
+              "sourceSeat": 1,
+              "payerSeats": [
+                1
+              ],
+              "publicEvidenceEventIds": [
+                "evt:r7-rob-one:27"
+              ],
+              "tai": 7,
+              "breakdown": [
+                {
+                  "code": "rob-added-kong",
+                  "name": "搶槓胡",
+                  "tai": 1,
+                  "ruleVersion": "tw16-gametower-authoritative@1.0.0-experimental",
+                  "source": "https://www.gametower.com.tw/Games/Freeplay/MJ/Star31/Data/i_ingame-count.aspx",
+                  "scope": "hand"
+                },
+                {
+                  "code": "concealed",
+                  "name": "門清",
+                  "tai": 1,
+                  "ruleVersion": "tw16-gametower-authoritative@1.0.0-experimental",
+                  "source": "https://www.gametower.com.tw/Games/Freeplay/MJ/Star31/Data/i_ingame-count.aspx",
+                  "scope": "hand"
+                },
+                {
+                  "code": "concealed-triplets:4",
+                  "name": "暗刻",
+                  "tai": 5,
+                  "ruleVersion": "tw16-gametower-authoritative@1.0.0-experimental",
+                  "source": "https://www.gametower.com.tw/Games/Freeplay/MJ/Star31/Data/i_ingame-count.aspx",
+                  "scope": "hand"
+                }
+              ],
+              "payments": [
+                {
+                  "payerSeat": 1,
+                  "payeeSeat": 2,
+                  "points": 7,
+                  "handTai": 7,
+                  "appliedTai": 7,
+                  "dealerItems": []
+                }
+              ],
+              "playerTransferDeltas": [
+                0,
+                -7,
+                7,
+                0
+              ],
+              "playerDeltas": [
+                0,
+                -7,
+                7,
+                0
+              ],
+              "fees": [],
+              "houseDelta": 0
+            },
+            "robAddedKong": {
+              "proposalEventId": "evt:r7-rob-one:27",
+              "fromSeat": 1,
+              "tileId": "t:5:2"
+            }
+          },
+          "causedByActionId": "act:r7-rob-one:29:0:pass:CLAIM_WINDOW_PASS:evt:r7-rob-one:27",
+          "previousEventId": "evt:r7-rob-one:31"
+        }
+      }
+    ],
+    "decisions": [
+      {
+        "schemaVersion": 1,
+        "contractVersion": "master-academy/1.0.0",
+        "decisionVersion": "tw16-player-decision/1.0.0",
+        "replayId": "replay:r7-rob-one",
+        "eventSeq": 2,
+        "beforeEventSeq": 1,
+        "endEventSeq": 2,
+        "actorSeat": 0,
+        "actionId": "act:r7-rob-one:1:0:discard:OWN_DISCARD:t:5:3",
+        "kind": "discard"
+      },
+      {
+        "schemaVersion": 1,
+        "contractVersion": "master-academy/1.0.0",
+        "decisionVersion": "tw16-player-decision/1.0.0",
+        "replayId": "replay:r7-rob-one",
+        "eventSeq": 3,
+        "beforeEventSeq": 2,
+        "endEventSeq": 3,
+        "actorSeat": 1,
+        "actionId": "act:r7-rob-one:2:1:pong:OPEN_PONG:evt:r7-rob-one:2:t:5:0:t:5:1:t:5:3",
+        "kind": "pong"
+      },
+      {
+        "schemaVersion": 1,
+        "contractVersion": "master-academy/1.0.0",
+        "decisionVersion": "tw16-player-decision/1.0.0",
+        "replayId": "replay:r7-rob-one",
+        "eventSeq": 4,
+        "beforeEventSeq": 3,
+        "endEventSeq": 4,
+        "actorSeat": 2,
+        "actionId": "act:r7-rob-one:3:2:pass:CLAIM_WINDOW_PASS:evt:r7-rob-one:2",
+        "kind": "pass"
+      },
+      {
+        "schemaVersion": 1,
+        "contractVersion": "master-academy/1.0.0",
+        "decisionVersion": "tw16-player-decision/1.0.0",
+        "replayId": "replay:r7-rob-one",
+        "eventSeq": 5,
+        "beforeEventSeq": 4,
+        "endEventSeq": 6,
+        "actorSeat": 3,
+        "actionId": "act:r7-rob-one:4:3:pass:CLAIM_WINDOW_PASS:evt:r7-rob-one:2",
+        "kind": "pass"
+      },
+      {
+        "schemaVersion": 1,
+        "contractVersion": "master-academy/1.0.0",
+        "decisionVersion": "tw16-player-decision/1.0.0",
+        "replayId": "replay:r7-rob-one",
+        "eventSeq": 7,
+        "beforeEventSeq": 6,
+        "endEventSeq": 7,
+        "actorSeat": 1,
+        "actionId": "act:r7-rob-one:6:1:discard:OWN_DISCARD:t:4:0",
+        "kind": "discard"
+      },
+      {
+        "schemaVersion": 1,
+        "contractVersion": "master-academy/1.0.0",
+        "decisionVersion": "tw16-player-decision/1.0.0",
+        "replayId": "replay:r7-rob-one",
+        "eventSeq": 8,
+        "beforeEventSeq": 7,
+        "endEventSeq": 8,
+        "actorSeat": 2,
+        "actionId": "act:r7-rob-one:7:2:pass:CLAIM_WINDOW_PASS:evt:r7-rob-one:7",
+        "kind": "pass"
+      },
+      {
+        "schemaVersion": 1,
+        "contractVersion": "master-academy/1.0.0",
+        "decisionVersion": "tw16-player-decision/1.0.0",
+        "replayId": "replay:r7-rob-one",
+        "eventSeq": 9,
+        "beforeEventSeq": 8,
+        "endEventSeq": 9,
+        "actorSeat": 3,
+        "actionId": "act:r7-rob-one:8:3:pass:CLAIM_WINDOW_PASS:evt:r7-rob-one:7",
+        "kind": "pass"
+      },
+      {
+        "schemaVersion": 1,
+        "contractVersion": "master-academy/1.0.0",
+        "decisionVersion": "tw16-player-decision/1.0.0",
+        "replayId": "replay:r7-rob-one",
+        "eventSeq": 10,
+        "beforeEventSeq": 9,
+        "endEventSeq": 10,
+        "actorSeat": 0,
+        "actionId": "act:r7-rob-one:9:0:pass:CLAIM_WINDOW_PASS:evt:r7-rob-one:7",
+        "kind": "pass"
+      },
+      {
+        "schemaVersion": 1,
+        "contractVersion": "master-academy/1.0.0",
+        "decisionVersion": "tw16-player-decision/1.0.0",
+        "replayId": "replay:r7-rob-one",
+        "eventSeq": 11,
+        "beforeEventSeq": 10,
+        "endEventSeq": 11,
+        "actorSeat": 2,
+        "actionId": "act:r7-rob-one:10:2:draw:LIVE_WALL_DRAW",
+        "kind": "draw"
+      },
+      {
+        "schemaVersion": 1,
+        "contractVersion": "master-academy/1.0.0",
+        "decisionVersion": "tw16-player-decision/1.0.0",
+        "replayId": "replay:r7-rob-one",
+        "eventSeq": 12,
+        "beforeEventSeq": 11,
+        "endEventSeq": 12,
+        "actorSeat": 2,
+        "actionId": "act:r7-rob-one:11:2:discard:OWN_DISCARD:t:31:3",
+        "kind": "discard"
+      },
+      {
+        "schemaVersion": 1,
+        "contractVersion": "master-academy/1.0.0",
+        "decisionVersion": "tw16-player-decision/1.0.0",
+        "replayId": "replay:r7-rob-one",
+        "eventSeq": 13,
+        "beforeEventSeq": 12,
+        "endEventSeq": 13,
+        "actorSeat": 3,
+        "actionId": "act:r7-rob-one:12:3:pass:CLAIM_WINDOW_PASS:evt:r7-rob-one:12",
+        "kind": "pass"
+      },
+      {
+        "schemaVersion": 1,
+        "contractVersion": "master-academy/1.0.0",
+        "decisionVersion": "tw16-player-decision/1.0.0",
+        "replayId": "replay:r7-rob-one",
+        "eventSeq": 14,
+        "beforeEventSeq": 13,
+        "endEventSeq": 14,
+        "actorSeat": 0,
+        "actionId": "act:r7-rob-one:13:0:pass:CLAIM_WINDOW_PASS:evt:r7-rob-one:12",
+        "kind": "pass"
+      },
+      {
+        "schemaVersion": 1,
+        "contractVersion": "master-academy/1.0.0",
+        "decisionVersion": "tw16-player-decision/1.0.0",
+        "replayId": "replay:r7-rob-one",
+        "eventSeq": 15,
+        "beforeEventSeq": 14,
+        "endEventSeq": 15,
+        "actorSeat": 1,
+        "actionId": "act:r7-rob-one:14:1:pass:CLAIM_WINDOW_PASS:evt:r7-rob-one:12",
+        "kind": "pass"
+      },
+      {
+        "schemaVersion": 1,
+        "contractVersion": "master-academy/1.0.0",
+        "decisionVersion": "tw16-player-decision/1.0.0",
+        "replayId": "replay:r7-rob-one",
+        "eventSeq": 16,
+        "beforeEventSeq": 15,
+        "endEventSeq": 16,
+        "actorSeat": 3,
+        "actionId": "act:r7-rob-one:15:3:draw:LIVE_WALL_DRAW",
+        "kind": "draw"
+      },
+      {
+        "schemaVersion": 1,
+        "contractVersion": "master-academy/1.0.0",
+        "decisionVersion": "tw16-player-decision/1.0.0",
+        "replayId": "replay:r7-rob-one",
+        "eventSeq": 17,
+        "beforeEventSeq": 16,
+        "endEventSeq": 17,
+        "actorSeat": 3,
+        "actionId": "act:r7-rob-one:16:3:discard:OWN_DISCARD:t:32:3",
+        "kind": "discard"
+      },
+      {
+        "schemaVersion": 1,
+        "contractVersion": "master-academy/1.0.0",
+        "decisionVersion": "tw16-player-decision/1.0.0",
+        "replayId": "replay:r7-rob-one",
+        "eventSeq": 18,
+        "beforeEventSeq": 17,
+        "endEventSeq": 18,
+        "actorSeat": 0,
+        "actionId": "act:r7-rob-one:17:0:pass:CLAIM_WINDOW_PASS:evt:r7-rob-one:17",
+        "kind": "pass"
+      },
+      {
+        "schemaVersion": 1,
+        "contractVersion": "master-academy/1.0.0",
+        "decisionVersion": "tw16-player-decision/1.0.0",
+        "replayId": "replay:r7-rob-one",
+        "eventSeq": 19,
+        "beforeEventSeq": 18,
+        "endEventSeq": 19,
+        "actorSeat": 1,
+        "actionId": "act:r7-rob-one:18:1:pass:CLAIM_WINDOW_PASS:evt:r7-rob-one:17",
+        "kind": "pass"
+      },
+      {
+        "schemaVersion": 1,
+        "contractVersion": "master-academy/1.0.0",
+        "decisionVersion": "tw16-player-decision/1.0.0",
+        "replayId": "replay:r7-rob-one",
+        "eventSeq": 20,
+        "beforeEventSeq": 19,
+        "endEventSeq": 20,
+        "actorSeat": 2,
+        "actionId": "act:r7-rob-one:19:2:pass:CLAIM_WINDOW_PASS:evt:r7-rob-one:17",
+        "kind": "pass"
+      },
+      {
+        "schemaVersion": 1,
+        "contractVersion": "master-academy/1.0.0",
+        "decisionVersion": "tw16-player-decision/1.0.0",
+        "replayId": "replay:r7-rob-one",
+        "eventSeq": 21,
+        "beforeEventSeq": 20,
+        "endEventSeq": 21,
+        "actorSeat": 0,
+        "actionId": "act:r7-rob-one:20:0:draw:LIVE_WALL_DRAW",
+        "kind": "draw"
+      },
+      {
+        "schemaVersion": 1,
+        "contractVersion": "master-academy/1.0.0",
+        "decisionVersion": "tw16-player-decision/1.0.0",
+        "replayId": "replay:r7-rob-one",
+        "eventSeq": 22,
+        "beforeEventSeq": 21,
+        "endEventSeq": 22,
+        "actorSeat": 0,
+        "actionId": "act:r7-rob-one:21:0:discard:OWN_DISCARD:t:33:3",
+        "kind": "discard"
+      },
+      {
+        "schemaVersion": 1,
+        "contractVersion": "master-academy/1.0.0",
+        "decisionVersion": "tw16-player-decision/1.0.0",
+        "replayId": "replay:r7-rob-one",
+        "eventSeq": 23,
+        "beforeEventSeq": 22,
+        "endEventSeq": 23,
+        "actorSeat": 1,
+        "actionId": "act:r7-rob-one:22:1:pass:CLAIM_WINDOW_PASS:evt:r7-rob-one:22",
+        "kind": "pass"
+      },
+      {
+        "schemaVersion": 1,
+        "contractVersion": "master-academy/1.0.0",
+        "decisionVersion": "tw16-player-decision/1.0.0",
+        "replayId": "replay:r7-rob-one",
+        "eventSeq": 24,
+        "beforeEventSeq": 23,
+        "endEventSeq": 24,
+        "actorSeat": 2,
+        "actionId": "act:r7-rob-one:23:2:pass:CLAIM_WINDOW_PASS:evt:r7-rob-one:22",
+        "kind": "pass"
+      },
+      {
+        "schemaVersion": 1,
+        "contractVersion": "master-academy/1.0.0",
+        "decisionVersion": "tw16-player-decision/1.0.0",
+        "replayId": "replay:r7-rob-one",
+        "eventSeq": 25,
+        "beforeEventSeq": 24,
+        "endEventSeq": 25,
+        "actorSeat": 3,
+        "actionId": "act:r7-rob-one:24:3:pass:CLAIM_WINDOW_PASS:evt:r7-rob-one:22",
+        "kind": "pass"
+      },
+      {
+        "schemaVersion": 1,
+        "contractVersion": "master-academy/1.0.0",
+        "decisionVersion": "tw16-player-decision/1.0.0",
+        "replayId": "replay:r7-rob-one",
+        "eventSeq": 26,
+        "beforeEventSeq": 25,
+        "endEventSeq": 26,
+        "actorSeat": 1,
+        "actionId": "act:r7-rob-one:25:1:draw:LIVE_WALL_DRAW",
+        "kind": "draw"
+      },
+      {
+        "schemaVersion": 1,
+        "contractVersion": "master-academy/1.0.0",
+        "decisionVersion": "tw16-player-decision/1.0.0",
+        "replayId": "replay:r7-rob-one",
+        "eventSeq": 27,
+        "beforeEventSeq": 26,
+        "endEventSeq": 27,
+        "actorSeat": 1,
+        "actionId": "act:r7-rob-one:26:1:kong:ADDED_KONG:t:5:2",
+        "kind": "kong"
+      },
+      {
+        "schemaVersion": 1,
+        "contractVersion": "master-academy/1.0.0",
+        "decisionVersion": "tw16-player-decision/1.0.0",
+        "replayId": "replay:r7-rob-one",
+        "eventSeq": 28,
+        "beforeEventSeq": 27,
+        "endEventSeq": 28,
+        "actorSeat": 2,
+        "actionId": "act:r7-rob-one:27:2:win:ROB_ADDED_KONG_WIN:evt:r7-rob-one:27:t:5:2",
+        "kind": "win"
+      },
+      {
+        "schemaVersion": 1,
+        "contractVersion": "master-academy/1.0.0",
+        "decisionVersion": "tw16-player-decision/1.0.0",
+        "replayId": "replay:r7-rob-one",
+        "eventSeq": 29,
+        "beforeEventSeq": 28,
+        "endEventSeq": 29,
+        "actorSeat": 3,
+        "actionId": "act:r7-rob-one:28:3:pass:CLAIM_WINDOW_PASS:evt:r7-rob-one:27",
+        "kind": "pass"
+      },
+      {
+        "schemaVersion": 1,
+        "contractVersion": "master-academy/1.0.0",
+        "decisionVersion": "tw16-player-decision/1.0.0",
+        "replayId": "replay:r7-rob-one",
+        "eventSeq": 30,
+        "beforeEventSeq": 29,
+        "endEventSeq": 32,
+        "actorSeat": 0,
+        "actionId": "act:r7-rob-one:29:0:pass:CLAIM_WINDOW_PASS:evt:r7-rob-one:27",
+        "kind": "pass"
+      }
+    ]
+  },
+  "expectedResult": {
+    "reason": "win",
+    "winnerSeat": 2,
+    "tai": 7,
+    "delta": [
+      0,
+      -7,
+      7,
+      0
+    ],
+    "scoringVersion": "tw16-gametower-authoritative@1.0.0-experimental",
+    "settlement": {
+      "contractVersion": "tw16-pre-settlement/1.0.0",
+      "settlementId": "r7-rob-one-round-0",
+      "scoringVersion": "tw16-gametower-authoritative@1.0.0-experimental",
+      "status": "experimental-not-rule-certified",
+      "unit": "abstract-points",
+      "reason": "win",
+      "winType": "rob-added-kong",
+      "winnerSeat": 2,
+      "sourceSeat": 1,
+      "payerSeats": [
+        1
+      ],
+      "publicEvidenceEventIds": [
+        "evt:r7-rob-one:27"
+      ],
+      "tai": 7,
+      "breakdown": [
+        {
+          "code": "rob-added-kong",
+          "name": "搶槓胡",
+          "tai": 1,
+          "ruleVersion": "tw16-gametower-authoritative@1.0.0-experimental",
+          "source": "https://www.gametower.com.tw/Games/Freeplay/MJ/Star31/Data/i_ingame-count.aspx",
+          "scope": "hand"
+        },
+        {
+          "code": "concealed",
+          "name": "門清",
+          "tai": 1,
+          "ruleVersion": "tw16-gametower-authoritative@1.0.0-experimental",
+          "source": "https://www.gametower.com.tw/Games/Freeplay/MJ/Star31/Data/i_ingame-count.aspx",
+          "scope": "hand"
+        },
+        {
+          "code": "concealed-triplets:4",
+          "name": "暗刻",
+          "tai": 5,
+          "ruleVersion": "tw16-gametower-authoritative@1.0.0-experimental",
+          "source": "https://www.gametower.com.tw/Games/Freeplay/MJ/Star31/Data/i_ingame-count.aspx",
+          "scope": "hand"
+        }
+      ],
+      "payments": [
+        {
+          "payerSeat": 1,
+          "payeeSeat": 2,
+          "points": 7,
+          "handTai": 7,
+          "appliedTai": 7,
+          "dealerItems": []
+        }
+      ],
+      "playerTransferDeltas": [
+        0,
+        -7,
+        7,
+        0
+      ],
+      "playerDeltas": [
+        0,
+        -7,
+        7,
+        0
+      ],
+      "fees": [],
+      "houseDelta": 0
+    },
+    "robAddedKong": {
+      "proposalEventId": "evt:r7-rob-one:27",
+      "fromSeat": 1,
+      "tileId": "t:5:2"
+    },
+    "sourceSeat": 1,
+    "via": "discard",
+    "winningTileId": "t:5:2",
+    "breakdown": [
+      {
+        "code": "rob-added-kong",
+        "name": "搶槓胡",
+        "tai": 1,
+        "ruleVersion": "tw16-gametower-authoritative@1.0.0-experimental",
+        "source": "https://www.gametower.com.tw/Games/Freeplay/MJ/Star31/Data/i_ingame-count.aspx",
+        "scope": "hand"
+      },
+      {
+        "code": "concealed",
+        "name": "門清",
+        "tai": 1,
+        "ruleVersion": "tw16-gametower-authoritative@1.0.0-experimental",
+        "source": "https://www.gametower.com.tw/Games/Freeplay/MJ/Star31/Data/i_ingame-count.aspx",
+        "scope": "hand"
+      },
+      {
+        "code": "concealed-triplets:4",
+        "name": "暗刻",
+        "tai": 5,
+        "ruleVersion": "tw16-gametower-authoritative@1.0.0-experimental",
+        "source": "https://www.gametower.com.tw/Games/Freeplay/MJ/Star31/Data/i_ingame-count.aspx",
+        "scope": "hand"
+      }
+    ],
+    "authoritativeSettlement": {
+      "evidence": {
+        "contractVersion": "tw16-pre-settlement/1.0.0",
+        "publicEventContractVersion": "tw16-rob-added-kong-public/1.0.0",
+        "ruleRef": {
+          "profileId": "tw16-authoritative-scoring",
+          "ruleVersion": "experimental-v1"
+        },
+        "scoringRef": {
+          "profileId": "tw16-gametower-authoritative",
+          "version": "1.0.0-experimental"
+        },
+        "gameId": "r7-rob-one",
+        "roundId": "r7-rob-one-round-0",
+        "sourceRevision": 30,
+        "settlementId": "r7-rob-one-round-0",
+        "reason": "win",
+        "winType": "rob-added-kong",
+        "payerSeats": [
+          1
+        ],
+        "evidence": {
+          "ruleRef": {
+            "profileId": "tw16-authoritative-scoring",
+            "ruleVersion": "experimental-v1"
+          },
+          "winnerSeat": 2,
+          "sourceSeat": 1,
+          "via": "discard",
+          "dealerSeat": 0,
+          "concealed": [
+            "t:9:0",
+            "t:9:1",
+            "t:9:2",
+            "t:10:0",
+            "t:10:1",
+            "t:10:2",
+            "t:11:0",
+            "t:11:1",
+            "t:11:2",
+            "t:12:0",
+            "t:12:1",
+            "t:12:2",
+            "t:6:0",
+            "t:7:0",
+            "t:27:0",
+            "t:27:1"
+          ],
+          "melds": [],
+          "flowers": [],
+          "prevailingWindType": 27,
+          "dealerStreak": 0,
+          "winningTile": "t:5:2",
+          "robAddedKong": {
+            "proposalEventId": "evt:r7-rob-one:27",
+            "fromSeat": 1,
+            "tileId": "t:5:2"
+          }
+        },
+        "winningTileId": "t:5:2",
+        "evidenceEventIds": [
+          "evt:r7-rob-one:1",
+          "evt:r7-rob-one:27",
+          "evt:r7-rob-one:28",
+          "evt:r7-rob-one:29",
+          "evt:r7-rob-one:30"
+        ]
+      },
+      "ledger": {
+        "contractVersion": "tw16-scoring/1.0.0-experimental",
+        "scoringVersion": "tw16-gametower-authoritative@1.0.0-experimental",
+        "status": "experimental-not-rule-certified",
+        "unit": "abstract-points",
+        "reason": "win",
+        "winnerSeat": 2,
+        "sourceSeat": 1,
+        "score": {
+          "contractVersion": "tw16-scoring/1.0.0-experimental",
+          "scoringVersion": "tw16-gametower-authoritative@1.0.0-experimental",
+          "status": "experimental-not-rule-certified",
+          "tai": 7,
+          "breakdown": [
+            {
+              "code": "rob-added-kong",
+              "name": "搶槓胡",
+              "tai": 1,
+              "evidence": "public kong_proposed evt:r7-rob-one:27 / source seat 1 / tile t:5:2",
+              "ruleVersion": "tw16-gametower-authoritative@1.0.0-experimental",
+              "source": "https://www.gametower.com.tw/Games/Freeplay/MJ/Star31/Data/i_ingame-count.aspx",
+              "scope": "hand"
+            },
+            {
+              "code": "concealed",
+              "name": "門清",
+              "tai": 1,
+              "evidence": "no open meld",
+              "ruleVersion": "tw16-gametower-authoritative@1.0.0-experimental",
+              "source": "https://www.gametower.com.tw/Games/Freeplay/MJ/Star31/Data/i_ingame-count.aspx",
+              "scope": "hand"
+            },
+            {
+              "code": "concealed-triplets:4",
+              "name": "暗刻",
+              "tai": 5,
+              "evidence": "concealed triplets/kongs 4",
+              "ruleVersion": "tw16-gametower-authoritative@1.0.0-experimental",
+              "source": "https://www.gametower.com.tw/Games/Freeplay/MJ/Star31/Data/i_ingame-count.aspx",
+              "scope": "hand"
+            }
+          ],
+          "decomposition": {
+            "pair": 27,
+            "melds": [
+              {
+                "kind": "sequence",
+                "type": 5,
+                "open": false
+              },
+              {
+                "kind": "triplet",
+                "type": 9,
+                "open": false
+              },
+              {
+                "kind": "triplet",
+                "type": 10,
+                "open": false
+              },
+              {
+                "kind": "triplet",
+                "type": 11,
+                "open": false
+              },
+              {
+                "kind": "triplet",
+                "type": 12,
+                "open": false
+              }
+            ],
+            "ronRole": "sequence"
+          },
+          "via": "discard",
+          "winnerSeat": 2,
+          "sourceSeat": 1,
+          "ruleRef": {
+            "profileId": "tw16-authoritative-scoring",
+            "ruleVersion": "experimental-v1"
+          },
+          "excludedCapabilities": [
+            "flower-only-wins",
+            "unverified-specific-wait-bonuses",
+            "bao-pai",
+            "multi-winner",
+            "declared-ready",
+            "heaven-earth-wins"
+          ],
+          "sourceRefs": [
+            "https://www.gametower.com.tw/Games/Freeplay/MJ/Star31/Data/i_ingame-count.aspx",
+            "https://mahjongorchid.com/zh-tw/tai/"
+          ]
+        },
+        "payments": [
+          {
+            "payerSeat": 1,
+            "payeeSeat": 2,
+            "points": 7,
+            "handTai": 7,
+            "appliedTai": 7,
+            "dealerItems": []
+          }
+        ],
+        "playerTransferDeltas": [
+          0,
+          -7,
+          7,
+          0
+        ],
+        "fees": [],
+        "houseDelta": 0,
+        "playerDeltas": [
+          0,
+          -7,
+          7,
+          0
+        ],
+        "settlementId": "r7-rob-one-round-0",
+        "gameId": "r7-rob-one",
+        "roundId": "r7-rob-one-round-0",
+        "sourceRevision": 30,
+        "ruleRef": {
+          "profileId": "tw16-authoritative-scoring",
+          "ruleVersion": "experimental-v1"
+        },
+        "scoringRef": {
+          "profileId": "tw16-gametower-authoritative",
+          "version": "1.0.0-experimental"
+        },
+        "preSettlementContractVersion": "tw16-pre-settlement/1.0.0",
+        "publicEventContractVersion": "tw16-rob-added-kong-public/1.0.0",
+        "winType": "rob-added-kong",
+        "evidenceEventIds": [
+          "evt:r7-rob-one:1",
+          "evt:r7-rob-one:27",
+          "evt:r7-rob-one:28",
+          "evt:r7-rob-one:29",
+          "evt:r7-rob-one:30"
+        ]
+      },
+      "publicEvidenceEventIds": [
+        "evt:r7-rob-one:27"
+      ],
+      "scoringProfile": {
+        "contractVersion": "tw16-scoring/1.0.0-experimental",
+        "profileId": "tw16-gametower-authoritative",
+        "version": "1.0.0-experimental",
+        "status": "experimental",
+        "claim": "Pinned experimental Rules-host settlement; not a Taiwan-wide certification",
+        "sourceRefs": [
+          "https://www.gametower.com.tw/Games/Freeplay/MJ/Star31/Data/i_ingame-count.aspx",
+          "https://mahjongorchid.com/zh-tw/tai/"
+        ],
+        "ruleRefs": [
+          {
+            "profileId": "tw16-authoritative-scoring",
+            "ruleVersion": "experimental-v1"
+          }
+        ],
+        "points": {
+          "base": 0,
+          "perTai": 1,
+          "unit": "abstract-points"
+        },
+        "settlement": {
+          "discard": "discarder-only",
+          "selfDraw": "all-other-three",
+          "liability": "unsupported",
+          "fee": {
+            "mode": "none",
+            "points": 0
+          }
+        },
+        "variants": {
+          "wind": "round-and-seat",
+          "flower": "correct-and-sets",
+          "kong": "none",
+          "flowerSetsReplaceCorrect": true,
+          "smallWindRetainsWind": true,
+          "allHonorsSuppressAllPongs": true,
+          "pinghuSuppressNoHonorsNoFlowers": true
+        },
+        "tai": {
+          "concealed": 1,
+          "selfDraw": 1,
+          "concealedSelfDraw": 3,
+          "roundWind": 1,
+          "seatWind": 1,
+          "dragon": 1,
+          "correctFlower": 1,
+          "flowerSet": 2,
+          "allPongs": 4,
+          "allExposed": 2,
+          "pinghu": 2,
+          "kongBloom": 1,
+          "seaBottom": 1,
+          "mixedSuit": 4,
+          "pureSuit": 8,
+          "allHonors": 8,
+          "smallDragons": 4,
+          "bigDragons": 8,
+          "smallWinds": 8,
+          "bigWinds": 16,
+          "concealedTriplets": {
+            "3": 2,
+            "4": 5,
+            "5": 8
+          },
+          "openKong": 0,
+          "concealedKong": 0,
+          "noHonorsNoFlowers": 0,
+          "robAddedKong": 1,
+          "dealer": 1,
+          "dealerStreakEach": 2,
+          "uniqueWait": 1
+        }
+      }
+    }
+  },
+  "expectedScores": [
+    0,
+    -7,
+    7,
+    0
+  ]
+}

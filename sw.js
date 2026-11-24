@@ -1,7 +1,7 @@
 /* Offline-first, atomic shell for GitHub Pages root or /repo/ deployments.
  * IMPORTANT: change CACHE_VERSION whenever any precached file changes.
  * The install event only succeeds if the entire listed release is cached. */
-const CACHE_VERSION = 'tmt-v02-realistic-tiles-r73-pwa-4dbe74a3-r72';
+const CACHE_VERSION = 'tmt-v02-realistic-tiles-r74-authority-7b030571-4477aa2d-b58bd3a7';
 const SHELL_CACHE = `tmt-shell-${CACHE_VERSION}`;
 const BASE = new URL('./', self.location.href);
 const SHELL = [
@@ -94,6 +94,7 @@ const SHELL = [
   './src/scoring/adapter.js',
   './src/scoring/evaluate.js',
   './src/scoring/index.js',
+  './src/scoring/pre-settlement.js',
   './src/scoring/profiles.js',
   './src/scoring/settlement.js',
   './src/shanten.js',

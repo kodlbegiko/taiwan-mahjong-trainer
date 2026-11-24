@@ -3,12 +3,14 @@ on:
   pull_request:
     paths:
       - 'src/rules/**'
+      - 'src/scoring/**'
       - 'src/bots/**'
       - 'src/replay/**'
       - 'src/table-ui/**'
       - 'src/adaptive/**'
       - 'src/integration/**'
       - 'tests/rules/**'
+      - 'tests/scoring/**'
       - 'tests/bots/**'
       - 'tests/replay/**'
       - 'tests/integration/**'
@@ -49,6 +51,103 @@ jobs:
         run: |
           node --input-type=module -e "import {getRuleProfile} from './src/rules/index.js'; getRuleProfile('tw16-rob-added-kong','experimental-v1');"
           node --test tests/rules/r7-rob-added-kong-golden.test.js tests/scoring/golden.test.js tests/bots/r7-rob-kong-contract.test.js tests/replay/r71-compatibility.test.js
+      - name: Strict R7.4 authoritative Rules / Scoring / Replay contract (zero skips)
+        if: github.head_ref == 'integration/mahjong-r7-release-audit' || github.ref_name == 'integration/mahjong-r7-release-audit'
+        env:
+          RULES_REQUIRE_R73_SCORING: '1'
+          SCORING_REQUIRE_R73_RULES: '1'
+          REPLAY_REQUIRE_R73_AUTHORITATIVE: '1'
+        run: |
+          set -euo pipefail
+          node --test tests/rules/r73-authoritative-settlement.test.js tests/scoring/pre-settlement.test.js tests/scoring/r73-rules-integration.test.js tests/replay/r73-authoritative-ledger.test.js tests/replay/r73-authoritative-replay.test.js tests/replay/r73-historical-settlement.test.js tests/replay/r73-mixed-history.test.js | tee "$RUNNER_TEMP/r74-authority.tap"
+          grep -Eq '^# skipped 0
+        run: node --test tests/bots/r5-single-winner-full-match.test.js
+  r3-chromium:
+    name: Full human + 3 bots / settlement / Replay / Daily / PWA
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install 'playwright==1.56.0'
+      - run: google-chrome --version
+      # Renderer correctness is tested without relying on apt network access.
+      # CJK font enrichment is optional; a blocked package mirror must not mask E2E.
+      - name: Verify exact tested source
+        run: |
+          git rev-parse HEAD
+          echo "TESTED_SOURCE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
+      - name: Chromium 320 / 390 / 1440, real full match, daily, service worker, offline
+        run: PHASE3_REQUIRE_SINGLE_WINNER=1 python tests/browser/full-table-ui-r3-gates.py --screenshots tw16-r3-full-match-evidence
+      - name: Evidence manifest (only after complete browser gate)
+        if: success()
+        run: |
+          python - <<'PY'
+          import json, os, pathlib
+          d=pathlib.Path('tw16-r3-full-match-evidence')
+          d.mkdir(exist_ok=True)
+          (d/'acceptance.json').write_text(json.dumps({
+            'testedSourceSHA':__import__('subprocess').check_output(['git','rev-parse','HEAD'],text=True).strip(),
+            'workflowTriggerSHA':os.environ.get('GITHUB_SHA'),
+            'headSourceSHA':'${{ github.event.pull_request.head.sha || github.sha }}',
+            'gate':'chromium-full-match-r3',
+            'ruleStatus':'experimental',
+            'release':False,
+            'physicalDevice':'NOT_RUN',
+            'screenshots':sorted(p.name for p in d.glob('*.png'))
+          },indent=2),encoding='utf-8')
+          PY
+      - name: Preserve screenshots and action evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase3-real-r3-match-evidence
+          path: tw16-r3-full-match-evidence
+          if-no-files-found: warn
+          retention-days: 14
+
+  r7-public-https:
+    name: R7 public HTTPS / genuine UI match / settlement / Replay
+    if: github.event_name == 'pull_request' && github.head_ref == 'fix/r7-live-table-ux'
+    needs: [r3-chromium]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install 'playwright==1.56.0'
+      - name: Record exact test SHA and public deployment source
+        run: |
+          echo "TESTED_SOURCE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
+          echo "PUBLIC_DEPLOYMENT_SOURCE_SHA=ee2eda1a3223ac85433f3ae5e31604258e1b4e7c" >> "$GITHUB_STEP_SUMMARY"
+          echo "PUBLIC_DEPLOYMENT_URL=https://taiwan-mahjong-phase3-r5-experimental-ib7ewqch0-sign2.vercel.app/" >> "$GITHUB_STEP_SUMMARY"
+          google-chrome --version
+      - name: Public Vercel HTTPS — real human plus three Bots
+        env:
+          DEPLOYMENT_SOURCE_SHA: ee2eda1a3223ac85433f3ae5e31604258e1b4e7c
+          R7_PUBLIC_URL: https://taiwan-mahjong-phase3-r5-experimental-ib7ewqch0-sign2.vercel.app/
+        run: |
+          python tests/browser/r7-public-https-gates.py \
+            --url "$R7_PUBLIC_URL" --screenshots r7-public-https-evidence \
+            --max-matches 4 --source-sha "$(git rev-parse HEAD)" \
+            --deployment-sha "$DEPLOYMENT_SOURCE_SHA"
+      - name: Preserve public-origin screenshot and trace evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: r7-real-public-https-evidence
+          path: r7-public-https-evidence
+          if-no-files-found: warn
+          retention-days: 14
+ "$RUNNER_TEMP/r74-authority.tap"
       - name: Strict single-winner 100 fixed seeds (all must settle)
         run: node --test tests/bots/r5-single-winner-full-match.test.js
   r3-chromium:

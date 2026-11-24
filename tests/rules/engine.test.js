@@ -26,6 +26,7 @@ test('V1 contract: verified structural profile is not verified four-player gamep
     ['tw16-configurable-table','experimental-full-v1'],
     ['tw16-single-winner-interception','experimental-v1'],
     ['tw16-rob-added-kong','experimental-v1'],
+    ['tw16-authoritative-scoring','experimental-v1'],
   ];
   assert.deepEqual(profiles.map(p=>[p.profileId,p.ruleVersion]),expected,
     'R7 must be strictly additive and preserve all four original profile versions');

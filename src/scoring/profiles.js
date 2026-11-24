@@ -50,7 +50,19 @@ SEE.tai.roundWind=1;
 SEE.tai.seatWind=0;
 SEE.tai.flowerSet=2;
 const PRESETS=freeze([base,SEE]);
-const keys=Object.keys(tai);
+const AUTHORITATIVE=clone(base);
+AUTHORITATIVE.profileId='tw16-gametower-authoritative';
+AUTHORITATIVE.claim='Pinned experimental Rules-host settlement; not a Taiwan-wide certification';
+AUTHORITATIVE.ruleRefs=[{profileId:'tw16-authoritative-scoring',ruleVersion:'experimental-v1'}];
+AUTHORITATIVE.tai.uniqueWait=1;
+freeze(AUTHORITATIVE);
+export const AUTHORITATIVE_RULE_REF=freeze(clone(AUTHORITATIVE.ruleRefs[0]));
+export const AUTHORITATIVE_SCORING_REF=freeze({profileId:AUTHORITATIVE.profileId,version:AUTHORITATIVE.version});
+export function getAuthoritativeScoringProfile(){
+  return createScoringProfile(AUTHORITATIVE);
+}
+
+const comparisonKeys=Object.keys(tai);
 const str=x=>typeof x==='string'&&x.length>0;
 const nonneg=x=>Number.isSafeInteger(x)&&x>=0;
 export function validateScoringProfile(p){
@@ -80,6 +92,8 @@ export function validateScoringProfile(p){
     typeof v.allHonorsSuppressAllPongs!=='boolean'||
     typeof v.pinghuSuppressNoHonorsNoFlowers!=='boolean')
     throw new RangeError('Unsupported scoring variants');
+  const keys=p.profileId===AUTHORITATIVE.profileId&&p.version===AUTHORITATIVE.version
+    ?[...comparisonKeys,'uniqueWait']:comparisonKeys;
   if(!isObject(p.tai)||keys.some(k=>!Object.hasOwn(p.tai,k))||
     Object.keys(p.tai).some(k=>!keys.includes(k))||
     keys.some(k=>k!=='concealedTriplets'&&!nonneg(p.tai[k]))||
@@ -95,7 +109,7 @@ export function createScoringProfile(definition){
 }
 export function listScoringProfiles(){return clone(PRESETS);}
 export function getScoringProfile(profileId,version='1.0.0-experimental'){
-  const found=PRESETS.find(x=>x.profileId===profileId&&x.version===version);
+  const found=[...PRESETS,AUTHORITATIVE].find(x=>x.profileId===profileId&&x.version===version);
   if(!found)throw new RangeError('Unknown ScoringProfile: '+profileId+'@'+version);
   return createScoringProfile(found);
 }
