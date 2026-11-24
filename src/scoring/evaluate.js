@@ -60,8 +60,6 @@ function validateEvidence(p,e){
     'liabilityPolicy','winReason']){
     if(e[field]!==undefined)throw new ScoringCapabilityError(field);
   }
-  if(e.via==='self-draw'&&e.winningTile!==undefined)
-    assert(false,'discard winningTile must not accompany self-draw');
   if(e.robAddedKong!==undefined){
     const marker=e.robAddedKong;
     assert(e.ruleRef.profileId==='tw16-rob-added-kong'&&
@@ -75,6 +73,8 @@ function validateEvidence(p,e){
       'rob-added-kong provenance/source/winning tile mismatch');
     typeOf(marker.tileId);
   }
+  if(e.via==='self-draw'&&e.winningTile!==undefined)
+    assert(false,'discard winningTile must not accompany self-draw');
   if(e.specialWin!==undefined&&e.specialWin!=='ordinary')
     throw new ScoringCapabilityError(e.specialWin);
   if(e.liability!==undefined&&e.liability!==null)
