@@ -120,15 +120,98 @@ function member(s, self = false) {
   array(s.river, 'river').forEach(discard);
   array(s.flowers, 'flowers').forEach(t => identity(t, 'flower'));
 }
-function publicEvent(e, asOf) {
+
+/** Only the exact Rules #51 opt-in contract may disclose a proposed kong. */
+export function isRobAddedKongRuleRef(ref) {
+  return ref?.profileId==='tw16-rob-added-kong' &&
+    ref?.ruleVersion==='experimental-v1';
+}
+export function validateRobKongPublicEvent(e, events, ref, terminal=false) {
+  const p=e.payload;
+  if(e.type!=='kong_proposed' &&
+    !(p&&(Object.hasOwn(p,'proposalEventId')||Object.hasOwn(p,'robAddedKong'))))return false;
+  if(!isRobAddedKongRuleRef(ref)||e.visibility!=='public')
+    throw new RangeError('R7 robbery event requires exact public RuleProfile');
+  sameRule(e.ruleRef,ref);
+  id(e.eventId,'eventId');id(e.gameId,'gameId');integer(e.seq,'seq',1);
+  integer(e.actorSeat,'actorSeat',0,3);
+  if(e.type==='kong_proposed'){
+    object(p,'R7 proposal payload',['kind','tileId'],['kind','tileId']);
+    if(p.kind!=='ADDED_KONG')throw new RangeError('Invalid R7 proposal kind');
+    physical(p.tileId);return true;
+  }
+  function link(proposalId,tileId,fromSeat){
+    id(proposalId,'proposalEventId');physical(tileId);integer(fromSeat,'fromSeat',0,3);
+    const q=events.find(x=>x.eventId===proposalId);
+    if(!q||q.type!=='kong_proposed'||q.visibility!=='public'||
+       q.gameId!==e.gameId||q.seq>=e.seq||q.actorSeat!==fromSeat||
+       q.ruleRef?.profileId!==ref.profileId||q.ruleRef?.ruleVersion!==ref.ruleVersion||
+       q.payload?.kind!=='ADDED_KONG'||q.payload?.tileId!==tileId)
+      throw new RangeError('R7 public proposal link invalid');
+  }
+  if(e.type==='kong'){
+    object(p,'R7 committed kong payload',['kind','tileIds','proposalEventId'],
+      ['kind','tileIds','proposalEventId']);
+    if(p.kind!=='ADDED_KONG'||array(p.tileIds,'kong.tileIds').length!==1)
+      throw new RangeError('Invalid R7 committed kong');
+    link(p.proposalEventId,p.tileIds[0],e.actorSeat);return true;
+  }
+  if(!terminal||!['win','settle'].includes(e.type))
+    throw new RangeError('R7 robbery result is terminal-only');
+  const keys=e.type==='win'?['seat','sourceSeat','robAddedKong']:['robAddedKong'];
+  object(p,'R7 terminal payload',keys,keys);
+  const m=p.robAddedKong;
+  object(m,'R7 robbery marker',['proposalEventId','fromSeat','tileId'],
+    ['proposalEventId','fromSeat','tileId']);
+  link(m.proposalEventId,m.tileId,m.fromSeat);
+  if(e.type==='win'){
+    integer(p.seat,'winner',0,3);
+    if(p.seat===m.fromSeat||p.sourceSeat!==m.fromSeat||e.actorSeat!==p.seat)
+      throw new RangeError('R7 winner/source mismatch');
+  }else{
+    const w=events.find(x=>x.type==='win'&&x.seq<e.seq&&
+      x.payload?.robAddedKong?.proposalEventId===m.proposalEventId);
+    if(!w||w.actorSeat!==e.actorSeat||w.payload.robAddedKong.fromSeat!==m.fromSeat||
+      w.payload.robAddedKong.tileId!==m.tileId)
+      throw new RangeError('R7 WIN/SETTLE marker mismatch');
+  }
+  return true;
+}
+function pendingRobProposal(v){
+  if(!isRobAddedKongRuleRef(v.ruleRef)||v.round.phase!=='claim_window')return null;
+  const q=[...v.publicEvents].reverse().find(e=>e.type==='kong_proposed');
+  if(!q||v.publicEvents.some(e=>e.seq>q.seq&&
+    ((e.type==='kong'&&e.payload.proposalEventId===q.eventId)||
+      e.payload.robAddedKong?.proposalEventId===q.eventId)))return null;
+  const p=[v.self,...v.opponents].find(x=>x.seat===q.actorSeat);
+  const tile=physical(q.payload.tileId);
+  if(!p?.melds.some(m=>m.kind==='triplet'&&m.open&&
+     m.tileIds.every(x=>physical(x)===tile)&&!m.tileIds.includes(q.payload.tileId))||
+     (p===v.self&&!v.self.concealed.some(t=>t.id===q.payload.tileId))||
+     (p!==v.self&&v.self.concealed.some(t=>t.id===q.payload.tileId)))
+    throw new RangeError('R7 proposal does not match public triplet');
+  if(p===v.self&&v.legalActions.length)throw new RangeError('R7 proposer cannot answer own proposal');
+  for(const a of v.legalActions){
+    const win=a.kind==='win'&&a.tileIds.length===1&&a.tileIds[0]===q.payload.tileId&&
+      a.legalityBasis.reasonCodes.includes('ROB_ADDED_KONG_WIN');
+    const pass=a.kind==='pass'&&a.tileIds.length===0&&
+      a.legalityBasis.reasonCodes.includes('CLAIM_WINDOW_PASS');
+    if(a.claimEventId!==q.eventId||!(win||pass))
+      throw new RangeError('R7 proposal permits only linked WIN/PASS');
+  }
+  return q;
+}
+
+function publicEvent(e, asOf, events, ref) {
   object(e, 'TurnEventPublic', ['schemaVersion','contractVersion','eventId','gameId','seq','ruleRef','actorSeat','type','visibility','payload','causedByActionId','previousEventId','occurredAt'],
     ['schemaVersion','contractVersion','eventId','gameId','seq','ruleRef','type','visibility','payload']);
   v1(e, 'TurnEventPublic'); id(e.eventId, 'eventId'); integer(e.seq, 'event.seq', 1, asOf);
   if (e.visibility !== 'public') throw new TypeError('不得使用私人 TurnEvent');
-  if (!['deal','draw','discard','claim','kong','flower','win','pass','settle'].includes(e.type)) throw new RangeError('未知公開事件');
+  if (!['deal','draw','discard','claim','kong','flower','win','pass','settle','kong_proposed'].includes(e.type)) throw new RangeError('未知公開事件');
   if (e.actorSeat !== undefined) integer(e.actorSeat, 'actorSeat', 0, 3);
   if (e.causedByActionId !== undefined) id(e.causedByActionId, 'causedByActionId');
   if (e.previousEventId !== undefined) id(e.previousEventId, 'previousEventId');
+  if(validateRobKongPublicEvent(e,events,ref))return;
   // The adapter deliberately accepts only unambiguous public payload fields.
   object(e.payload, 'public payload', ['seat','tileId','tileIds','kind','claimEventId','concealedCount','reasonCode','sourceSeat','count','countsBySeat'], []);
   if (e.payload.tileId !== undefined) {
@@ -184,6 +267,9 @@ function countVisible(v) {
     if (d.claimedByEventId && meldIds.has(d.tileId) && seen.has(d.tileId)) continue; // 已領取之河牌仍只扣一次
     add(d.tileId);
   }
+  // The fourth physical tile is public even before its ownership changes.
+  const proposal=pendingRobProposal(v);
+  if(proposal&&!seen.has(proposal.payload.tileId))add(proposal.payload.tileId);
   const counts = knownTileCounts(hand, visible);
   for (const tile of v.knownUnavailableTypes) if (counts[tile] !== 4) throw new RangeError('knownUnavailableTypes 不能暗示不可見的額外牌');
   return { hand, visible, counts };
@@ -211,7 +297,7 @@ export function readPlayerView(input) {
   v.opponents.forEach(p=>member(p));
   const seats = new Set([v.self.seat,...v.opponents.map(p=>p.seat)]);
   if (seats.size !== 4) throw new RangeError('席位重複');
-  array(v.publicEvents, 'publicEvents').forEach(e => { publicEvent(e, v.asOfEventSeq); if (e.gameId !== v.gameId) throw new RangeError('event.gameId 不符'); sameRule(e.ruleRef, v.ruleRef); });
+  array(v.publicEvents, 'publicEvents').forEach(e => { publicEvent(e, v.asOfEventSeq, v.publicEvents, v.ruleRef); if (e.gameId !== v.gameId) throw new RangeError('event.gameId 不符'); sameRule(e.ruleRef, v.ruleRef); });
   array(v.legalActions, 'legalActions').forEach(a=>action(a, v));
   if (new Set(v.legalActions.map(a=>a.actionId)).size !== v.legalActions.length) throw new RangeError('actionId 重複');
   array(v.knownUnavailableTypes, 'knownUnavailableTypes').forEach(t=>integer(t, 'knownUnavailableType', 0, 33));

@@ -71,16 +71,17 @@ function legacyIntermediateAction(bot,input){
 }
 
 const REF={profileId:'tw16-single-winner-interception',ruleVersion:'experimental-v1'};
-// Ten independent seeds by default: 10 x 4 target seats x 2 policies = 80
-// complete real games. Override explicitly for local smoke or larger research.
+// Twenty independent seeds: 20 x 4 target seats x 2 policies = 160 games.
+// Beginner/Advanced get separate four-seed controlled smoke comparisons.
 const seeds=(process.env.R7_BENCH_SEEDS||
-  Array.from({length:10},(_,i)=>String(i)).join(',')).split(',').map(s=>s.trim());
+  Array.from({length:20},(_,i)=>String(i)).join(',')).split(',').map(s=>s.trim());
 if(!seeds.every(s=>/^\d+$/.test(s)))throw new RangeError('R7_BENCH_SEEDS must be comma-separated integer seeds');
-const contenderLevel=process.env.R7_BENCH_LEVEL||'Intermediate';
-if(!['Intermediate','Advanced'].includes(contenderLevel))throw new RangeError('R7_BENCH_LEVEL invalid');
+const explicitLevel=process.env.R7_BENCH_LEVEL;
+const levels=explicitLevel?[explicitLevel]:['Intermediate','Beginner','Advanced'];
+if(!levels.every(x=>['Beginner','Intermediate','Advanced'].includes(x)))throw new RangeError('R7_BENCH_LEVEL invalid');
 const MAX_ACTIONS=1800;
 
-function runMatch(seed,targetSeat,contender){
+function runMatch(seed,targetSeat,contender,contenderLevel){
   // The host alone owns full state. Decisions receive PlayerView only.
   let state=createGame({
     gameId:`r7-compare-${seed}`,
@@ -160,20 +161,21 @@ function summary(rows){
   };
 }
 
-test('R7 paired 4-seat baseline vs public-only contender; emit measured outcomes, no fabricated uplift',
+for(const contenderLevel of levels)test('R7 paired 4-seat baseline vs '+contenderLevel+'; measured outcomes',
   {timeout:1200000},()=>{
+    const testSeeds=explicitLevel||contenderLevel==='Intermediate'?seeds:seeds.slice(0,4);
     const before=[],after=[];
-    for(const seed of seeds){
+    for(const seed of testSeeds){
       for(let seat=0;seat<4;seat++){
-        before.push(runMatch(seed,seat,false));
-        after.push(runMatch(seed,seat,true));
+        before.push(runMatch(seed,seat,false,contenderLevel));
+        after.push(runMatch(seed,seat,true,contenderLevel));
       }
     }
     const baseline=summary(before),candidate=summary(after);
     const report={
       benchmark:'R7-paired-baseline/1.0',sourceBaseline:'pre-R7 Intermediate snapshot',
       contenderLevel,profile:REF,scoring:'tw16-minimal-tai-v1 EXPERIMENTAL',
-      seeds,seats:[0,1,2,3],opponents:'three fixed pre-R7 Intermediate',
+      seeds:testSeeds,seats:[0,1,2,3],opponents:'three fixed pre-R7 Intermediate',
       pairedGames:before.length,baseline,candidate,
       byTargetSeat:[0,1,2,3].map(seat=>({
         seat,
@@ -183,10 +185,11 @@ test('R7 paired 4-seat baseline vs public-only contender; emit measured outcomes
       delta:{winRate:Number((candidate.winRate-baseline.winRate).toFixed(4)),
         dealInRate:Number((candidate.dealInRate-baseline.dealInRate).toFixed(4)),
         drawRate:Number((candidate.drawRate-baseline.drawRate).toFixed(4))},
-      limitations:'Small paired sample; outcomes observational, not a certified skill uplift. Hardware timing is runner-specific.',
+      bySeed:testSeeds.map(seed=>({seed,baseline:summary(before.filter(x=>x.seed===seed)),candidate:summary(after.filter(x=>x.seed===seed))})),
+      limitations:'Seat outcomes share seed; use seed-clustered analysis. Beginner/Advanced smoke defaults to four seeds only. Hardware timing is runner-specific.',
     };
     console.log('BOT_R7_PAIRED_BENCHMARK '+JSON.stringify(report));
-    assert.equal(before.length,seeds.length*4);
+    assert.equal(before.length,testSeeds.length*4);
     assert.equal(after.length,before.length);
     assert.equal(baseline.invalidActions,0);assert.equal(candidate.invalidActions,0);
     assert.equal(baseline.replayMatches,before.length);
