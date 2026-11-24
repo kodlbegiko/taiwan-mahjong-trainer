@@ -573,7 +573,7 @@ test('R7.1 flower replacement wins after a discard can qualify, but initial setu
   const state=supplementalWinSnapshot('flower');
   const e=evidenceFromSettledRulesState(state);
   assert.equal(e.specialDraw?.kind,'kong-bloom');
-  assert.equal(scoreRulesState(p,state).breakdown.find(x=>x.code==='kong-bloom')?.tai,1);
+  assert.equal(scoreRulesState(p,state,{seatWindType:27}).breakdown.find(x=>x.code==='kong-bloom')?.tai,1);
   const initial=structuredClone(state);
   initial.events=initial.events.filter(x=>x.type!=='discard');
   assert.throws(()=>evidenceFromSettledRulesState(initial),ScoringCapabilityError);
@@ -586,6 +586,6 @@ test('R7.1 unreviewed open-kong selfdraw and corrupted draw provenance reject ex
   assert.throws(()=>evidenceFromSettledRulesState(malformed),ScoringCapabilityError);
   const forged=supplementalWinSnapshot('kong');
   forged.events[1].payload.tileId='t:18:1';
-  assert.equal(evidenceFromSettledRulesState(forged).specialDraw,undefined,
-    'non-matching last draw cannot claim gang-bloom bonus');
+  assert.throws(()=>evidenceFromSettledRulesState(forged),
+    /Winning draw lacks matching private Rules event/);
 });
