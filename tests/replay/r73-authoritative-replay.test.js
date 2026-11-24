@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import * as Rules from '../../src/rules/index.js';
 import {createReplayService,ReplayError} from '../../src/replay/index.js';
 import {createReplayArchive,validateReplayArchive,replayStateAt,replayIntegrityHashes,checksum,
@@ -186,6 +187,16 @@ test('R7.3 authoritative Rules + Scoring + Replay mandatory integration: actual 
   assert.equal(store.get(key(incomplete.replayId)),original);
   const robbed=take(s,last);
   assert.deepEqual(verifyArchive(robbed,'rob-added-kong',[1]).playerDeltas,[0,-7,7,0]);
+  // Fixed actual prior authoritative archive, not regenerated expectations.
+  const frozen=JSON.parse(readFileSync(new URL('./fixtures/r73-authoritative-robbery-archive.json',import.meta.url),'utf8'));
+  assert.deepEqual(createReplayArchive(robbed,{ownerSeat:0,disclosurePolicy:'settled-public-only',...opts()}),frozen.archive);
+  assert.deepEqual(robbed.extensions.tw16.result,frozen.expectedResult);
+  const frozenId=frozen.archive.manifest.replayId,frozenRaw=JSON.stringify(frozen.archive);
+  const frozenStorage=new Map([[key(frozenId),frozenRaw]]),frozenService=createReplayService({storage:frozenStorage,...opts()});
+  assert.deepEqual(replayStateAt(frozen.archive,frozen.archive.events.length,opts()),robbed);
+  assert.equal(frozenService.recoverReplay(frozenId).scoringVersion,AUTHORITATIVE_SCORING_VERSION);
+  assert.deepEqual(frozenService.getReplayFrame(frozenId,1,{perspective:'postgame'}).postgameDisclosure.outcome.settlement,frozen.expectedResult.settlement);
+  assert.equal(frozenStorage.get(key(frozenId)),frozenRaw);
   assert.throws(()=>applyAction(robbed,actionInput(last),opts()));
   // Real scoring failure: no opening/dice seat-wind proof for flower tai.
   const flower='f:season-spring:0',hand=robber(9,27);hand[15]=flower;

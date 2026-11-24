@@ -1,26 +1,63 @@
-# R7.3 — deterministic historical settlement & authoritative integration gate
+# R7.3 Replay settlement integrity and historical compatibility
 
-Inputs: integration 793bbb1caeef79b94e0bb29bf2ea66b3f7c43f4d (R7-009); Agent 8 handoff #46 comment 7121875501; Rules #51 ff27c52526acfdf5fb905b4dd72a229289b8d734; Scoring #52 1b27d5b9cf0c6e3bb7aff894288adfbf309c1b48.
+**Draft / formal integration and release NO-GO until combined CI and public browser acceptance.**
+Scope: src/replay/**, tests/replay/**, docs/replay/** only; existing PR #46, no new branch/PR.
 
-| Rule/Scoring identity | FNV | SHA | authoritative status |
-| --- | --- | --- | --- |
-| Sandbox experimental-move-v1 / unavailable | legacy | supported | no settlement |
-| R3 experimental-full-v1 / tw16-minimal-tai-v1 | legacy | supported | unchanged |
-| R5 experimental-v1 / tw16-minimal-tai-v1 | frozen historical win | frozen historical win | unchanged; actual exhaustive DRAW regression |
-| R7 robbery experimental-v1 / tw16-minimal-tai-v1 + public contract 1.0.0 | legacy optional digest | supported | R7.1 legal WIN/PASS/robbery; new comparison scorer separate |
-| R7.3 authoritative new RuleProfile + ScoringProfile | NOT DEFINED | NOT DEFINED | BLOCKED — missing upstream implemented contract |
-| Missing or unknown archive scoring version | reject | reject | missing CORRUPT_REPLAY; unavailable UNSUPPORTED_SCORING_PROFILE; no storage mutation |
+## Source and contract pins
 
-R7-009 exact integration patch copied into source test, including both negative version negotiation assertions. Historical archived policy is never replaced by comparative scorer. Strict single terminal settlement, win+settle atomic linkage, reason, tai/breakdown sum, payer responsibility, amount, signed-zero and final score equality audited against original pinned minimal policy. No latest scorer invocation or new event fabricated. Old archive layout and digest format unchanged. Fixed historical FNV and SHA fixtures were generated from actual pre-R7/R7 source modules, not the current serializer. The deterministic Rules replay remains the authority; an unsupported scoring failure cannot create or recover a terminal archive. SHA detects corruption, not signature/authenticity.
+- Agent 8 integration #53 application 793bbb1caeef79b94e0bb29bf2ea66b3f7c43f4d; handoff #46 comment 7121875501. Exact R7-009 negotiation patch backported.
+- Rules #51 7b03057180194064826832759472bd87de49ea42: docs/rules/R73_SETTLEMENT_CONTRACT.md; original runtime boundary appended to existing src/rules/scoring.js (removed temporary settlement-lifecycle.js).
+- Scoring #52 aa2535499377f4e3fc625506f1150f493191b791: docs/scoring/R73_AUTHORITATIVE_CONTRACT.md; pure settlePreSettlement; existing comparison adapter retained.
+- Replay adapter application/test source 86632d0353ca44cc6ee8d088d1d13f57bfffbfc4: actual combined source-overlay PASS; frozen authoritative archive commit 57564fef4b5f78b1f7181deb050a57bba68969d5. This final report/test update adds fixed readback assertion; final HEAD evidence is separate.
 
-## Authoritative integration contract — dependency, NOT implemented by Replay
+## Version compatibility
 
-Rules must publish distinct RuleRef + immutable versioned ScoringProfile reference/config snapshot (not reused ID with changed configuration), evidence contract and accepted scorer dispatch. Pre-settlement evidence derived from validated private host prefix and issued action, winning tile/source/dealer, proposal/reply provenance, replacement provenance, verified wind/streak only; no invented terminal state. Scoring produces pure deterministic ledger with version, breakdown and payer lines, transfer deltas, fee ledger, house delta and net player deltas, +0 normalization, typed unsupported cases. Rules commits WIN/SETTLE or DRAW atomically and replays original exact policy; raw event + authoritative result + final scores must agree. Private evidence stays out of PlayerView, public breakdown only explicit allowlist. No unsupported scoring version fallback.
+| RuleProfile | ScoringProfile | Archive behavior |
+| --- | --- | --- |
+| tw16-four-player-sandbox@experimental-move-v1 | unavailable | original incomplete-only V1 FNV / optional SHA |
+| tw16-configurable-table@experimental-full-v1 | tw16-minimal-tai-v1 | original FNV/SHA, legacy multi-WIN rejection |
+| tw16-single-winner-interception@experimental-v1 | tw16-minimal-tai-v1 | historical frozen FNV and SHA Goldens, unchanged R5 policy |
+| tw16-rob-added-kong@experimental-v1 | tw16-minimal-tai-v1 | negotiated public event contract 1.0.0; original minimal liability, optional legacy SHA; comparison scorer never authoritative |
+| tw16-authoritative-scoring@experimental-v1 | tw16-gametower-authoritative@1.0.0-experimental | exact pinned trusted runtime, scoringRef, preSettlementContractVersion, publicEventContractVersion, settled private ScoringProfile snapshot, required SHA; no downgrade to FNV-only |
+| unavailable historical RuleRef | none | UNKNOWN_RULE_PROFILE, no fallback |
+| unknown scoringVersion | none | UNSUPPORTED_SCORING_PROFILE; missing version / incompatible known pair or digest CORRUPT_REPLAY |
+| missing/forged trusted authoritative runtime | none | SCORING_RUNTIME_REQUIRED; no archive/index write or fake settlement |
 
-Minimal reproduction of blocker:
-`REPLAY_REQUIRE_R73_AUTHORITATIVE=1 node --test tests/replay/r73-historical-settlement.test.js`
-fails explicitly with BLOCKED if distinct authoritative RuleProfile absent (or newly introduced without reviewed Replay integration). Do not waive this test. Combined existing R7 gate:
-`REPLAY_REQUIRE_R7_RULES=1 REPLAY_REQUIRE_R7_SCORING=1 node --test tests/replay/*.test.js`.
-Both gates and full npm run check, strict R5 100/100, physical browser SHA parity mandatory before promotion. Standalone source lacks upstream modules; historical tests run independently. No new runtime imports.
+New authoritative archive remains V1 envelope with profile-specific additional required metadata; SHA chain seed binds scoring identity and full settled profile snapshot. All previous FNV and SHA formats/digest inputs unchanged. Incomplete authority stores exact immutable scoringRef and negotiated versions, with null terminal profile snapshot; no fabricated settlement/config snapshot. Settled profile snapshot must exactly match the canonical reconstructed private commitment. Runtime is branded by Rules and passed via options to createReplayArchive, validateReplayArchive, replayStateAt and createReplayService; never serialized or taken from archive bytes. Host composes Rules.createSettlementRuntime(actual Scoring module). Legacy replay ignores this runtime.
 
-Public HTTPS: integration #53 reports R7.2 pinned preview READY, public browser observed nonterminal play only; no terminal WIN/DRAW Replay or exact asset-byte parity. #49/#50 handoff requests terminal Replay/reload/cold offline/update and original historical bytes. Standalone #46 offline failure is not a current combined result. No release approval.
+## Event and privacy contract
+
+The Rules host validates raw private pre-settlement evidence before committing an atomic legal action group. Private GameState has result.authoritativeSettlement={evidence,ledger,publicEvidenceEventIds,scoringProfile}. Public raw SETTLE stores only scoringVersion + sanitized settlement summary (not private scoringLedger). Replay uses canonical Rules replay with the original pinned runtime and independently checks:
+- original policy/version/round/settlement/source revision and ordered raw evidence refs;
+- exactly one SETTLE, WIN+SETTLE or final private response+WIN+SETTLE, or final PASS+SETTLE; no intermediate frames;
+- full ledger, tai/breakdown and per-payer dealer items, self-draw vs single source/robbery payer, strict +0, transfers and fixed zero-fee house conservation;
+- public summary exactly derived from private commitment and identical to terminal event/result, final scores and state hash;
+- missing/unknown versions, profile substitution, duplicate/truncated/reordered/tampered events and recomputed digests still reject; archive index recovery only existing valid bytes;
+- scorer exception or unsupported missing seat-wind facts leaves accepted prefix incomplete, no fabricated terminal, no private Bot hand, seed, wall, raw evidence IDs, private reply/action IDs, hidden score decomposition. Postgame exposes only the Rules-sanctioned summary, not private scoring evidence. SHA is integrity detection, not a digital signature or authenticated proof.
+
+## Golden cases and executed evidence
+
+Historical static fixture tests/replay/fixtures/r73-historical-win.json generated by actual base a29bebfc... and R7 f6da1d2b source; R5 selfdraw tai 3, delta [540,-180,-180,-180]; unchanged original FNV/SHA bytes. tests/replay/fixtures/r73-authoritative-ledgers.json contains actual pure scorer output on synthetic pre-settlement envelopes (not legal Rules evidence). tests/replay/fixtures/r73-authoritative-robbery-archive.json contains actual Rules-issued robbery, Scoring and Replay archive generated from exact sources above; independent old/new readback tests.
+ 
+Actual isolated three-source test on Replay 86632d03 / Rules 7b030571 / Scoring aa253549: 1 mandatory integrated test callback PASS, no FAIL or SKIP; includes four real complete rounds plus incomplete privacy, missing/forged runtime, unknown version, archive recovery, malicious FNV/SHA re-computation and injected/real missing-seat-wind scoring failure. The callback executed real Rules, Scoring runtime and Replay modules; lightweight Node test/assert/UTF-8 adapters, unused Strategy/Academy/comparison modules fail-on-call stubs. It is not native Node or browser CI.
+
+| Actual legal outcome | Tai | Delta (abstract points, seats 0-3) | Events | SHA event chain |
+| --- | ---: | --- | ---: | --- |
+| Robbery | 7 | [0,-7,7,0] | 32 | 3dd08be59cb11750c297f3c041bbe47d3e2641e60c7d5e5aa40af90dd0302819 |
+| Later discard WIN | 6 | [-7,0,7,0] | 27 | 7f6e22fdac83adb34073dc0bcda3608520cafcb316e91a3e072efb2514bddb1c |
+| Later selfdraw WIN | 8 | [-9,25,-8,-8] | 28 | 749c3e7232afcdc734d6bbe54e8eebf8ed3ee0d58b3deb3d7925a276d4b840d6 |
+| Exhaustive DRAW | 0 | [0,0,0,0] | 321 | d71ea3b42901e11b9101752cff4b306f71960dbc06e874914e2d233dbaad4d4f |
+
+Earlier R7.3 historical tests 5/5 PASS (7b416f93 + ff27c525), R7.1 negotiated comparison/robbery tests 8/8 PASS (7b416f93 + ff27c525 + 4db3d3e), pure ledger golden checks 2/2 PASS (1b5a2ced). Earlier source evidence must not be represented as final-HEAD native CI. Exact latest results in PR conversation. R5 100/100 and Legacy Seed87 must run again on combined candidate.
+
+## Mandatory no-SKIP combined gate
+
+```sh
+REPLAY_REQUIRE_R7_RULES=1 REPLAY_REQUIRE_R7_SCORING=1 REPLAY_REQUIRE_R73_AUTHORITATIVE=1 node --test tests/replay/*.test.js
+npm run check
+```
+Missing upstream contract/runtime fails explicit strict dependency gate. Standalone PR diagnostic is BLOCKED/no integrated evidence, not integrated PASS. New authoritative profile is not enabled in UI/Bot by this PR. Agent 3's old combined integration test expected scoringLedger rather than actual private authoritativeSettlement; source-owner handoff requested correction, no edits to Scoring.
+
+## Public browser / PWA handoff
+
+Agent 1 and 7 must compose the trusted runtime from actual pinned Scoring, not serialized/user callbacks. Same runtime/version across new game, readback, reload and offline cold-start; no new source imports in Replay. Cache all actual transitive host Scoring modules and existing src/rules/scoring.js, src/replay/index.js, internal.js, integrity.js; removed settlement-lifecycle.js must not be listed. Update cache generation on integrated source changes. Test existing FNV/SHA and new authoritative archive readback before/after upgrade; verify same public summary, digest and stored bytes, no private projection leaks. R7.2 #53 public preview reached nonterminal play only, terminal Replay/reload/offline cold start and exact candidate asset parity remain BLOCKED, actual Safari/Chromium digest parity NOT_RUN. No public success claimed.
