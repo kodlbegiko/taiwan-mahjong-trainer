@@ -135,7 +135,10 @@ export function evidenceFromSettledRulesState(state,{seatWindType,prevailingWind
           drawEventId:last.eventId};
       else if(last.type==='draw'&&!['live','tail'].includes(last.payload.source))
         throw new ScoringCapabilityError('unsupported-winning-draw-source');
-    }
+    }else if(state.extensions?.tw16?.lastDraw?.seat===r.winnerSeat&&
+      state.extensions.tw16.lastDraw.tileId===r.winningTileId&&
+      ['replacement','flower','live'].includes(state.extensions.tw16.lastDraw.source))
+      throw new RangeError('Winning draw lacks matching private Rules event');
   }
   const actualPrevailing=WIND_TYPES[state.round.prevailingWind];
   if(actualPrevailing===undefined||
