@@ -47,7 +47,12 @@ export const same = (a,b) => canonical(a)===canonical(b);
 export function replayIntegrityHashes(manifest, events, decisions, state) {
   const initial={domain:'tw16-replay-chain-seed/v1',gameId:manifest.gameId,
     ruleRef:manifest.ruleRef,initialSeed:manifest.initialSeed,
-    dealerSeat:manifest.dealerSeat,roundConfig:manifest.roundConfig??null};
+    dealerSeat:manifest.dealerSeat,roundConfig:manifest.roundConfig??null,
+    ...(isAuthoritativeScoring(manifest.ruleRef)?{
+      scoringVersion:manifest.scoringVersion,scoringRef:manifest.scoringRef,
+      preSettlementContractVersion:manifest.preSettlementContractVersion,
+      publicEventContractVersion:manifest.publicEventContractVersion,
+      scoringProfileSnapshot:manifest.scoringProfileSnapshot}: {})};
   let eventChain=sha256Utf8(canonical(initial));
   for(const event of events)
     eventChain=sha256Utf8(eventChain+'\n'+canonical(event));
@@ -64,8 +69,10 @@ function assertProfile(ruleRef) {
 /** Only explicitly reviewed complete-table profiles are accepted.
  * The optional robbery profile shares the canonical Rules action protocol;
  * no unknown profile is silently interpreted as a legacy sandbox. */
-export const isRobAddedKong = ref =>
-  ref?.profileId==='tw16-rob-added-kong' && ref?.ruleVersion==='experimental-v1';
+export const isAuthoritativeScoring = ref =>
+  ref?.profileId==='tw16-authoritative-scoring' && ref?.ruleVersion==='experimental-v1';
+export const isRobAddedKong = ref => isAuthoritativeScoring(ref) ||
+  (ref?.profileId==='tw16-rob-added-kong' && ref?.ruleVersion==='experimental-v1');
 const isR3 = ref => isRobAddedKong(ref) ||
   (ref?.profileId==='tw16-configurable-table' &&
     ref?.ruleVersion==='experimental-full-v1') ||
@@ -78,8 +85,18 @@ function pinnedScoringVersion(profile,ref) {
     if(isRobAddedKong(ref) &&
        getRuleCapabilities(ref).publicEventContractVersion!=='tw16-rob-added-kong-public/1.0.0')
       throw new ReplayError('UNSUPPORTED_PUBLIC_EVENT_CONTRACT','R7 robbery public projection must negotiate the reviewed contract');
-    // The Rules R7 robbery profile still uses minimal discard liability.
-    // Scoring PR #52 is not an authoritative Rules settlement integration.
+    if(isAuthoritativeScoring(ref)){
+      const caps=getRuleCapabilities(ref);
+      if(profile.scoringPolicy?.mode!=='configured'||
+         profile.scoringPolicy.configRef!==AUTHORITATIVE_SCORING_VERSION||
+         caps.scoring?.policy!==AUTHORITATIVE_SCORING_VERSION||
+         caps.scoring?.evidenceContractVersion!==AUTHORITATIVE_PRE_SETTLEMENT||
+         caps.scoring?.runtimeRequired!==true||
+         !same(caps.scoring?.scoringRef,AUTHORITATIVE_SCORING_REF))
+        throw new ReplayError('UNSUPPORTED_SCORING_PROFILE','Authoritative Rules/Scoring negotiation is incompatible');
+      return AUTHORITATIVE_SCORING_VERSION;
+    }
+    // Historical R3/R5/R7.1 remain pinned to minimal discard liability.
     if(profile.scoringPolicy?.mode!=='configured' ||
        profile.scoringPolicy.configRef!=='tw16-minimal-tai-v1')
       throw new ReplayError('UNSUPPORTED_SCORING_PROFILE','No historical Rules replay adapter for this scoring policy');
@@ -97,6 +114,9 @@ function verifyPinnedSettlement(state,version) {
     if(result!==null||settlements.length||wins.length)
       throw new ReplayError('INVALID_SETTLEMENT','Unfinished round contains terminal scoring evidence');
     return;
+  }
+  if(isAuthoritativeScoring(state.ruleRef)){
+    verifyAuthoritativeStateSettlement(state,version);return;
   }
   const terminal=state.events.at(-1),payload=terminal?.payload;
   if(version!=='tw16-minimal-tai-v1'||!result||terminal?.type!=='settle'||
@@ -245,6 +265,76 @@ export function verifyAuthoritativeLedger(ledger,{gameId,roundId,sourceRevision,
   return true;
 }
 
+
+/** The complete private commitment is only in GameState, never a public
+ * TurnEvent. Derive an independent allowlisted public summary for equality. */
+function safeAuthoritativeSummary(commit){
+  const {evidence:e,ledger:l}=commit;
+  const item=i=>({code:i.code,name:i.name,tai:i.tai,ruleVersion:i.ruleVersion,source:i.source,scope:i.scope});
+  return {contractVersion:AUTHORITATIVE_PRE_SETTLEMENT,settlementId:e.settlementId,
+    scoringVersion:l.scoringVersion,status:l.status,unit:l.unit,reason:l.reason,
+    winType:e.winType,winnerSeat:l.winnerSeat,sourceSeat:l.sourceSeat,
+    payerSeats:[...e.payerSeats],publicEvidenceEventIds:[...commit.publicEvidenceEventIds],
+    tai:l.score?.tai??0,breakdown:(l.score?.breakdown??[]).map(item),
+    payments:l.payments.map(p=>({payerSeat:p.payerSeat,payeeSeat:p.payeeSeat,points:p.points,
+      handTai:p.handTai,appliedTai:p.appliedTai,dealerItems:p.dealerItems.map(item)})),
+    playerTransferDeltas:[...l.playerTransferDeltas],playerDeltas:[...l.playerDeltas],fees:[],houseDelta:0};
+}
+function verifyAuthoritativeStateSettlement(state,version){
+  const result=state.extensions.tw16.result,commit=result?.authoritativeSettlement,
+    terminal=state.events.at(-1),win=result?.reason==='win',winEvent=win?state.events.at(-2):null;
+  ledgerCheck(version===AUTHORITATIVE_SCORING_VERSION&&commit&&terminal?.type==='settle'&&
+    terminal.visibility==='public'&&state.events.filter(e=>e.type==='settle').length===1&&
+    state.events.filter(e=>e.type==='win').length===(win?1:0)&&
+    result.scoringVersion===version&&terminal.payload.scoringVersion===version,
+    'missing/duplicate terminal commitment');
+  const {evidence:e,ledger:l,scoringProfile:p,publicEvidenceEventIds:publicIds}=commit;
+  ledgerCheck(e&&l&&p&&p.profileId===AUTHORITATIVE_SCORING_REF.profileId&&
+    p.version===AUTHORITATIVE_SCORING_REF.version&&p.contractVersion===SCORE_CONTRACT&&
+    p.points?.base===0&&p.points?.perTai===1&&p.settlement?.fee?.mode==='none'&&p.settlement?.fee?.points===0&&
+    e.contractVersion===AUTHORITATIVE_PRE_SETTLEMENT&&same(e.ruleRef,AUTHORITATIVE_RULE_REF)&&
+    same(e.scoringRef,AUTHORITATIVE_SCORING_REF)&&e.publicEventContractVersion===PUBLIC_ROBBERY_CONTRACT&&
+    e.gameId===state.gameId&&e.roundId===state.round.roundId&&e.settlementId===e.roundId&&
+    e.sourceRevision===state.revision-(win?2:1)&&e.reason===result.reason&&
+    same(e.evidenceEventIds,l.evidenceEventIds)&&same(e.payerSeats,l.payments.map(x=>x.payerSeat))&&
+    same(publicIds,state.events.filter(x=>x.visibility==='public'&&e.evidenceEventIds.includes(x.eventId)).map(x=>x.eventId)),
+    'private evidence/profile snapshot binding');
+  const type=win?(result.robAddedKong?'rob-added-kong':result.via):null;
+  verifyAuthoritativeLedger(l,{gameId:state.gameId,roundId:state.round.roundId,
+    sourceRevision:e.sourceRevision,events:state.events,reason:result.reason,
+    winnerSeat:result.winnerSeat,sourceSeat:win?result.sourceSeat:null,winType:type,
+    robAddedKong:result.robAddedKong});
+  ledgerCheck(same(result.delta,l.playerDeltas)&&same(state.round.scores,l.playerDeltas)&&
+    same(terminal.payload.delta,l.playerDeltas)&&terminal.payload.reason===result.reason&&
+    terminal.payload.winnerSeat===result.winnerSeat&&result.tai===(l.score?.tai??0)&&
+    terminal.payload.tai===result.tai&&same(result.settlement,safeAuthoritativeSummary(commit))&&
+    same(terminal.payload.settlement,result.settlement),'public summary/final scores mismatch');
+  if(win){
+    ledgerCheck(winEvent?.type==='win'&&winEvent.visibility==='public'&&
+      winEvent.causedByActionId===terminal.causedByActionId&&winEvent.actorSeat===result.winnerSeat&&
+      winEvent.payload?.winnerSeat===result.winnerSeat&&winEvent.payload?.sourceSeat===result.sourceSeat&&
+      winEvent.payload?.via===result.via&&terminal.actorSeat===result.winnerSeat&&
+      e.winningTileId===result.winningTileId&&e.evidence?.winnerSeat===result.winnerSeat&&
+      e.evidence?.sourceSeat===result.sourceSeat&&e.evidence?.via===result.via&&
+      same(result.breakdown,result.settlement.breakdown),'atomic WIN/breakdown mismatch');
+    if(result.robAddedKong)ledgerCheck(same(result.robAddedKong,e.evidence.robAddedKong)&&
+      same(result.robAddedKong,winEvent.payload.robAddedKong)&&
+      same(result.robAddedKong,terminal.payload.robAddedKong),'robbery commitment mismatch');
+  }else ledgerCheck(result.reason==='exhaustive-draw'&&e.evidence===null&&e.winningTileId===null&&
+    result.winnerSeat===null&&e.winType===null,'draw contains WIN evidence');
+}
+function requireReplayRuntime(ref,settlementRuntime){
+  if(isAuthoritativeScoring(ref)&&
+     (!settlementRuntime||settlementRuntime.contractVersion!==AUTHORITATIVE_PRE_SETTLEMENT||
+      settlementRuntime.scoringVersion!==AUTHORITATIVE_SCORING_VERSION))
+    throw new ReplayError('SCORING_RUNTIME_REQUIRED','Historical authoritative Replay requires the trusted pinned Rules settlement runtime');
+}
+function runtimeError(error){
+  if(error?.code==='UNSUPPORTED_RULE_CAPABILITY'&&error.capability==='authoritative_scoring_runtime_required')
+    return new ReplayError('SCORING_RUNTIME_REQUIRED','Historical authoritative settlement runtime is not trusted or available',error);
+  return null;
+}
+
 const replayConfig = (manifest, events) => ({
   gameId:manifest.gameId,seed:manifest.initialSeed,
   dealerSeat:manifest.dealerSeat,ruleRef:manifest.ruleRef,
@@ -285,7 +375,7 @@ function decisionsOf(events,m) {
  * exact action IDs / multi-WIN outcomes can disclose private claim intents.
  * A mere caller-provided error string is not accepted as evidence.
  */
-function verifiedUnsupportedSubmission(state,submitted) {
+function verifiedUnsupportedSubmission(state,submitted,settlementRuntime) {
   if(submitted===undefined || submitted===null)return null;
   if(!isR3(state?.ruleRef)||state.round.phase==='settled')
     throw new ReplayError('INVALID_INTERRUPTION','Only an unfinished R3 round may report unsupported rule capability');
@@ -308,7 +398,7 @@ function verifiedUnsupportedSubmission(state,submitted) {
   try {
     // Authority is Rules. Do not invent an alternative arbitration/reducer.
     applyAction(state,{actorSeat:legal.actorSeat,actionId:legal.actionId,
-      expectedRevision:legal.expectedRevision});
+      expectedRevision:legal.expectedRevision},{settlementRuntime});
   } catch(error) {
     if(!(error instanceof RuleCapabilityError)||
        error.code!=='UNSUPPORTED_RULE_CAPABILITY'||
@@ -324,20 +414,21 @@ function verifiedUnsupportedSubmission(state,submitted) {
     submittedAction:{actorSeat:legal.actorSeat,actionId:legal.actionId,
       expectedRevision:legal.expectedRevision}};
 }
-export function createReplayArchive(state,{ownerSeat=0,disclosurePolicy='none',unsupportedSubmission=null}={}) {
+export function createReplayArchive(state,{ownerSeat=0,disclosurePolicy='none',unsupportedSubmission=null,settlementRuntime}={}) {
   if(!Number.isInteger(ownerSeat)||ownerSeat<0||ownerSeat>3)
     throw new ReplayError('INVALID_SEAT','ownerSeat must be 0..3');
   const profile=assertProfile(state?.ruleRef),r3=isR3(state.ruleRef);
   const scoringVersion=pinnedScoringVersion(profile,state.ruleRef);
-  try { validateGameState(state); }
-  catch(error) { throw new ReplayError('INVALID_GAME_STATE','Original game is not replayable',error); }
+  requireReplayRuntime(state.ruleRef,settlementRuntime);
+  try { validateGameState(state,{settlementRuntime}); }
+  catch(error) { throw runtimeError(error)??new ReplayError('INVALID_GAME_STATE','Original game is not replayable',error); }
   if(typeof state.rng?.seed!=='string'||!state.rng.seed)
     throw new ReplayError('MISSING_SEED','Seed is mandatory');
   if(!['none','settled-public-only'].includes(disclosurePolicy) ||
       (disclosurePolicy!=='none' && (!r3||state.round.phase!=='settled')))
     throw new ReplayError('INVALID_DISCLOSURE_POLICY','Only an explicitly settled R3 game permits public-only postgame disclosure');
   if(r3)verifyPinnedSettlement(state,scoringVersion);
-  const unsupported=verifiedUnsupportedSubmission(state,unsupportedSubmission);
+  const unsupported=verifiedUnsupportedSubmission(state,unsupportedSubmission,settlementRuntime);
   const events=state.events.map(turnEvent=>({...V1,replayEventVersion:REPLAY_VERSION,
     seq:turnEvent.seq,turnEvent:clone(turnEvent)}));
   const completionStatus=r3&&state.round.phase==='settled'?'settled-experimental':'incomplete';
@@ -365,6 +456,12 @@ export function createReplayArchive(state,{ownerSeat=0,disclosurePolicy='none',u
     ...(unsupported?{unsupportedInterruption:unsupported}:{}),
     disclosurePolicy,
   });
+  if(isAuthoritativeScoring(state.ruleRef))Object.assign(m,{
+    scoringRef:clone(AUTHORITATIVE_SCORING_REF),
+    preSettlementContractVersion:AUTHORITATIVE_PRE_SETTLEMENT,
+    publicEventContractVersion:PUBLIC_ROBBERY_CONTRACT,
+    scoringProfileSnapshot:settlement?clone(settlement.authoritativeSettlement.scoringProfile):null,
+  });
   const decisions=decisionsOf(state.events,m);
   if(r3)m.actionCount=decisions.length;
   m.integrity={algorithm:'fnv1a-32-canonical-checksum-not-signature',
@@ -372,12 +469,12 @@ export function createReplayArchive(state,{ownerSeat=0,disclosurePolicy='none',u
     finalStateChecksum:checksum(state),
     sha256:replayIntegrityHashes(m,events,decisions,state)};
   const archive={...V1,replayVersion:REPLAY_VERSION,manifest:m,events,decisions};
-  validateReplayArchive(archive);
+  validateReplayArchive(archive,{settlementRuntime});
   return clone(archive);
 }
 
 /** Strict record verification; never apply saved TurnEvents as trusted mutations. */
-export function validateReplayArchive(archive) {
+export function validateReplayArchive(archive,{settlementRuntime}={}) {
   try {
     if(!archive||archive.schemaVersion!==1||archive.contractVersion!==CONTRACT_VERSION||
        archive.replayVersion!==REPLAY_VERSION||!archive.manifest||
@@ -386,6 +483,7 @@ export function validateReplayArchive(archive) {
     const m=archive.manifest,r3=isR3(m.ruleRef);
     // Resolve the historical identity before interpreting engine-specific fields.
     const profile=assertProfile(m.ruleRef);
+    requireReplayRuntime(m.ruleRef,settlementRuntime);
     if(m.schemaVersion!==1||m.contractVersion!==CONTRACT_VERSION||
        m.replayVersion!==REPLAY_VERSION||m.replayId!=='replay:'+m.gameId||
        !Number.isInteger(m.ownerSeat)||m.ownerSeat<0||m.ownerSeat>3||
@@ -401,11 +499,17 @@ export function validateReplayArchive(archive) {
     if(typeof m.scoringVersion!=='string'||!m.scoringVersion)
       throw new Error('Missing historical scoring version');
     if(m.scoringVersion!==pinned){
-      if(!['unavailable','tw16-minimal-tai-v1'].includes(m.scoringVersion))
+      if(!['unavailable','tw16-minimal-tai-v1',AUTHORITATIVE_SCORING_VERSION].includes(m.scoringVersion))
         throw new ReplayError('UNSUPPORTED_SCORING_PROFILE','Historical scoring policy is unavailable for this RuleProfile');
       throw new Error('Pinned scoring policy mismatch');
     }
     if(!same(m.ruleProfileSnapshot,profile))throw new Error('RuleProfile snapshot mismatch; historical policy cannot be silently upgraded');
+    if(isAuthoritativeScoring(m.ruleRef)&&
+       (!same(m.scoringRef,AUTHORITATIVE_SCORING_REF)||
+        m.preSettlementContractVersion!==AUTHORITATIVE_PRE_SETTLEMENT||
+        m.publicEventContractVersion!==PUBLIC_ROBBERY_CONTRACT||!m.integrity?.sha256||
+        !Object.hasOwn(m,'scoringProfileSnapshot')))
+      throw new Error('Authoritative archive lacks pinned scoring metadata or SHA-256');
     if(r3){
       if(profile.status!=='experimental'||m.ruleProfileVersion!==profile.ruleVersion||
          m.initialSeedRef!=='private:ReplayManifest.initialSeed'||
@@ -429,8 +533,11 @@ export function validateReplayArchive(archive) {
       throw new Error('event/decision checksum');
     if(!same(decisionsOf(events,m),archive.decisions))
       throw new Error('decision group/event mismatch');
-    const state=replayGame(replayConfig(m,archive.events));
-    validateGameState(state);
+    const state=replayGame(replayConfig(m,archive.events),{settlementRuntime});
+    validateGameState(state,{settlementRuntime});
+    if(isAuthoritativeScoring(m.ruleRef)&&
+       !same(m.scoringProfileSnapshot,state.extensions?.tw16?.result?.authoritativeSettlement?.scoringProfile??null))
+      throw new Error('Authoritative archived profile snapshot mismatch');
     if(checksum(state)!==m.integrity?.finalStateChecksum)
       throw new Error('canonical final state mismatch');
     // Older Replay v1 archives remain readable. A present V2 hash object
@@ -443,7 +550,7 @@ export function validateReplayArchive(archive) {
       if(m.unsupportedInterruption!==undefined){
         const interruption=m.unsupportedInterruption;
         if(interruption?.kind!=='unsupported-rule-capability' ||
-           !same(interruption,verifiedUnsupportedSubmission(state,interruption.submittedAction)))
+           !same(interruption,verifiedUnsupportedSubmission(state,interruption.submittedAction,settlementRuntime)))
           throw new Error('unsupported action evidence no longer matches Rules');
       }
       const settled=state.round.phase==='settled',result=state.extensions?.tw16?.result;
@@ -458,19 +565,20 @@ export function validateReplayArchive(archive) {
     }
     return true;
   } catch(error) {
-    if(error instanceof ReplayError && ['UNKNOWN_RULE_PROFILE','UNSUPPORTED_SCORING_PROFILE','UNSUPPORTED_PUBLIC_EVENT_CONTRACT'].includes(error.code))throw error;
+    if(runtimeError(error))throw runtimeError(error);
+    if(error instanceof ReplayError && ['UNKNOWN_RULE_PROFILE','UNSUPPORTED_SCORING_PROFILE','UNSUPPORTED_PUBLIC_EVENT_CONTRACT','SCORING_RUNTIME_REQUIRED'].includes(error.code))throw error;
     throw new ReplayError('CORRUPT_REPLAY','Replay record does not match canonical seeded Rules Engine',error);
   }
 }
-export function replayStateAt(archive,seq) {
-  validateReplayArchive(archive);
+export function replayStateAt(archive,seq,{settlementRuntime}={}) {
+  validateReplayArchive(archive,{settlementRuntime});
   if(!Number.isInteger(seq)||seq<1||seq>archive.events.length)
     throw new ReplayError('INVALID_EVENT_SEQ','Event sequence is outside this replay');
   if(isR3(archive.manifest.ruleRef)&&seq!==1 &&
       !archive.decisions.some(d=>d.endEventSeq===seq))
     throw new ReplayError('NON_ATOMIC_EVENT_SEQ','R3 frames require a complete LegalAction event-group boundary');
-  try {return replayGame(replayConfig(archive.manifest,archive.events.slice(0,seq)));}
-  catch(error){throw new ReplayError('REPLAY_MISMATCH','Unable to reconstruct canonical event prefix',error);}
+  try {return replayGame(replayConfig(archive.manifest,archive.events.slice(0,seq)),{settlementRuntime});}
+  catch(error){throw runtimeError(error)??new ReplayError('REPLAY_MISMATCH','Unable to reconstruct canonical event prefix',error);}
 }
 export function publicManifest(archive) {
   const {manifest:m}=archive,r3=isR3(m.ruleRef);
@@ -495,6 +603,9 @@ export function publicManifest(archive) {
       }:null,
       disclosurePolicy:m.disclosurePolicy,
     }:{}),
+    ...(isAuthoritativeScoring(m.ruleRef)?{scoringRef:clone(m.scoringRef),
+      preSettlementContractVersion:m.preSettlementContractVersion,
+      publicEventContractVersion:m.publicEventContractVersion}:{}),
     postgameAvailable:r3&&m.completionStatus==='settled-experimental'&&
       m.disclosurePolicy==='settled-public-only'};
 }

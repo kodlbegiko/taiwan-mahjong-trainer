@@ -10,7 +10,7 @@ import { getSkillTag } from '../academy/registry.js';
 import { createUnscoredScenario } from '../scenario/index.js';
 import { V1, clone, checksum, same, ReplayError, REPLAY_VERSION, FRAME_VERSION,
   DECISION_VERSION, ANALYSIS_VERSION, FINDING_VERSION,
-  createReplayArchive, validateReplayArchive, replayStateAt, publicManifest, isRobAddedKong } from './internal.js';
+  createReplayArchive, validateReplayArchive, replayStateAt, publicManifest, isRobAddedKong, isAuthoritativeScoring } from './internal.js';
 
 export { ReplayError, REPLAY_VERSION, FRAME_VERSION, DECISION_VERSION,
   ANALYSIS_VERSION, FINDING_VERSION } from './internal.js';
@@ -40,7 +40,7 @@ function indexFrom(store) {
     return ids;
   } catch(e) { throw new ReplayError('STORAGE_CORRUPT','Replay index invalid',e); }
 }
-function readArchive(store,replayId) {
+function readArchive(store,replayId,settlementRuntime) {
   if(typeof replayId!=='string'||!/^replay:[A-Za-z0-9_-]+$/.test(replayId))
     throw new ReplayError('INVALID_REPLAY_ID','Invalid replay identifier');
   const raw=store.read(DATA_PREFIX+replayId);
@@ -48,7 +48,7 @@ function readArchive(store,replayId) {
   let archive;
   try { archive=JSON.parse(raw); }
   catch(e) { throw new ReplayError('CORRUPT_REPLAY','Replay JSON invalid',e); }
-  validateReplayArchive(archive);
+  validateReplayArchive(archive,{settlementRuntime});
   if(archive.manifest.replayId!==replayId) throw new ReplayError('CORRUPT_REPLAY','Replay ID mismatch');
   return archive;
 }
@@ -66,10 +66,10 @@ function strategyUnavailableReason(view) {
     return 'Unreplaced flowers are outside the Strategy V1 standard-tile parser; legal actions only.';
   return null;
 }
-function frameFrom(archive,seq) {
+function frameFrom(archive,seq,settlementRuntime) {
   const m=archive.manifest;
-  const state=replayStateAt(archive,seq);
-  const view=createPlayerView(state,m.ownerSeat);
+  const state=replayStateAt(archive,seq,{settlementRuntime});
+  const view=createPlayerView(state,m.ownerSeat,state.revision,{settlementRuntime});
   // Rules R3 can expose an own concealed flower while awaiting replacement;
   // Strategy V1's standard-only view parser does not model that legal phase.
   // In that case the authoritative Rules projection above is used as-is,
@@ -92,6 +92,17 @@ function frameFrom(archive,seq) {
       (replySeqs.has(e.seq)&&(e.type!=='claim'||Object.hasOwn(e,'actorSeat')||
         Object.hasOwn(e,'causedByActionId')||Object.keys(e.payload).length!==0))))
       throw new ReplayError('VIEW_FORBIDDEN','Private claim provenance escaped R7 Rules projection');
+  }
+  if(isAuthoritativeScoring(m.ruleRef)){
+    const privateKeys=new Set(['authoritativeSettlement','scoringProfile','evidence','evidenceEventIds',
+      'decomposition','winningTileId','initialSeed','fixtureDeck','rng','wall','concealed']);
+    function forbidden(v){
+      return v&&typeof v==='object'&&Object.entries(v).some(([k,x])=>privateKeys.has(k)||forbidden(x));
+    }
+    if(forbidden(view.publicEvents)||forbidden(view.round)||
+       (state.round.phase==='settled'&&!same(view.publicEvents.at(-1)?.payload?.settlement,
+          state.extensions.tw16.result.settlement)))
+      throw new ReplayError('VIEW_FORBIDDEN','Authoritative historical projection contains private evidence or an incorrect summary');
   }
   if(!strategyUnavailableReason(view))readPlayerView(view);
   return {...V1,frameVersion:FRAME_VERSION,replayId:m.replayId,
@@ -134,7 +145,7 @@ function findingsFor(analysis) {
  * All methods are synchronous and use only new replay-prefixed storage keys.
  * No existing DecisionRecord v3 archive, Academy sidecar or Rules file is touched.
  */
-export function createReplayService({storage=null}={}) {
+export function createReplayService({storage=null,settlementRuntime}={}) {
   const store=createStorage(storage);
   function indexVerifiedArchive(id,ids=indexFrom(store)) {
     if(!ids.includes(id)) store.write(INDEX_KEY,JSON.stringify([...ids,id].sort()));
@@ -151,14 +162,14 @@ export function createReplayService({storage=null}={}) {
     return same(previous,withoutNewDigest);
   }
   function saveReplay(gameState,{ownerSeat=0,disclosurePolicy='none',unsupportedSubmission=null}={}) {
-    const archive=createReplayArchive(gameState,{ownerSeat,disclosurePolicy,unsupportedSubmission});
+    const archive=createReplayArchive(gameState,{ownerSeat,disclosurePolicy,unsupportedSubmission,settlementRuntime});
     const id=archive.manifest.replayId;
     // Preflight the index BEFORE writing sensitive archive bytes. A damaged
     // index must not silently trigger a partially successful new save.
     const ids=indexFrom(store);
     const existing=store.read(DATA_PREFIX+id);
     if(existing!==null && existing!==undefined) {
-      const previous=readArchive(store,id);
+      const previous=readArchive(store,id,settlementRuntime);
       if(!sameReplayHistory(previous,archive))
         throw new ReplayError('REPLAY_ALREADY_EXISTS','Cannot overwrite a replay with a different event ledger');
       // Repair only the index: a previously validated archive can exist even
@@ -173,22 +184,22 @@ export function createReplayService({storage=null}={}) {
   function recoverReplay(replayId,{viewerSeat}={}) {
     // Caller supplies the exact replay ID. Do not fabricate missing events,
     // regenerate a seed, or auto-discover/accept unvalidated archive bytes.
-    const archive=readArchive(store,replayId);
+    const archive=readArchive(store,replayId,settlementRuntime);
     ownerOnly(archive.manifest,viewerSeat??archive.manifest.ownerSeat);
     indexVerifiedArchive(replayId);
     return publicManifest(archive);
   }
   function listReplays() {
-    return indexFrom(store).map(id=>publicManifest(readArchive(store,id)));
+    return indexFrom(store).map(id=>publicManifest(readArchive(store,id,settlementRuntime)));
   }
-  function loadReplay(replayId) { return publicManifest(readArchive(store,replayId)); }
+  function loadReplay(replayId) { return publicManifest(readArchive(store,replayId,settlementRuntime)); }
   function getReplayFrame(replayId,eventSeq,{viewerSeat,perspective='player-at-time'}={}) {
-    const archive=readArchive(store,replayId);
+    const archive=readArchive(store,replayId,settlementRuntime);
     const m=archive.manifest;
     ownerOnly(m,viewerSeat??m.ownerSeat);
     if(perspective!=='player-at-time'&&perspective!=='postgame')
       throw new ReplayError('INVALID_PERSPECTIVE','Unknown replay perspective');
-    const frame=frameFrom(archive,eventSeq);
+    const frame=frameFrom(archive,eventSeq,settlementRuntime);
     if(perspective==='player-at-time')return frame;
     if(m.completionStatus!=='settled-experimental'&&m.completionStatus!=='settled-verified')
       throw new ReplayError('POSTGAME_UNAVAILABLE','Unsettled games have no postgame disclosure');
@@ -196,7 +207,7 @@ export function createReplayService({storage=null}={}) {
       throw new ReplayError('POSTGAME_UNAVAILABLE','Postgame disclosure was not explicitly authorized');
     // Final-state result is the Rules-authoritative settlement. Only an auditable
     // allowlist of public outcome fields is copied; never an opponent hand or wall.
-    const final=replayStateAt(archive,archive.events.length);
+    const final=replayStateAt(archive,archive.events.length,{settlementRuntime});
     const result=final.extensions?.tw16?.result;
     if(!result||final.round.phase!=='settled')
       throw new ReplayError('POSTGAME_UNAVAILABLE','Missing settled Rules result');
@@ -204,6 +215,7 @@ export function createReplayService({storage=null}={}) {
       winnerSeat:result.winnerSeat??null,
       delta:clone(result.delta),
       ...(Number.isInteger(result.tai)?{experimentalTai:result.tai}:{}),
+      ...(isAuthoritativeScoring(m.ruleRef)?{settlement:clone(result.settlement)}:{}),
       ...(isRobAddedKong(m.ruleRef)&&result.robAddedKong?{robAddedKong:{
         proposalEventId:result.robAddedKong.proposalEventId,
         fromSeat:result.robAddedKong.fromSeat,
@@ -227,7 +239,7 @@ export function createReplayService({storage=null}={}) {
   // Public timeline navigation must use Rules-validated complete-action boundaries,
   // never raw TurnEvent increments (which can land between WIN and SETTLE).
   function listReplayFrameBoundaries(replayId,{viewerSeat}={}) {
-    const archive=readArchive(store,replayId),m=archive.manifest;
+    const archive=readArchive(store,replayId,settlementRuntime),m=archive.manifest;
     ownerOnly(m,viewerSeat??m.ownerSeat);
     const boundaries=[...new Set([1,...archive.decisions.map(d=>d.endEventSeq??d.eventSeq)])]
       .sort((a,b)=>a-b);
@@ -236,13 +248,13 @@ export function createReplayService({storage=null}={}) {
     return Object.freeze(boundaries);
   }
   function getPlayerDecision(replayId,eventSeq,{viewerSeat}={}) {
-    const archive=readArchive(store,replayId),m=archive.manifest;
+    const archive=readArchive(store,replayId,settlementRuntime),m=archive.manifest;
     ownerOnly(m,viewerSeat??m.ownerSeat);
     const d=archive.decisions.find(x=>x.eventSeq===eventSeq||x.endEventSeq===eventSeq);
     if(!d)throw new ReplayError('DECISION_NOT_FOUND','No complete LegalAction decision at event sequence');
     if(d.actorSeat!==m.ownerSeat)
       throw new ReplayError('VIEW_FORBIDDEN','Other players private decisions are not disclosed');
-    const frame=frameFrom(archive,d.beforeEventSeq);
+    const frame=frameFrom(archive,d.beforeEventSeq,settlementRuntime);
     const chosen=frame.playerView.legalActions.find(a=>a.actionId===d.actionId);
     if(!chosen||chosen.kind!==d.kind)
       throw new ReplayError('INVALID_ACTION_ID','Recorded LegalAction fails historical Rules validation');
@@ -254,13 +266,13 @@ export function createReplayService({storage=null}={}) {
         audienceSeat:m.ownerSeat},legalActionIds:frame.playerView.legalActions.map(a=>a.actionId)};
   }
   function getDecisionAnalysis(replayId,eventSeq,{viewerSeat,actionId}={}) {
-    const archive=readArchive(store,replayId);
+    const archive=readArchive(store,replayId,settlementRuntime);
     const m=archive.manifest;
     ownerOnly(m,viewerSeat??m.ownerSeat);
     const decision=archive.decisions.find(d=>d.eventSeq===eventSeq||d.endEventSeq===eventSeq);
     if(!decision) throw new ReplayError('DECISION_NOT_FOUND','No decision at event sequence');
     if(decision.actorSeat!==m.ownerSeat) throw new ReplayError('VIEW_FORBIDDEN','Other players decisions have no authorized own-hand view');
-    const frame=frameFrom(archive,decision.beforeEventSeq);
+    const frame=frameFrom(archive,decision.beforeEventSeq,settlementRuntime);
     const view=frame.playerView;
     const legal=view.legalActions.find(a=>a.actionId===decision.actionId);
     if(!legal || legal.kind!==decision.kind) throw new ReplayError('INVALID_ACTION_ID','Recorded action is not legal at the original decision point');
@@ -331,7 +343,7 @@ export function createReplayService({storage=null}={}) {
     return {...analysis,findings:findingsFor(analysis)};
   }
   function listCoachingFindings(replayId) {
-    const archive=readArchive(store,replayId),owner=archive.manifest.ownerSeat;
+    const archive=readArchive(store,replayId,settlementRuntime),owner=archive.manifest.ownerSeat;
     const findings=[];
     for(const d of archive.decisions) if(d.actorSeat===owner && d.kind==='discard')
       findings.push(...getDecisionAnalysis(replayId,d.eventSeq).findings);

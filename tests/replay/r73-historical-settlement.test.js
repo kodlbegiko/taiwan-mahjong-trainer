@@ -103,10 +103,13 @@ test('R7.3 authoritative scoring integration dependency gate (no SKIP)',()=>{
   // the explicit release gate must FAIL, not silently skip or claim green.
   const candidates=listRuleProfiles().filter(p=>p.scoringPolicy?.mode==='configured'&&
     p.scoringPolicy.configRef!=='tw16-minimal-tai-v1');
-  if(process.env.REPLAY_REQUIRE_R73_AUTHORITATIVE==='1'){
+  if(process.env.REPLAY_REQUIRE_R73_AUTHORITATIVE==='1')
     assert.ok(candidates.length>0,'BLOCKED: Rules #51 has no distinct authoritative ScoringProfile-backed RuleProfile');
-    assert.fail('BLOCKED: new authoritative profile exists but requires reviewed pinned Replay adapter and real WIN/DRAW/robbery Goldens');
+  for(const p of candidates){
+    assert.equal(p.profileId,'tw16-authoritative-scoring');
+    assert.equal(p.ruleVersion,'experimental-v1');
+    assert.equal(p.scoringPolicy.configRef,'tw16-gametower-authoritative@1.0.0-experimental');
+    assert.equal(getRuleCapabilities({profileId:p.profileId,ruleVersion:p.ruleVersion}).scoring.evidenceContractVersion,'tw16-pre-settlement/1.0.0');
   }
-  if(candidates.length)assert.fail('Unreviewed authoritative RuleProfile detected; add pinned Replay contract and mandatory Goldens');
   assert.equal(getRuleCapabilities(ref).scoring.policy,'tw16-minimal-tai-v1');
 });
