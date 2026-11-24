@@ -327,3 +327,66 @@ assert.equal(alternative.breakdown.filter(x=>x.code.startsWith('flower:')).lengt
 assert.equal(alternative.breakdown.filter(x=>x.code.startsWith('flower:')).reduce((n,x)=>n+x.tai,0),4);
 assert.ok(!alternative.breakdown.some(x=>x.code.startsWith('correct-flower:')));
 });
+
+
+test('R7-001 exhaustive zero-fee settlement never emits signed negative zero',()=>{
+  const ledger=settleExhaustiveDraw(p);
+  assert.deepEqual(ledger.playerDeltas,[0,0,0,0]); // strict Object.is
+  assert.deepEqual(ledger.playerTransferDeltas,[0,0,0,0]);
+  assert.equal(ledger.houseDelta,0);
+  assert.ok(ledger.playerDeltas.every(value=>!Object.is(value,-0)));
+  assert.ok(ledger.playerTransferDeltas.every(value=>!Object.is(value,-0)));
+  assert.equal(assertLedgerConservation(ledger),true);
+  const hydrated=JSON.parse(JSON.stringify(ledger));
+  assert.deepEqual(hydrated,ledger);
+  assert.equal(assertLedgerConservation(hydrated),true);
+});
+test('R7-001 explicitly configured zero fee, including input -0, normalizes every account',()=>{
+  for(const fee of [0,-0]){
+    const definition=structuredClone(p);
+    definition.settlement.fee={mode:'fixed-per-player',points:fee};
+    const custom=createScoringProfile(definition);
+    for(const ledger of [settleExhaustiveDraw(custom),settleWinningHand(custom,fixture())]){
+      assert.deepEqual(ledger.playerDeltas,[0,0,0,0]);
+      assert.deepEqual(ledger.playerTransferDeltas,[0,0,0,0]);
+      assert.deepEqual(ledger.fees.map(f=>f.points),[0,0,0,0]);
+      assert.equal(ledger.houseDelta,0);
+      assert.ok(!ledger.fees.some(f=>Object.is(f.points,-0)));
+      assert.ok(!ledger.playerDeltas.some(x=>Object.is(x,-0)));
+      assert.equal(assertLedgerConservation(ledger),true);
+      assert.deepEqual(JSON.parse(JSON.stringify(ledger)),ledger);
+    }
+  }
+});
+test('R7-001 nonzero table fee: exhaustive and winner-ledger balance including JSON roundtrip',()=>{
+  const definition=structuredClone(p);
+  definition.settlement.fee={mode:'fixed-per-player',points:7};
+  const custom=createScoringProfile(definition);
+  for(const ledger of [settleExhaustiveDraw(custom),settleWinningHand(custom,fixture())]){
+    assert.deepEqual(ledger.playerTransferDeltas,[0,0,0,0]);
+    assert.deepEqual(ledger.playerDeltas,[-7,-7,-7,-7]);
+    assert.equal(ledger.houseDelta,28);
+    assert.equal(ledger.playerDeltas.reduce((n,x)=>n+x,0)+ledger.houseDelta,0);
+    assert.equal(assertLedgerConservation(ledger),true);
+    const hydrated=JSON.parse(JSON.stringify(ledger));
+    assert.deepEqual(hydrated,ledger);
+    assert.equal(assertLedgerConservation(hydrated),true);
+  }
+});
+test('R7-001 ledger rejects forged signed-zero amounts rather than hiding them in JSON',()=>{
+  const baseline=settleExhaustiveDraw(p);
+  for(const path of [
+    ledger=>ledger.playerDeltas[0]=-0,
+    ledger=>ledger.playerTransferDeltas[2]=-0,
+    ledger=>ledger.houseDelta=-0,
+  ]){
+    const ledger=structuredClone(baseline);
+    path(ledger);
+    assert.throws(()=>assertLedgerConservation(ledger),/Invalid ledger|Ledger/);
+  }
+  const definition=structuredClone(p);
+  definition.settlement.fee={mode:'fixed-per-player',points:3};
+  const ledger=settleExhaustiveDraw(createScoringProfile(definition));
+  ledger.fees[0].points=-0;
+  assert.throws(()=>assertLedgerConservation(ledger),/Invalid fee/);
+});
