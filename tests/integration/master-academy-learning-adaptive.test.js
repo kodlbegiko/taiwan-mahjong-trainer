@@ -169,3 +169,29 @@ test('Unknown question version and missing scenario scorer do not create formal 
   assert.throws(()=>f.submitScenarioAnswer({actionId:'fake'}),/unavailable/);
   assert.equal(storage.getItem(ARCHIVE_STORAGE_KEY),null);
 });
+
+test('R7.4 diagnostic UI uses real durable facade and distinguishes unobserved from repeated evidence',async()=>{
+  const {renderSkillDiagnostics}=await import('../../src/academy-ui/academy-live.js');
+  const storage=memoryStorage(),f=createMasterAcademyFacade(storage);
+  const fresh=f.getDashboard({asOf});
+  assert.equal(fresh.durable,true);
+  assert.equal(fresh.pendingRecovery.remaining,0);
+  assert.ok(fresh.recommendation.skillDiagnostics.length>0);
+  assert.ok(fresh.recommendation.skillDiagnostics.every(r=>r.status==='unobserved'));
+  assert.match(renderSkillDiagnostics(fresh),/data-skill-diagnostics="verified"/);
+  for(let i=0;i<5;i++){
+    const r=submit(f,'r74-repeat-'+i);
+    assert.equal(r.durable,true);assert.equal(r.provenanceDurable,true);
+  }
+  const raw=storage.getItem(ARCHIVE_STORAGE_KEY);
+  const d=createMasterAcademyFacade(storage).getDashboard({asOf});
+  assert.equal(d.pendingRecovery.remaining,0);
+  const observed=d.recommendation.skillDiagnostics.filter(r=>r.attempts>0);
+  assert.ok(observed.length>0);
+  assert.ok(observed.every(r=>r.attempts===5&&r.uniqueQuestionCount===1&&r.status==='insufficient-evidence'));
+  assert.match(renderSkillDiagnostics(d),/data-skill-diagnostics="verified"/);
+  assert.match(renderSkillDiagnostics(d),/證據不足/);
+  assert.equal(storage.getItem(ARCHIVE_STORAGE_KEY),raw);
+  const damaged=structuredClone(d);damaged.pendingRecovery={remaining:1,results:[{recovered:false}]};
+  assert.match(renderSkillDiagnostics(damaged),/data-skill-diagnostics="unavailable"/);
+});
