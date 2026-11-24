@@ -14,6 +14,7 @@ on:
       - 'tests/integration/**'
       - 'tests/browser/full-table-ui-r3-gates.py'
       - 'tests/browser/r7-public-https-gates.py'
+      - 'tests/browser/r73-exact-origin-gate.py'
       - 'sw.js'
       - 'index.html'
       - '.github/workflows/phase3-full-match.yml'
@@ -92,11 +93,47 @@ jobs:
           retention-days: 14
 
   r7-public-https:
-    name: R7 public HTTPS / genuine UI match / settlement / Replay
+    name: R7.3 exact R7.2 deployed public HTTPS / three difficulties / Replay / Daily / offline
     if: github.event_name == 'pull_request' && github.head_ref == 'fix/r7-live-table-ux'
-    needs: [r3-chromium]
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/checkout@v4
+        with:
+          ref: 793bbb1caeef79b94e0bb29bf2ea66b3f7c43f4d
+          path: r72-deployed
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install 'playwright==1.56.0'
+      - run: google-chrome --version
+      - name: Existing Agent 8 deployment only — no Vercel creation
+        run: |
+          python tests/browser/r73-exact-origin-gate.py \
+            --source-root r72-deployed \
+            --url https://taiwan-mahjong-phase3-r5-experimental-iotn3v964-sign2.vercel.app/ \
+            --deployment-sha 793bbb1caeef79b94e0bb29bf2ea66b3f7c43f4d \
+            --max-matches 6 --screenshots r73-r72-public-evidence
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: r73-r72-exact-public-evidence
+          path: r73-r72-public-evidence
+          if-no-files-found: error
+          retention-days: 14
+
+  r73-seeded-ui:
+    name: R7.3 fixed-seed real UI / ${{ matrix.difficulty }}
+    if: github.event_name == 'pull_request' && github.head_ref == 'fix/r7-live-table-ux'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    strategy:
+      fail-fast: false
+      matrix:
+        difficulty: [Beginner, Intermediate, Advanced]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -105,26 +142,16 @@ jobs:
         with:
           python-version: '3.12'
       - run: python -m pip install 'playwright==1.56.0'
-      - name: Record exact test SHA and public deployment source
+      - run: google-chrome --version
+      - name: Explicit fixed seed via normal UI, real Rules and Controller
         run: |
-          echo "TESTED_SOURCE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
-          echo "PUBLIC_DEPLOYMENT_SOURCE_SHA=ee2eda1a3223ac85433f3ae5e31604258e1b4e7c" >> "$GITHUB_STEP_SUMMARY"
-          echo "PUBLIC_DEPLOYMENT_URL=https://taiwan-mahjong-phase3-r5-experimental-ib7ewqch0-sign2.vercel.app/" >> "$GITHUB_STEP_SUMMARY"
-          google-chrome --version
-      - name: Public Vercel HTTPS — real human plus three Bots
-        env:
-          DEPLOYMENT_SOURCE_SHA: ee2eda1a3223ac85433f3ae5e31604258e1b4e7c
-          R7_PUBLIC_URL: https://taiwan-mahjong-phase3-r5-experimental-ib7ewqch0-sign2.vercel.app/
-        run: |
-          python tests/browser/r7-public-https-gates.py \
-            --url "$R7_PUBLIC_URL" --screenshots r7-public-https-evidence \
-            --max-matches 4 --source-sha "$(git rev-parse HEAD)" \
-            --deployment-sha "$DEPLOYMENT_SOURCE_SHA"
-      - name: Preserve public-origin screenshot and trace evidence even on failure
-        if: always()
+          python tests/browser/r73-exact-origin-gate.py \
+            --difficulty "${{ matrix.difficulty }}" --seeds r73-case-0,r73-case-1,r73-case-2 \
+            --screenshots r73-seeded-evidence
+      - if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: r7-real-public-https-evidence
-          path: r7-public-https-evidence
-          if-no-files-found: warn
+          name: r73-seeded-${{ matrix.difficulty }}
+          path: r73-seeded-evidence
+          if-no-files-found: error
           retention-days: 14
