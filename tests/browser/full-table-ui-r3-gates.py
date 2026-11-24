@@ -74,6 +74,9 @@ def probe_inline_confirmation(page, folder):
 
 def make_human_decision(page, coverage, folder):
     # Only click currently issued UI LegalAction controls. Never fabricate IDs.
+    # Intermediate/Advanced may need longer than the original 100ms pacing.
+    # Observe the real busy state; never click a disabled or pending action.
+    page.locator('[data-table-busy="false"]').wait_for(timeout=25000)
     if page.locator('.table-round-summary').count():
         return 'settled'
     if coverage.get('consumed_id') and not coverage.get('expired_dom'):

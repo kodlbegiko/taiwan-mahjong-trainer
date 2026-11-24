@@ -191,10 +191,15 @@ test('R7.1 full-round Bot difficulties preserve existing public host and checkpo
     assert.equal(initial.botDifficulty,difficulty);
     assert.match(TableView(initial),new RegExp('data-bot-difficulty="'+difficulty+'"'));
     assert.ok(BotDifficultySelect(difficulty).includes('value="'+difficulty+'" selected'));
-    const a=initial.view.legalActions[0];
-    assert.ok(a,'Rules must supply a legal first action');
+    // Opening flowers can belong to another seat. Advance only through the
+    // actual host/controller until Rules publishes the first human LegalAction.
+    const opening=await session.advanceBots({maxActions:128});
+    assert.equal(opening.status,'human-turn','Opening must reach a genuine human turn');
+    const ready=session.snapshot();
+    const a=ready.view.legalActions.find(x=>x.kind==='discard')??ready.view.legalActions.find(x=>x.kind!=='win');
+    assert.ok(a,'Rules must supply a non-terminal human LegalAction');
     const submission={actionId:a.actionId,actorSeat:a.actorSeat,expectedRevision:a.expectedRevision};
-    const before=initial.view.asOfEventSeq;
+    const before=ready.view.asOfEventSeq;
     await assert.rejects(session.submit({...submission,expectedRevision:before+1}),/過期|不合法/);
     assert.equal(session.snapshot().view.asOfEventSeq,before);
     const both=await Promise.allSettled([session.submit(submission),session.submit(submission)]);
@@ -215,7 +220,7 @@ test('R7.1 full-round Bot difficulties preserve existing public host and checkpo
     }
     const progressed=await session.advanceBots({maxActions:128});
     assert.ok(['human-turn','settled'].includes(progressed.status));
-    assert.ok(progressed.actions>0,'difficulty must drive real Bot actions');
+    assert.ok(opening.actions+progressed.actions>0,'difficulty must drive real Bot actions');
     const persisted=session.snapshot();
     const restored=await createFullRoundSession({storage});
     assert.equal(restored.restore(),true);
