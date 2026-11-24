@@ -1,3 +1,4 @@
+import {AUTHORITATIVE_RULE_REF,AUTHORITATIVE_SCORING_VERSION,PRE_SETTLEMENT_CONTRACT} from './settlement-lifecycle.js';
 import { SCHEMA_VERSION, CONTRACT_VERSION } from './tile-constants.js';
 
 const BASE_TILE_SET = {
@@ -104,6 +105,18 @@ Object.assign(robberyProfile.extensions.tw16, {
   verificationStatus: 'experimental',
 });
 PRESETS.push(robberyProfile);
+const authoritativeProfile=JSON.parse(JSON.stringify(robberyProfile));
+Object.assign(authoritativeProfile,AUTHORITATIVE_RULE_REF,{
+  sourceRefs:['docs/rules/R73_SETTLEMENT_CONTRACT.md'],
+  scoringPolicy:{mode:'configured',configRef:AUTHORITATIVE_SCORING_VERSION},
+});
+Object.assign(authoritativeProfile.extensions.tw16,{
+  housePolicyVersion:'tw16-authoritative-scoring/1.0.0',
+  robAddedKongSettlement:'authoritative-single-declarer',
+  settlementEvidenceContractVersion:PRE_SETTLEMENT_CONTRACT,
+  scoringPolicy:AUTHORITATIVE_SCORING_VERSION,
+});
+PRESETS.push(authoritativeProfile);
 
 const isObj = x => x !== null && typeof x === 'object' && !Array.isArray(x);
 function fail(message) { throw new RangeError('Invalid RuleProfile: ' + message); }
@@ -142,9 +155,10 @@ export function validateRuleProfile(p) {
       || !['undefined','configured'].includes(p.scoringPolicy.mode)
       || (p.scoringPolicy.mode === 'configured' && !string(p.scoringPolicy.configRef))) fail('scoringPolicy');
   if (p.extensions !== undefined && !isObj(p.extensions)) fail('extensions');
-  if (['tw16-configurable-table','tw16-single-winner-interception','tw16-rob-added-kong'].includes(p.profileId)) {
+  if (['tw16-configurable-table','tw16-single-winner-interception','tw16-rob-added-kong','tw16-authoritative-scoring'].includes(p.profileId)) {
     const interception=p.profileId==='tw16-single-winner-interception';
-    const robbery=p.profileId==='tw16-rob-added-kong';
+    const authoritative=p.profileId===AUTHORITATIVE_RULE_REF.profileId;
+    const robbery=p.profileId==='tw16-rob-added-kong'||authoritative;
     const x=p.extensions?.tw16;
     if (p.ruleVersion !== (interception||robbery?'experimental-v1':'experimental-full-v1') || p.status !== 'experimental'
         || p.scope !== 'four-player' || !isObj(x)
@@ -153,9 +167,10 @@ export function validateRuleProfile(p) {
         || p.winningPolicy.mode !== 'configured'
         || p.winningPolicy.configRef !== 'tw16-win-five-melds-v1'
         || p.scoringPolicy.mode !== 'configured'
-        || p.scoringPolicy.configRef !== 'tw16-minimal-tai-v1'
+        || p.scoringPolicy.configRef !== (authoritative?AUTHORITATIVE_SCORING_VERSION:'tw16-minimal-tai-v1')
         || x.housePolicyVersion !== (interception
           ? 'tw16-single-winner-interception/1.0.0'
+          : authoritative ? 'tw16-authoritative-scoring/1.0.0'
           : robbery ? 'tw16-rob-added-kong/1.0.0'
           : 'tw16-table-experimental/1.0.0')
         || x.multipleDiscardWins !== (interception?'single-winner':'unsupported')
@@ -179,10 +194,11 @@ export function validateRuleProfile(p) {
         || x.scoringPolicy !== 'tw16-minimal-tai-v1'
         || x.verificationStatus !== 'experimental'))
       fail('interception policy');
-    if (robbery && (x.robAddedKongSettlement !== 'existing-minimal-discard-liability'
+    if (robbery && (x.robAddedKongSettlement !== (authoritative?'authoritative-single-declarer':'existing-minimal-discard-liability')
         || x.robAddedKongPriority !== 'win-only-legacy-multiwinner-fail-closed'
         || x.verificationStatus !== 'experimental'))
       fail('rob-added-kong policy');
+    if(authoritative&&(x.settlementEvidenceContractVersion!==PRE_SETTLEMENT_CONTRACT||x.scoringPolicy!==AUTHORITATIVE_SCORING_VERSION||x.reserveTail!==16))fail('authoritative settlement policy');
   }
   // Verification in this engine is intentionally restricted to the independently
   // regression-tested concealed-hand structure, not local four-player house rules.

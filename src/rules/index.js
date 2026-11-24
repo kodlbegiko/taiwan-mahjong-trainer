@@ -16,3 +16,5 @@ export {
 export { scoreWinningHand, settleWin } from './scoring.js';
 
 export { COMPLETE_ENGINE_VERSION, RuleCapabilityError } from './complete-engine.js';
+
+export {createSettlementRuntime,AUTHORITATIVE_RULE_REF,AUTHORITATIVE_SCORING_REF,AUTHORITATIVE_SCORING_VERSION,PRE_SETTLEMENT_CONTRACT} from './settlement-lifecycle.js';

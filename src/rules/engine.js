@@ -14,7 +14,7 @@ import {
 } from './complete-engine.js';
 const isCompleteRef=ref=>['tw16-configurable-table',
   'tw16-single-winner-interception',
-  'tw16-rob-added-kong'].includes(ref?.profileId);
+  'tw16-rob-added-kong','tw16-authoritative-scoring'].includes(ref?.profileId);
 
 
 const V1 = { schemaVersion: SCHEMA_VERSION, contractVersion: CONTRACT_VERSION };
@@ -86,8 +86,8 @@ export function createGame({
   gameId = 'game-1', seed, profileId = 'tw16-four-player-sandbox',
   ruleVersion = 'experimental-move-v1', dealerSeat = 0, fixtureDeck = null,
   handIndex = 0, previousRoundRef = null, prevailingWind = null,
-} = {}) {
-  if(isCompleteRef({profileId})) return completeCreateGame({gameId,seed,profileId,ruleVersion,dealerSeat,fixtureDeck,handIndex,previousRoundRef,prevailingWind});
+} = {}, {settlementRuntime} = {}) {
+  if(isCompleteRef({profileId})) return completeCreateGame({gameId,seed,profileId,ruleVersion,dealerSeat,fixtureDeck,handIndex,previousRoundRef,prevailingWind},settlementRuntime);
   if (typeof gameId !== 'string' || !/^[A-Za-z0-9_-]+$/.test(gameId)) throw new TypeError('Invalid gameId');
   assertSeat(dealerSeat);
   const profile = getRuleProfile(profileId, ruleVersion);
@@ -174,8 +174,8 @@ export function listLegalActions(state, seat) {
   return [];
 }
 
-export function applyAction(state, submission) {
-  if(isCompleteRef(state?.ruleRef))return completeApplyAction(state,submission);
+export function applyAction(state, submission, {settlementRuntime} = {}) {
+  if(isCompleteRef(state?.ruleRef))return completeApplyAction(state,submission,settlementRuntime);
   validateGameState(state, { replay: false });
   if (!submission || typeof submission !== 'object') throw new TypeError('Action submission required');
   const { actorSeat, actionId, expectedRevision } = submission;
@@ -232,8 +232,8 @@ function publicEvent(event) {
   };
 }
 
-export function createPlayerView(state, seat, eventSeq = state.revision) {
-  if(isCompleteRef(state?.ruleRef))return completeCreatePlayerView(state,seat,eventSeq);
+export function createPlayerView(state, seat, eventSeq = state.revision, {settlementRuntime} = {}) {
+  if(isCompleteRef(state?.ruleRef))return completeCreatePlayerView(state,seat,eventSeq,settlementRuntime);
   assertSeat(seat);
   if (!Number.isInteger(eventSeq) || eventSeq < 1 || eventSeq > state.revision) {
     throw new RangeError('Invalid asOfEventSeq');
@@ -279,8 +279,8 @@ export const projectPlayerView = createPlayerView;
  * Replay cross-checks every event including hidden draw payload and action ID.
  * Events are never applied as trusted state mutations.
  */
-export function replayGame(config) {
-  if(isCompleteRef(config?.ruleRef))return completeReplayGame(config);
+export function replayGame(config, {settlementRuntime} = {}) {
+  if(isCompleteRef(config?.ruleRef))return completeReplayGame(config,settlementRuntime);
   if (!config || !Array.isArray(config.events)) throw new TypeError('Replay events required');
   const seed = config.seed ?? config.rng?.seed;
   const ruleRef = config.ruleRef ?? {};
@@ -310,8 +310,8 @@ export function replayGame(config) {
 }
 
 /** Strict inventory, phase, causality, seat-count and optional replay checks. */
-export function validateGameState(state, { replay = true } = {}) {
-  if(isCompleteRef(state?.ruleRef))return completeValidateGameState(state,{replay});
+export function validateGameState(state, { replay = true,settlementRuntime } = {}) {
+  if(isCompleteRef(state?.ruleRef))return completeValidateGameState(state,{replay,settlementRuntime});
   if (!state || state.schemaVersion !== 1 || state.contractVersion !== CONTRACT_VERSION
       || !Array.isArray(state.players) || state.players.length !== 4
       || !Array.isArray(state.wall) || !Array.isArray(state.events)
@@ -385,7 +385,7 @@ export function validateGameState(state, { replay = true } = {}) {
 }
 
 /** Only the experimental complete profile supports linked next-hand initialization. */
-export function startNextRound(previous,options){
+export function startNextRound(previous,options,{settlementRuntime}={}){
   if(!isCompleteRef(previous?.ruleRef))throw new RangeError('Next-hand API requires explicit experimental complete profile');
-  return completeStartNextRound(previous,options);
+  return completeStartNextRound(previous,options,settlementRuntime);
 }
