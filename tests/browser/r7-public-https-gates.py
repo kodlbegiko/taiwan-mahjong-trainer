@@ -20,7 +20,7 @@ full_round = BASE['full_round']
 require = BASE['require']
 
 def parse_summary(text):
-    outcome = re.search(r'結果：\s*(win|draw)(?=\s|$)', text, re.IGNORECASE | re.MULTILINE)
+    outcome = re.search(r'結果：\s*(win|exhaustive-draw)(?=\s|$)', text, re.IGNORECASE | re.MULTILINE)
     require(outcome is not None, 'No authoritative WIN/DRAW outcome in UI settlement')
     scores = re.search(r'四家分數變化：([^\n]+)', text)
     require(scores is not None, 'Missing scoreDelta in authoritative settlement')
@@ -33,7 +33,7 @@ def parse_summary(text):
     require(sum(vals) == 0, 'Non-zero-sum settlement: ' + str(vals))
     winner = re.search(r'勝方：([^\n]+)', text)
     require(winner is not None, 'Missing public winner status')
-    kind=outcome.group(1).upper()
+    kind='DRAW' if outcome.group(1).lower()=='exhaustive-draw' else 'WIN'
     if kind == 'WIN':
         require(winner.group(1).strip() not in ('流局／無', '無', ''),
                 'WIN must include an actual winner')
