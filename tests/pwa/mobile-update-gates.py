@@ -15,18 +15,80 @@ def require(value, why):
 def shell_names(page):
     return page.evaluate("async () => (await caches.keys()).filter(n => n.startsWith('tmt-shell-'))")
 
+def cache_snapshot(page):
+    return page.evaluate("""async () => {
+      const names=await caches.keys(), entries={};
+      for(const name of names){
+        const cache=await caches.open(name);
+        const requests=await cache.keys();
+        entries[name]=[];
+        for(const request of requests){
+          const response=await cache.match(request);
+          const bytes=await response.arrayBuffer();
+          const hash=await crypto.subtle.digest('SHA-256',bytes);
+          entries[name].push([request.url,Array.from(new Uint8Array(hash), b=>b.toString(16).padStart(2,'0')).join('')]);
+        }
+        entries[name].sort((a,b)=>a[0].localeCompare(b[0]));
+      }
+      return {names,entries,controller:navigator.serviceWorker.controller?.state};
+    }""")
+
+
+def install_observer(page):
+    page.evaluate("""async () => {
+      const reg=await navigator.serviceWorker.getRegistration();
+      window.__r7Events=[];
+      window.__r7OldController=navigator.serviceWorker.controller;
+      reg.addEventListener('updatefound',()=>{
+        const worker=reg.installing;
+        if(!worker)return;
+        const record=()=>{
+          const state=worker.state, at=performance.timeOrigin+performance.now();
+          const item={state,at,controllerUnchanged:navigator.serviceWorker.controller===window.__r7OldController};
+          window.__r7Events.push(item);
+          caches.keys().then(names=>{item.names=names;});
+        };
+        record();worker.addEventListener('statechange',record);
+      });
+    }""")
+
+
+def reject_update(page, peer, before, label, evidence):
+    page.evaluate("""async () => {
+      const reg=await navigator.serviceWorker.getRegistration();
+      await reg.update();
+    }""")
+    # Do not poll for cache deletion: at the failed worker's redundant event,
+    # the install waitUntil transaction must already have cleaned its staging.
+    page.wait_for_function("window.__r7Events.some(e=>e.state==='redundant')", timeout=30000)
+    after=cache_snapshot(page)
+    evidence.append({'case':label,'before':before,'after':after,
+                     'states':page.evaluate('window.__r7Events')})
+    print(label, 'before=', before['names'], 'after=', after['names'], flush=True)
+    require(shell_names(page) == [n for n in before['names'] if n.startswith('tmt-shell-')],
+            'failed update leaked staging cache or removed old cache')
+    require(after['entries']==before['entries'], label+' changed old/unrelated cached bytes')
+    require(page.evaluate('navigator.serviceWorker.controller===window.__r7OldController'),
+            label+' replaced active controller')
+    require(peer.evaluate('navigator.serviceWorker.controller!==null'), 'peer lost controller')
+    require(page.locator('#hand button').count()==17 and peer.locator('#hand button').count()==17,
+            label+' broke an existing tab')
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument('--evidence', type=Path, required=True)
     args = p.parse_args()
     args.evidence.mkdir(parents=True, exist_ok=True)
     results = []
+    lifecycle = []
     with served_site() as (url, app):
         with sync_playwright() as pw:
             browser = pw.chromium.launch(channel='chrome', headless=True, args=['--no-sandbox'])
             context = browser.new_context(viewport={'width': 390, 'height': 844},
                                           is_mobile=True, has_touch=True, service_workers='allow')
             page = context.new_page()
+            context.tracing.start(screenshots=True, snapshots=True, sources=True)
             try:
                 page.goto(url + '?academy=training', wait_until='networkidle')
                 page.evaluate("() => navigator.serviceWorker.ready")
@@ -99,25 +161,39 @@ def main():
                 previous_css = missing.read_bytes()
                 missing.unlink()
                 sw.write_text(original_sw.replace(version, version + '-broken'), encoding='utf-8')
-                # A failed install must not delete the old working cache.
-                page.evaluate("""async () => {
-                  const reg=await navigator.serviceWorker.getRegistration();
-                  window.__r7InstallFailed=false;
-                  reg.addEventListener('updatefound',()=>{
-                    const worker=reg.installing;
-                    worker?.addEventListener('statechange',()=>{
-                      if(worker.state==='redundant') window.__r7InstallFailed=true;
-                    });
-                  }, {once:true});
-                  await reg.update();
-                }""")
-                page.wait_for_function("window.__r7InstallFailed === true", timeout=30000)
+                # Open a second controlled document before the failed update.
+                peer = context.new_page()
+                peer.goto(url + '?academy=training', wait_until='networkidle')
+                peer.wait_for_function('navigator.serviceWorker.controller!==null')
+                page.evaluate("""async()=>{const c=await caches.open('r7-unrelated-cache');await c.put('./unrelated',new Response('keep'));}""")
+                page.evaluate("localStorage.setItem('r7-upgrade-sentinel','preserve-me')")
+                before=cache_snapshot(page)
+                install_observer(page)
+                reject_update(page, peer, before, 'http-404-rollback', lifecycle)
                 require(shell_names(page) == old, 'failed update leaked staging cache or removed old cache')
-                require(page.locator('#hand button').count() == 17,
-                        'failed update broke still-open training')
                 missing.write_bytes(previous_css)
                 results.append({'case': 'broken-release-staging-rollback', 'status': 'PASS'})
                 page.screenshot(path=str(args.evidence / 'old-client-after-broken-update.png'), full_page=True)
+
+                # Same active cache version with changed SW bytes must never
+                # open/overwrite/delete that cache. Inject faults only in served
+                # candidate script (not production source or localStorage).
+                fault_scripts = [
+                    ('reused-version', original_sw + '\n// repeated same cache version\n'),
+                    ('network-disconnect', original_sw.replace(version,version+'-network') +
+                     "\n{const real=fetch;self.fetch=(url,opts)=>String(url).endsWith('/src/academy-ui/academy.css')?Promise.reject(new TypeError('injected network disconnect')):real(url,opts);}\n"),
+                    ('cache-write-failure', original_sw.replace(version,version+'-quota') +
+                     "\n{const put=Cache.prototype.put;let n=0;Cache.prototype.put=function(...args){if(++n===3)return Promise.reject(new DOMException('injected write failure','QuotaExceededError'));return put.apply(this,args);};}\n"),
+                    ('repeat-broken-install', original_sw.replace(version,version+'-broken')+'\n// retry\n'),
+                ]
+                for name, script in fault_scripts:
+                    if name=='repeat-broken-install': missing.unlink()
+                    try:
+                        sw.write_text(script,encoding='utf-8')
+                        reject_update(page, peer, before, name, lifecycle)
+                        results.append({'case':name,'status':'PASS'})
+                    finally:
+                        if not missing.exists(): missing.write_bytes(previous_css)
 
                 core = app / 'src/core/efficiency.js'
                 old_core = core.read_text(encoding='utf-8')
@@ -126,17 +202,22 @@ def main():
                 core.write_text(old_core + '\n// r7-upgrade-js-byte-marker\n', encoding='utf-8')
                 css.write_text(old_css + '\n/* r7-upgrade-css-byte-marker */\n', encoding='utf-8')
                 sw.write_text(original_sw.replace(version, version + '-upgraded'), encoding='utf-8')
-                page.evaluate("""async () => {
-                  const reg=await navigator.serviceWorker.getRegistration();
-                  await reg.update();
-                }""")
+                install_observer(page)
+                page.evaluate("""() => { window.__r7Update = navigator.serviceWorker.getRegistration().then(r=>r.update()); }""")
+                peer.evaluate("""async () => { const r=await navigator.serviceWorker.getRegistration(); await r.update(); }""")
+                page.evaluate('window.__r7Update')
                 page.locator('#update-app:visible').wait_for(timeout=30000)
+                page.wait_for_function("window.__r7Events.some(e=>e.state==='installed')", timeout=30000)
+                lifecycle.append({'case':'successful-staging','before':before,'after':cache_snapshot(page),'states':page.evaluate('window.__r7Events')})
                 # No automatic swap while a page is open. User must opt in.
                 require(shell_names(page) == [old[0], 'tmt-shell-' + version + '-upgraded'],
                         'old/new caches were not staged side by side')
                 with page.expect_navigation(wait_until='domcontentloaded', timeout=30000):
                     page.locator('#update-app').click()
                 page.wait_for_function("navigator.serviceWorker.controller !== null")
+                peer.wait_for_load_state('domcontentloaded')
+                page.wait_for_function("navigator.serviceWorker.controller?.state==='activated'")
+                peer.wait_for_function("navigator.serviceWorker.controller?.state==='activated'")
                 new_names = shell_names(page)
                 require(new_names == ['tmt-shell-' + version + '-upgraded'],
                         f'new release should have only one shell: {new_names}')
@@ -148,6 +229,9 @@ def main():
                   return {js:core.includes('r7-upgrade-js-byte-marker'),
                           css:css.includes('r7-upgrade-css-byte-marker')};
                 }""")
+                require(page.evaluate("localStorage.getItem('r7-upgrade-sentinel')")=='preserve-me', 'localStorage lost during upgrade')
+                require(peer.locator('#hand button').count()==17, 'peer unusable after activation')
+                lifecycle.append({'case':'successful-activation','after':cache_snapshot(page),'peer':cache_snapshot(peer)})
                 require(latest['js'] and latest['css'], 'new JS/CSS not cached together')
                 require(page.locator('#hand button').count() == 17, 'post-upgrade app unusable')
                 results.append({'case': 'explicit-upgrade-atomic-js-css', 'status': 'PASS'})
@@ -160,6 +244,8 @@ def main():
                 (args.evidence / 'upgrade-results.json').write_text(json.dumps({
                     'engine': 'Chromium Playwright', 'real-installed-ios-android': 'NOT_RUN',
                     'results': results}, ensure_ascii=False, indent=2), encoding='utf-8')
+                (args.evidence / 'cache-lifecycle.json').write_text(json.dumps(lifecycle,indent=2),encoding='utf-8')
+                context.tracing.stop(path=str(args.evidence / 'pwa-update.trace.zip'))
                 context.close()
                 browser.close()
 

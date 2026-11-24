@@ -51,7 +51,7 @@ jobs:
           path: r7-graph
 
   combined-candidate:
-    # Snapshot of separately owned R7.1 PRs. This job never pushes or resolves conflicts.
+    # Pinned R7.2 application + PR50-owned R7.3 fix; no push or engine edits.
     if: github.event_name == 'pull_request' && github.event.pull_request.number == 50
     runs-on: ubuntu-24.04
     timeout-minutes: 35
@@ -76,18 +76,31 @@ jobs:
           git rev-parse HEAD > r7-combined-evidence/pr50-sha.txt
           git config user.name "R7 integration QA"
           git config user.email "r7-qa@example.invalid"
-          for pair in '46:797b7c8849529701aa3496ba500e37a8a6b25b5b' '47:d411cfcb6c7ddbd687d38be27ab041cabcaed8ea' '48:bb89c5ccd1aadeecfe2864cdfd0e48dd31961260' '49:d471f020d673de0e8916ae44b83b8d4a1db0aa04' '51:ff27c52526acfdf5fb905b4dd72a229289b8d734' '52:7a63b1e2fba602b9f92963cee62e601bbfcb4c8b'; do
-            pr="${pair%%:*}"; sha="${pair#*:}"
-            echo "$pr $sha" | tee -a r7-combined-evidence/pinned-prs.txt
-            git cat-file -e "$sha^{commit}" || git fetch --no-tags origin "$sha"
-            if ! git merge --no-ff --no-edit "$sha"; then
-              git status --short > r7-combined-evidence/merge-conflicts.txt
-              exit 1
-            fi
-          done
+          fix_sha=$(git rev-parse HEAD)
+          integrated=793bbb1caeef79b94e0bb29bf2ea66b3f7c43f4d
+          git cat-file -e "$integrated^{commit}" || git fetch --no-tags origin "$integrated"
+          git checkout --detach "$integrated"
+          # Apply only SW/test/contract changes from this PR; preserve R7.2 game code.
+          git checkout "$fix_sha" -- scripts/runtime-precache.mjs tests/pwa/mobile-update-gates.py tests/pwa/sw-transaction.test.js
+          # SW is owned by PR50; restore its implementation, then regenerate the
+          # complete integrated inventory/version from the actual composed tree.
+          git checkout "$fix_sha" -- sw.js
+          git add sw.js scripts/runtime-precache.mjs tests/pwa
+          git commit -m "R7.3 isolated transaction candidate"
           git rev-parse HEAD > r7-combined-evidence/composed-source-sha.txt
           node scripts/runtime-precache.mjs --write > r7-combined-evidence/runtime-graph.json
           node scripts/runtime-precache.mjs > /dev/null
+          node --test tests/pwa/sw-transaction.test.js
+          # R7-008 negative probe on actual integrated source (not a missing file).
+          cp src/app.js "$RUNNER_TEMP/r7-app-original.js"
+          trap 'cp "$RUNNER_TEMP/r7-app-original.js" src/app.js' EXIT
+          printf '\nimport "./academy/content-audit.js";\n' >> src/app.js
+          if node scripts/runtime-precache.mjs > r7-combined-evidence/qa-import-negative-probe.txt 2>&1; then
+            echo "QA-only runtime import passed" >&2; exit 1
+          fi
+          grep -q 'needs uncached/missing src/academy/content-audit.js' r7-combined-evidence/qa-import-negative-probe.txt
+          cp "$RUNNER_TEMP/r7-app-original.js" src/app.js
+          trap - EXIT
           cp sw.js r7-combined-evidence/generated-sw.txt
           git hash-object sw.js > r7-combined-evidence/generated-sw-blob.txt
       - name: Candidate viewport and accessibility regression

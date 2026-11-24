@@ -13,6 +13,7 @@ on:
       - 'public/manifest.webmanifest'
       - 'tests/browser/mobile-pwa-a11y-gates.py'
       - 'tests/pwa/mobile-update-gates.py'
+      - 'tests/pwa/sw-transaction.test.js'
       - 'docs/quality/R7_MOBILE_PWA_A11Y.md'
       - 'scripts/runtime-precache.mjs'
       - '.github/workflows/r7-runtime-precache.yml'
@@ -38,12 +39,14 @@ jobs:
           git fetch origin integration/mahjong-full-game
           while IFS= read -r file; do
             case "$file" in
-              index.html|style.css|sw.js|public/manifest.webmanifest|src/table-ui/table.css|src/table-ui/view.js|src/table-ui/a11y.js|tests/browser/mobile-pwa-a11y-gates.py|tests/pwa/mobile-update-gates.py|docs/quality/R7_MOBILE_PWA_A11Y.md|.github/workflows/r7-mobile-pwa-a11y.yml|scripts/runtime-precache.mjs|.github/workflows/r7-runtime-precache.yml) ;;
+              index.html|style.css|sw.js|public/manifest.webmanifest|src/table-ui/table.css|src/table-ui/view.js|src/table-ui/a11y.js|tests/browser/mobile-pwa-a11y-gates.py|tests/pwa/mobile-update-gates.py|tests/pwa/sw-transaction.test.js|docs/quality/R7_MOBILE_PWA_A11Y.md|.github/workflows/r7-mobile-pwa-a11y.yml|scripts/runtime-precache.mjs|.github/workflows/r7-runtime-precache.yml) ;;
               *) echo "::error::Out-of-scope file changed: $file"; exit 1 ;;
             esac
           done < <(git diff --name-only origin/integration/mahjong-full-game...HEAD)
       - name: Fast SVG and Service Worker compatibility contract
         run: node --test tests/tile-assets-integrity.test.js
+      - name: R7-010 deterministic transaction fault injection
+        run: node --test tests/pwa/sw-transaction.test.js
       - name: Run existing Node and compatibility regressions
         run: npm run check
   browser-pwa:
