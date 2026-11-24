@@ -79,7 +79,7 @@ export function settleWinningHand(profile,evidence){
 export function settleExhaustiveDraw(profile){
   validateScoringProfile(profile);
   const fees=profile.settlement.fee.mode==='none'?[]:
-    [0,1,2,3].map(seat=>({seat,points:profile.settlement.fee.points,
+    [0,1,2,3].map(seat=>({seat,points:canonical(profile.settlement.fee.points),
       reason:'independently-configured-table-fee'}));
   const result={contractVersion:SCORING_CONTRACT,
     scoringVersion:profile.profileId+'@'+profile.version,
