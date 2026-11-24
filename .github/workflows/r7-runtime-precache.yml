@@ -44,6 +44,23 @@ jobs:
           fi
           grep -q 'Runtime JS inventory differs' r7-graph/negative-probe.txt
           echo "PASS: uncached runtime module rejected" >> r7-graph/negative-probe.txt
+      - name: Prove a runtime import of a QA-only module fails the gate
+        run: |
+          set -euo pipefail
+          entry=src/app.js
+          qa=src/academy/content-audit.js
+          cp "$entry" "$RUNNER_TEMP/r7-app-original.js"
+          created=0
+          if test ! -f "$qa"; then
+            printf 'export const qaOnly = true;\n' > "$qa"
+            created=1
+          fi
+          trap 'cp "$RUNNER_TEMP/r7-app-original.js" "$entry"; if test "$created" = 1; then rm -f "$qa"; fi' EXIT
+          printf '\nimport "./academy/content-audit.js";\n' >> "$entry"
+          if node scripts/runtime-precache.mjs > r7-graph/qa-import-negative-probe.txt 2>&1; then
+            echo "QA-only runtime import incorrectly passed" >&2; exit 1
+          fi
+          grep -q 'needs uncached/missing src/academy/content-audit.js' r7-graph/qa-import-negative-probe.txt
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -68,7 +85,7 @@ jobs:
           python-version: '3.12'
       - run: npm install --no-save --package-lock=false --ignore-scripts acorn@8.15.0
       - run: python -m pip install playwright==1.56.0
-      - name: Compose pinned candidate in runner only; fail on any merge conflict
+      - name: Compose exact R7.2 base and PR50 owned transaction fix in runner only
         id: compose
         run: |
           set -euo pipefail
@@ -86,9 +103,10 @@ jobs:
           # complete integrated inventory/version from the actual composed tree.
           git checkout "$fix_sha" -- sw.js
           git add sw.js scripts/runtime-precache.mjs tests/pwa
+          node scripts/runtime-precache.mjs --write > r7-combined-evidence/runtime-graph.json
+          git add sw.js
           git commit -m "R7.3 isolated transaction candidate"
           git rev-parse HEAD > r7-combined-evidence/composed-source-sha.txt
-          node scripts/runtime-precache.mjs --write > r7-combined-evidence/runtime-graph.json
           node scripts/runtime-precache.mjs > /dev/null
           node --test tests/pwa/sw-transaction.test.js
           # R7-008 negative probe on actual integrated source (not a missing file).
@@ -108,7 +126,7 @@ jobs:
         run: python tests/browser/mobile-pwa-a11y-gates.py --evidence r7-combined-evidence/viewport
       - name: Candidate PWA cold start and update rollback
         if: always() && steps.compose.outcome == 'success'
-        run: python tests/pwa/mobile-update-gates.py --evidence r7-combined-evidence/pwa
+        run: PHASE3_REQUIRE_SINGLE_WINNER=1 python tests/pwa/mobile-update-gates.py --with-game-history --evidence r7-combined-evidence/pwa
       - name: Candidate full round, settlement, Replay, Daily and offline reload
         if: always() && steps.compose.outcome == 'success'
         run: PHASE3_REQUIRE_SINGLE_WINNER=1 python tests/browser/full-table-ui-r3-gates.py --screenshots r7-combined-evidence/full-match

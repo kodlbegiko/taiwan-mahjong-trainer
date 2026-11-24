@@ -70,6 +70,18 @@ jobs:
           google-chrome --version > r7-mobile-evidence/browser-version.txt
       - name: Six viewports, landscape, keyboard and legacy contract
         run: python tests/browser/mobile-pwa-a11y-gates.py --evidence r7-mobile-evidence
+      - name: Diagnose original historical rollback with lifecycle snapshots
+        if: always()
+        run: |
+          git fetch --no-tags origin d02eb508a0c302997f5e10a4eaf01c85bf0e6fb7
+          git show d02eb508a0c302997f5e10a4eaf01c85bf0e6fb7:sw.js > "$RUNNER_TEMP/r7-original-sw.js"
+          mkdir -p r7-mobile-evidence/baseline
+          set +e
+          python tests/pwa/mobile-update-gates.py --baseline-sw "$RUNNER_TEMP/r7-original-sw.js" --evidence r7-mobile-evidence/baseline
+          status=$?
+          set -e
+          echo "$status" > r7-mobile-evidence/baseline/exit-code.txt
+          # Historical diagnostic is not the fixed-version acceptance gate.
       - name: Cold offline, broken update rollback and explicit upgrade
         if: always()
         run: python tests/pwa/mobile-update-gates.py --evidence r7-mobile-evidence

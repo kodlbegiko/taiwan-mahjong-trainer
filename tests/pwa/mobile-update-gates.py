@@ -1,5 +1,6 @@
 """R7 PWA upgrade regression: offline cold start, failed staging and old/new shell coherence."""
 import argparse
+import importlib.util
 import json
 import re
 import sys
@@ -37,9 +38,10 @@ def cache_snapshot(page):
 def install_observer(page):
     page.evaluate("""async () => {
       const reg=await navigator.serviceWorker.getRegistration();
+      if(window.__r7Observer)reg.removeEventListener('updatefound',window.__r7Observer);
       window.__r7Events=[];
       window.__r7OldController=navigator.serviceWorker.controller;
-      reg.addEventListener('updatefound',()=>{
+      window.__r7Observer=()=>{
         const worker=reg.installing;
         if(!worker)return;
         const record=()=>{
@@ -49,11 +51,13 @@ def install_observer(page):
           caches.keys().then(names=>{item.names=names;});
         };
         record();worker.addEventListener('statechange',record);
-      });
+      };
+      reg.addEventListener('updatefound',window.__r7Observer);
     }""")
 
 
 def reject_update(page, peer, before, label, evidence):
+    install_observer(page)
     page.evaluate("""async () => {
       const reg=await navigator.serviceWorker.getRegistration();
       await reg.update();
@@ -61,11 +65,13 @@ def reject_update(page, peer, before, label, evidence):
     # Do not poll for cache deletion: at the failed worker's redundant event,
     # the install waitUntil transaction must already have cleaned its staging.
     page.wait_for_function("window.__r7Events.some(e=>e.state==='redundant')", timeout=30000)
+    # Capture names immediately at redundant, before expensive hashing.
+    immediate_names=shell_names(page)
     after=cache_snapshot(page)
-    evidence.append({'case':label,'before':before,'after':after,
+    evidence.append({'case':label,'before':before,'after':after,'immediateNames':immediate_names,
                      'states':page.evaluate('window.__r7Events')})
     print(label, 'before=', before['names'], 'after=', after['names'], flush=True)
-    require(shell_names(page) == [n for n in before['names'] if n.startswith('tmt-shell-')],
+    require(immediate_names == [n for n in before['names'] if n.startswith('tmt-shell-')],
             'failed update leaked staging cache or removed old cache')
     require(after['entries']==before['entries'], label+' changed old/unrelated cached bytes')
     require(page.evaluate('navigator.serviceWorker.controller===window.__r7OldController'),
@@ -75,20 +81,62 @@ def reject_update(page, peer, before, label, evidence):
             label+' broke an existing tab')
 
 
+def history_snapshot(page):
+    # Evidence contains record IDs and hashes, not raw concealed hands or private answers.
+    return page.evaluate("""async () => {
+      const out={};
+      for(const key of Object.keys(localStorage).sort()){
+        if(key==='tw-mahjong-master-academy:full-table:r3:v1' ||
+           key.startsWith('tw-mahjong-replay:')){
+          const raw=localStorage.getItem(key);
+          const hash=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(raw));
+          out[key]=Array.from(new Uint8Array(hash),b=>b.toString(16).padStart(2,'0')).join('');
+        }
+      }
+      const archive=JSON.parse(localStorage.getItem('tw-mahjong-trainer:archive:v3')||'{}');
+      const sidecar=JSON.parse(localStorage.getItem('tw-mahjong-master-academy:state:v1')||'{}');
+      return {hashes:out,canonical:(archive.records||[]).map(r=>r.id),
+        links:(sidecar.provenanceLinks||[]).map(r=>r.recordRef?.id),
+        sessions:(sidecar.trainingSessions||[]).flatMap(s=>(s.recordRefs||[]).map(r=>r.id))};
+    }""")
+
+
+def seed_real_history(page, folder):
+    folder.mkdir(parents=True,exist_ok=True)
+    spec=importlib.util.spec_from_file_location('r7_real_game',Path(__file__).resolve().parents[1]/'browser'/'full-table-ui-r3-gates.py')
+    module=importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    module.full_round(page,folder)
+    module.daily_roundtrip(page,folder)
+    snapshot=history_snapshot(page)
+    require('tw-mahjong-master-academy:full-table:r3:v1' in snapshot['hashes'], 'real saved game missing')
+    require(any(k.startswith('tw-mahjong-replay:archive:v1:') for k in snapshot['hashes']), 'real Replay archive missing')
+    require(bool(snapshot['canonical'] and snapshot['links'] and snapshot['sessions']), 'real Daily record missing')
+    return snapshot
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument('--evidence', type=Path, required=True)
+    p.add_argument('--baseline-sw', type=Path, help='Historical rollback diagnostic only')
+    p.add_argument('--with-game-history', action='store_true', help='Integrated real game + Daily data before update')
     args = p.parse_args()
     args.evidence.mkdir(parents=True, exist_ok=True)
     results = []
     lifecycle = []
+    cdp_events = []
     with served_site() as (url, app):
+        if args.baseline_sw:
+            (app / 'sw.js').write_bytes(args.baseline_sw.read_bytes())
         with sync_playwright() as pw:
             browser = pw.chromium.launch(channel='chrome', headless=True, args=['--no-sandbox'])
             context = browser.new_context(viewport={'width': 390, 'height': 844},
                                           is_mobile=True, has_touch=True, service_workers='allow')
             page = context.new_page()
             context.tracing.start(screenshots=True, snapshots=True, sources=True)
+            session = context.new_cdp_session(page)
+            session.on('ServiceWorker.workerVersionUpdated', lambda event: cdp_events.append(event))
+            session.send('ServiceWorker.enable')
             try:
                 page.goto(url + '?academy=training', wait_until='networkidle')
                 page.evaluate("() => navigator.serviceWorker.ready")
@@ -159,21 +207,27 @@ def main():
                 require(match, 'SW version marker not found')
                 version = match.group(1)
                 previous_css = missing.read_bytes()
-                missing.unlink()
-                sw.write_text(original_sw.replace(version, version + '-broken'), encoding='utf-8')
-                # Open a second controlled document before the failed update.
+                # Seed actual historical game/Replay/Daily before any update (candidate only).
+                game_before = None
+                if args.with_game_history:
+                    game_before=seed_real_history(page,args.evidence / 'history-before')
+                    page.goto(url + '?academy=training',wait_until='networkidle')
+                # Open a second controlled document before publishing the failed update.
                 peer = context.new_page()
                 peer.goto(url + '?academy=training', wait_until='networkidle')
                 peer.wait_for_function('navigator.serviceWorker.controller!==null')
                 page.evaluate("""async()=>{const c=await caches.open('r7-unrelated-cache');await c.put('./unrelated',new Response('keep'));}""")
                 page.evaluate("localStorage.setItem('r7-upgrade-sentinel','preserve-me')")
                 before=cache_snapshot(page)
-                install_observer(page)
+                missing.unlink()
+                sw.write_text(original_sw.replace(version, version + '-broken'), encoding='utf-8')
                 reject_update(page, peer, before, 'http-404-rollback', lifecycle)
                 require(shell_names(page) == old, 'failed update leaked staging cache or removed old cache')
                 missing.write_bytes(previous_css)
                 results.append({'case': 'broken-release-staging-rollback', 'status': 'PASS'})
                 page.screenshot(path=str(args.evidence / 'old-client-after-broken-update.png'), full_page=True)
+                if args.baseline_sw:
+                    return
 
                 # Same active cache version with changed SW bytes must never
                 # open/overwrite/delete that cache. Inject faults only in served
@@ -212,8 +266,9 @@ def main():
                 # No automatic swap while a page is open. User must opt in.
                 require(shell_names(page) == [old[0], 'tmt-shell-' + version + '-upgraded'],
                         'old/new caches were not staged side by side')
-                with page.expect_navigation(wait_until='domcontentloaded', timeout=30000):
-                    page.locator('#update-app').click()
+                with peer.expect_navigation(wait_until='domcontentloaded', timeout=30000):
+                    with page.expect_navigation(wait_until='domcontentloaded', timeout=30000):
+                        page.locator('#update-app').click()
                 page.wait_for_function("navigator.serviceWorker.controller !== null")
                 peer.wait_for_load_state('domcontentloaded')
                 page.wait_for_function("navigator.serviceWorker.controller?.state==='activated'")
@@ -230,12 +285,31 @@ def main():
                           css:css.includes('r7-upgrade-css-byte-marker')};
                 }""")
                 require(page.evaluate("localStorage.getItem('r7-upgrade-sentinel')")=='preserve-me', 'localStorage lost during upgrade')
+                peer.locator('#hand button').first.wait_for()
+                page.locator('#hand button').first.wait_for()
                 require(peer.locator('#hand button').count()==17, 'peer unusable after activation')
+                require(page.evaluate("async()=>!!(await caches.match(new URL('./unrelated',location.href),{cacheName:'r7-unrelated-cache'}))"), 'unrelated cache lost during activation')
                 lifecycle.append({'case':'successful-activation','after':cache_snapshot(page),'peer':cache_snapshot(peer)})
                 require(latest['js'] and latest['css'], 'new JS/CSS not cached together')
                 require(page.locator('#hand button').count() == 17, 'post-upgrade app unusable')
                 results.append({'case': 'explicit-upgrade-atomic-js-css', 'status': 'PASS'})
                 page.screenshot(path=str(args.evidence / 'upgraded-new-client.png'), full_page=True)
+                if game_before is not None:
+                    context.set_offline(True)
+                    page.locator('[data-table-nav="play"]').click()
+                    page.locator('.table-round-summary').wait_for()
+                    page.locator('[data-table-nav="replay"]').click()
+                    page.locator('.table-replay').wait_for()
+                    page.locator('[data-table-nav="daily"]').click()
+                    page.wait_for_function("() => document.body.dataset.tableView==='daily' && !!document.querySelector('#full-table-root [data-daily-start],#full-table-root [data-daily-resume],#full-table-root [data-daily-submit]')")
+                    game_after=history_snapshot(page)
+                    lifecycle.append({'case':'real-game-replay-daily-after-upgrade','before':game_before,'after':game_after})
+                    require(game_after['hashes']==game_before['hashes'],'historical game/Replay bytes changed after update')
+                    for key in ('canonical','links','sessions'):
+                        require(set(game_before[key]).issubset(game_after[key]), 'Daily history lost '+key)
+                    results.append({'case':'real-game-replay-daily-after-upgrade','status':'PASS'})
+                    page.screenshot(path=str(args.evidence / 'daily-after-offline-upgrade.png'),full_page=True)
+                    context.set_offline(False)
             except Exception as e:
                 results.append({'case': 'failure', 'status': 'FAIL', 'reason': str(e)})
                 page.screenshot(path=str(args.evidence / 'pwa-failure.png'), full_page=True)
@@ -245,6 +319,7 @@ def main():
                     'engine': 'Chromium Playwright', 'real-installed-ios-android': 'NOT_RUN',
                     'results': results}, ensure_ascii=False, indent=2), encoding='utf-8')
                 (args.evidence / 'cache-lifecycle.json').write_text(json.dumps(lifecycle,indent=2),encoding='utf-8')
+                (args.evidence / 'cdp-worker-lifecycle.json').write_text(json.dumps(cdp_events,indent=2),encoding='utf-8')
                 context.tracing.stop(path=str(args.evidence / 'pwa-update.trace.zip'))
                 context.close()
                 browser.close()
