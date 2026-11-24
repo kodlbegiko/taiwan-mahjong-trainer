@@ -118,7 +118,7 @@ test('wrong choices, mutated answer and unknown contract versions fail closed',(
 });
 
 test('scenario cannot use v3 and cannot score without verified Rules/Strategy fixtures',()=>{
- assert.equal(VERIFIED_SCENARIO_SCORER_COUNT,0);
+ assert.equal(VERIFIED_SCENARIO_SCORER_COUNT,5);
  const ex=createExercise({seed:'scenario-deny',index:0,taskType:'discard',level:'beginner'});
  ex.taskType='scenario';
  assert.throws(()=>createDecisionRecord(ex,0,{durationMs:1,timestamp:'2026-11-19T01:00:00.000Z'}),/未知題型/);

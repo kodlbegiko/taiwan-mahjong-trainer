@@ -41,7 +41,8 @@ test('L-01: real 20 lessons/100 seed-versioned QuestionPublic; no private answer
   assert.equal(f.getLessons().length,20);
   assert.equal(f.getQuestionRefs().length,100);
   assert.equal(f.capabilities.durableAcademyProvenance,true);
-  assert.equal(f.capabilities.verifiedScenarioScorer,false);
+  assert.equal(f.capabilities.verifiedScenarioScorer,true);
+  assert.equal(f.getScenarioQuestionRefs().length,5);
   const ref=f.getQuestionRefs()[0],q=f.getPublicQuestion(ref);
   assert.equal(q.questionId,ref.questionId);
   assert.equal(q.status,'validated');
