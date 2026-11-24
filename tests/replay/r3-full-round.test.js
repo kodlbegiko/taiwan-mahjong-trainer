@@ -88,6 +88,10 @@ test('R3 self-win+settlement is one atomic decision; owner historical and opted-
   assert.equal(d.endEventSeq,3);
   assert.deepEqual(api.getPlayerDecision(manifest.replayId,3),d);
   const analysis=api.getDecisionAnalysis(manifest.replayId,2);
+  assert.deepEqual(api.getDecisionAnalysis(manifest.replayId,3),analysis,
+    'start and end of one atomic action must have identical coaching provenance');
+  assert.equal(analysis.eventSeq,2);
+  assert.equal(analysis.sourceViewRef.asOfEventSeq,1);
   assert.equal(analysis.analysisStatus,'advisory-legal-only');
   assert.equal(analysis.officialScorerVerified,false);
   assert.equal(analysis.epistemic.winRate,'unknown');
@@ -266,4 +270,30 @@ test('R3 incomplete draw / all claim-pass / arbitrary boundary frames and no fut
   assert.equal(JSON.stringify(api.listReplays()).includes(s.rng.seed),false);
   assert.equal(JSON.stringify(end).includes('fixtureDeck'),false);
   assert.deepEqual(api.getReplayFrame(manifest.replayId,5),api.getReplayFrame(manifest.replayId,5));
+});
+
+test('R7.4 review and coaching use one verified storage snapshot and preserve original bytes',()=>{
+  const initial=fixed({},'single-snapshot'),end=act(initial,0,'discard');
+  const map=new Map();
+  let reads=0;
+  const storage={getItem(key){if(key.startsWith('tw-mahjong-replay:archive:v1:'))reads++;return map.get(key)??null;},
+    setItem(key,value){map.set(key,String(value));}};
+  const api=createReplayService({storage}),manifest=api.saveReplay(end,{ownerSeat:0});
+  const key='tw-mahjong-replay:archive:v1:'+manifest.replayId,original=map.get(key);
+  const decision=api.getPlayerDecision(manifest.replayId,2);
+  reads=0;
+  const scenario=api.createReviewQuestion(manifest.replayId,decision.endEventSeq);
+  assert.equal(reads,1,'review must not read a second potentially changed archive');
+  assert.equal(scenario.source.eventSeq,decision.eventSeq);
+  assert.equal(scenario.prompt.playerView.asOfEventSeq,decision.beforeEventSeq);
+  assert.equal(scenario.prompt.playerView.viewId,decision.sourceViewRef.viewId);
+  assert.equal(scenario.status,'unscorable');
+  assert.equal(scenario.canRecordOfficialAnswer,false);
+  reads=0;
+  api.listCoachingFindings(manifest.replayId);
+  assert.equal(reads,1,'coaching must use one verified snapshot');
+  assert.equal(map.get(key),original);
+  map.set(key,original.slice(0,-1));
+  assert.throws(()=>api.createReviewQuestion(manifest.replayId,decision.endEventSeq),
+    e=>e instanceof ReplayError&&e.code==='CORRUPT_REPLAY');
 });

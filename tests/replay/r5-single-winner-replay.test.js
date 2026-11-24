@@ -90,6 +90,22 @@ test('R5 Replay: claim-window WIN/WIN/PASS is atomic, deterministic, privately s
   assert.equal(post.postgameDisclosure.allowedForDecisionScoring,false);
   assert.equal(JSON.stringify(post).includes(GOLDEN.seed),false);
   assert.equal(JSON.stringify(post).includes('selectedClaimActionId'),false);
+  // Every viewer gets only its own canonical final hand, including when
+  // public WIN has an arbitration DTO unsupported by Strategy V1.
+  for(const ownerSeat of [0,1,2,3]){
+    const api=createReplayService({storage:new Map()});
+    const meta=api.saveReplay(final,{ownerSeat,disclosurePolicy:'settled-public-only'});
+    const frame=api.getReplayFrame(meta.replayId,165,{viewerSeat:ownerSeat});
+    assert.deepEqual(frame.playerView,createPlayerView(final,ownerSeat,165));
+    assert.equal(frame.publicEvent.type,'settle');
+    assert.deepEqual(frame.playerView.legalActions,[]);
+    assert.equal(frame.postgameDisclosure,null);
+    assert.ok(frame.playerView.opponents.every(p=>!Object.hasOwn(p,'concealed')));
+    assert.equal(frame.playerView.publicEvents.filter(e=>e.payload.claimResolution).length,1);
+    const terminalPost=api.getReplayFrame(meta.replayId,165,{viewerSeat:ownerSeat,perspective:'postgame'});
+    assert.deepEqual(terminalPost.playerView,frame.playerView);
+    assert.deepEqual(terminalPost.postgameDisclosure.outcome.delta,[0,0,-100,100]);
+  }
   assert.throws(()=>replay.getReplayFrame(manifest.replayId,165,{viewerSeat:0}),
     e=>e instanceof ReplayError && e.code==='VIEW_FORBIDDEN');
   const raw=JSON.parse(storage.get('tw-mahjong-replay:archive:v1:'+manifest.replayId));
