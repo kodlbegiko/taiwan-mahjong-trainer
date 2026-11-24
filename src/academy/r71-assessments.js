@@ -321,7 +321,7 @@ export function getR71Coverage(){
 /** Versioned teaching material supplement; preserves Lesson@1.0.0 identity.
  * Intended for a future instructor-reviewed lesson player, not new credits. */
 const lessonTeaching=[
- ['l1-01','先依牌碼分出萬、筒、索、字牌，再以牌碼除以花色範圍辨識點數；實體副本編號不影響牌種。','先辨識一張公開棄牌，再練習轉換同牌種不同副本；不要把牌碼當點數。'],
+ ['l1-01','先依牌碼分出萬、筒、索、字牌，數牌以整除 9 判斷花色、餘數加 1 判斷點數；實體副本編號不影響牌種。','先辨識一張公開棄牌，再練習轉換同牌種不同副本；不要把牌碼當點數。'],
  ['l1-02','順子須同花色連續三張，刻子須三張同牌，將眼須兩張同牌。公開吃牌後可見固定順子。','先分辨完整組合與搭子；字牌不可組順子，將眼不能當面子。'],
  ['l1-03','台灣十六張封閉標準形在和牌時包含五面子與一將眼；一般摸牌後十七張，未摸前十六張。','數有效面子與暗牌張數；槓以一個固定面子處理，不把多出的一張當普通暗牌。'],
  ['l1-04','標準和牌是全手結構命題；某張牌完成一個搭子，不代表整手已和。','先核對十六張手牌，枚舉候選新牌，再檢查整體結構。'],
@@ -354,4 +354,38 @@ export function getR71LessonPlan(lessonId){
     teachingZhTW:row[1],practiceZhTW:row[2],
     questionRefs:listR71QuestionRefs({lessonId}),
     completionPolicy:'no-official-credit-until-independent-review-and-record-contract'};
+}
+
+/**
+ * Instructor-only handoff to the existing AcademyDecisionRecord V1 registry.
+ * Only actual Rules-issued legal actions qualify for this record family;
+ * knowledge-choice questions require a separately agreed record contract.
+ * This bundle is deliberately not registered and cannot award official credit.
+ */
+export function buildR71ScenarioReviewBundle(ref){
+  const x=internal(ref);
+  if(x.kind!=='legal-action')throw new RangeError('Knowledge-choice is not a LegalAction record');
+  const q=getR71Question(ref),v=x.view;
+  const sourceViewRef={gameId:v.gameId,viewId:v.viewId,asOfEventSeq:v.asOfEventSeq,audienceSeat:v.audienceSeat};
+  const fixtureId='r71-review:'+q.questionId+'@'+q.questionVersion;
+  const legalActionIds=q.options.map(o=>o.id);
+  if(legalActionIds.some(id=>!v.legalActions.some(a=>a.actionId===id)))throw new RangeError('Non-Rules action');
+  const results=Object.fromEntries(legalActionIds.map(id=>[id,{
+    grade:x.accepted.includes(id)?'perfect':'improve',score:x.accepted.includes(id)?1:0,errorTypeIds:[] }]));
+  return {
+    question:{...V,questionId:q.questionId,questionVersion:q.questionVersion,lessonRef:clone(q.lessonRef),
+      taskType:'scenario',status:'draft',ruleRef:clone(v.ruleRef),skillTagIds:[q.targetSkillTagId],
+      source:{kind:'player-view-snapshot',snapshotRef:v.viewId},generator:{fixtureId,generatorVersion:R71_ASSESSMENT_VERSION},
+      prompt:{playerView:clone(v),options:legalActionIds,promptZhTW:q.promptZhTW},
+      answerKey:{scorerId:R71_SCORER_ID,scoringVersion:R71_ASSESSMENT_VERSION,
+        correctnessBasis:'unverified',acceptedActionIds:[...x.accepted]}},
+    fixture:{fixtureId,questionId:q.questionId,questionVersion:q.questionVersion,
+      ruleRef:clone(v.ruleRef),sourceViewRef,engineVersion:COMPLETE_ENGINE_VERSION,
+      scorerId:R71_SCORER_ID,scoringVersion:R71_ASSESSMENT_VERSION,
+      verified:false,basis:'unverified',skillTagIds:[q.targetSkillTagId],
+      legalActionIds,results},
+    reviewPolicy:{scope:q.scope,reasonZhTW:x.reason,observations:clone(x.observations),
+      releaseRequirements:['independent-rules-and-scorer-review','versioned-answer-snapshot-digest',
+        'contract-owner-approval','adaptive-ui-and-offline-gates'],officialCredit:false}
+  };
 }
