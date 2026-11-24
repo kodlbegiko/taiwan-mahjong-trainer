@@ -99,3 +99,20 @@ https://github.com/kodlbegiko/taiwan-mahjong-trainer/blob/feat/r7-rules-complete
 The proposed \`tw16-scoring-facts/1.0.0-proposal\` DTO is **not** a Rules
 emitted event. Its \`publicEventContractVersion\` is a host-provided
 negotiated fact, never something trusted from UI or a user-supplied payload.
+
+
+### R7.1 complete responder evidence (adversarial gate)
+
+Robbery settlement requires **exactly three** versioned raw `seat-private`
+responses (the three distinct non-declarer seats), all linked to the same
+`proposalEventId` after the proposal and before public WIN/SETTLE.
+Exactly one is `claim` with
+`payload:{kind:'win',claimEventId:proposalEventId,tileIds:[tileId]}`;
+the other two are `pass` with
+`payload:{kind:'pass',claimEventId:proposalEventId}` (no tileIds).
+Missing PASS, repeated responder seat, wrong tile ID, non-private reply,
+or unexpected extra reply fails closed. A lone correct WIN never settles
+even if all terminal markers match. Rules owns legal action issuance and replay.
+
+The Scoring Golden fixture and adversarial mutations exercise this contract.
+Joint Rules #51 + Replay #46 testing is still a separate acceptance gate.
