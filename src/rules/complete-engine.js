@@ -12,7 +12,7 @@ import {calculateShanten} from '../core/efficiency.js';
 import {settleWin, scoreWinningHand} from './scoring.js';
 import {AUTHORITATIVE_RULE_REF,AUTHORITATIVE_SCORING_REF,AUTHORITATIVE_SCORING_VERSION,
   PRE_SETTLEMENT_CONTRACT,isAuthoritativeRule,hasSettlementRuntime,evaluatePreSettlement,
-  validateSettlementCommit,publicSettlement,sameSettlement} from './settlement-lifecycle.js';
+  validateSettlementCommit,publicSettlement,sameSettlement} from './scoring.js';
 const REPLAY_TRANSITION=Symbol('canonical replay transition');
 const authoritativeSnapshots=new WeakMap();
 function sealAuthoritativeSnapshot(state,runtime){
