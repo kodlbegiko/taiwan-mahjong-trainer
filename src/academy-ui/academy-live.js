@@ -83,6 +83,54 @@ function lessonsView(b) {
       '</section>':'')+'</div>'
     +chooseQuestion(b);
 }
+// Presentation only. Do not infer mastery from an attempt count or average.
+const DIAGNOSTIC_LABELS=Object.freeze({
+  'unobserved':'尚未評估','insufficient-evidence':'證據不足',
+  'practice-priority':'優先練習','observed-high-score':'觀察表現良好',
+});
+export function renderSkillDiagnostics(dashboard,{compact=false}={}){
+  const rec=dashboard?.recommendation,profile=dashboard?.profile;
+  const fallback='<section class="academy-surface" data-skill-diagnostics="unavailable"><h2>個人化學習診斷</h2><p>尚無可核對的新版診斷資料；不自行推測弱點。</p></section>';
+  if(dashboard?.pendingRecovery||dashboard?.durable!==true||
+     rec?.diagnosticPolicy?.version!=='observed-practice-priority/1.0.0'||
+     rec.diagnosticPolicy.calibratedMastery!==false||
+     rec.diagnosticPolicy.minAttempts!==5||rec.diagnosticPolicy.minUniqueQuestions!==3||
+     rec.diagnosticPolicy.practiceScoreThreshold!==0.8||
+     rec.calibrationStatus!==profile?.calibrationStatus||
+     !Number.isFinite(Date.parse(profile?.updatedAt))||
+     Date.parse(rec.generatedAsOf)!==Date.parse(profile.updatedAt)||
+     !Array.isArray(rec.skillDiagnostics)||!Array.isArray(profile.skills))return fallback;
+  const byId=new Map(profile.skills.map(s=>[s.tagId,s]));
+  const rows=rec.skillDiagnostics,seen=new Set();
+  if(rows.length!==byId.size||byId.size!==profile.skills.length)return fallback;
+  for(const row of rows){
+    const s=byId.get(row?.tagId);
+    if(!s||seen.has(row.tagId)||!Object.hasOwn(DIAGNOSTIC_LABELS,row.status)||
+       !Number.isSafeInteger(row.attempts)||row.attempts<0||row.attempts!==s.attempts||
+       !(row.uniqueQuestionCount===null||Number.isSafeInteger(row.uniqueQuestionCount)&&
+         row.uniqueQuestionCount>=0&&row.uniqueQuestionCount<=row.attempts)||
+       !(row.observedMean===null||Number.isFinite(row.observedMean)&&row.observedMean>=0&&row.observedMean<=1)||
+       row.observedMean!==s.meanScore)return fallback;
+    const enough=row.attempts>=5&&row.uniqueQuestionCount>=3&&Number.isFinite(s.estimatedProficiency);
+    const expected=!row.attempts?'unobserved':!enough?'insufficient-evidence':
+      row.observedMean<0.8?'practice-priority':'observed-high-score';
+    if(row.status!==expected)return fallback;
+    seen.add(row.tagId);
+  }
+  const order=['practice-priority','insufficient-evidence','unobserved','observed-high-score'];
+  const sorted=[...rows].sort((a,b)=>order.indexOf(a.status)-order.indexOf(b.status)||
+    (a.observedMean??1)-(b.observedMean??1)||a.tagId.localeCompare(b.tagId));
+  const shown=compact?sorted.slice(0,6):sorted;
+  return '<section class="academy-surface" data-skill-diagnostics="verified"><h2>個人化學習診斷</h2>'+
+    '<p class="academy-caption">至少 5 次作答、3 道不同題目才比較觀察分數；低於 80% 列為練習優先。未經真人校準，不代表精熟度。</p>'+
+    '<div class="academy-data-table-wrap"><table class="academy-data-table"><thead><tr><th scope="col">技能</th><th scope="col">作答／不同題</th><th scope="col">觀察平均</th><th scope="col">診斷</th></tr></thead><tbody>'+
+    shown.map(r=>'<tr data-diagnostic-status="'+escapeHTML(r.status)+'"><th scope="row">'+escapeHTML(r.tagId)+
+      '</th><td>'+r.attempts+' 次／'+(r.uniqueQuestionCount??'—')+' 題</td><td>'+
+      (r.observedMean===null?'—':pct(r.observedMean))+'</td><td>'+DIAGNOSTIC_LABELS[r.status]+'</td></tr>').join('')+
+    '</tbody></table></div>'+
+    (rows.length>shown.length?'<p class="academy-caption">另有 '+(rows.length-shown.length)+' 項技能，可至成長中心查看。</p>':'')+
+    '</section>';
+}
 function todayView(b){
   const profile=b.dashboard.profile;
   const due=b.getDueItems();
@@ -102,6 +150,7 @@ function todayView(b){
     +(next?'<p>課程 '+escapeHTML(next.lessonId)+' · '+next.questionRefs.length+' 題（非模擬分數）</p>':'')
     +(next?button('選擇課程並開始','go-lesson','data-lesson="'+escapeHTML(next.lessonId)+'"','primary'):'')+
     '</section>'
+    +renderSkillDiagnostics(b.dashboard,{compact:true})
     +'<section class="academy-surface"><h2>來自 Adaptive 的複習計畫</h2>'
     +(due.length?due.slice(0,6).map(x=>{
       const link=b.reviewLink(x);
@@ -124,7 +173,7 @@ function growthView(b){
         '<td>'+pct(x.estimatedProficiency)+'（未校準）</td><td>'+x.evidenceRefs.length+'</td><td>'+(
           Number.isFinite(x.meanDurationMs)?(x.meanDurationMs/1000).toFixed(1)+' 秒':'—')+'</td></tr>').join('')+
       '</tbody></table></div>':'<p>目前沒有有效逐題能力證據，不顯示虛構弱點或實力等級。</p>')
-    +'</section><section class="academy-surface"><h2>正式複習資料</h2>'
+    +'</section>'+renderSkillDiagnostics(b.dashboard)+'<section class="academy-surface"><h2>正式複習資料</h2>'
     +'<p>ReviewPlan：'+escapeHTML(plan.planId)+' · SM-2-inspired、未經真人校準</p>'
     +'<p>已安排 '+plan.items.length+' 項，已到期且可重播 '+b.getDueItems().length+' 項。</p>'
     +'</section><section class="academy-surface"><h2>訓練 Session</h2><p>'
