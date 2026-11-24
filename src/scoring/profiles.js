@@ -14,7 +14,7 @@ const tai={
   allPongs:4,mixedSuit:4,pureSuit:8,allHonors:8,
   smallDragons:4,bigDragons:8,smallWinds:8,bigWinds:16,
   concealedTriplets:{3:2,4:5,5:8},
-  openKong:0,concealedKong:0,noHonorsNoFlowers:0,dealer:1,dealerStreakEach:2,
+  openKong:0,concealedKong:0,noHonorsNoFlowers:0,robAddedKong:1,dealer:1,dealerStreakEach:2,
 };
 const base={
   contractVersion:SCORING_CONTRACT,
@@ -26,6 +26,7 @@ const base={
   ruleRefs:[
     {profileId:'tw16-configurable-table',ruleVersion:'experimental-full-v1'},
     {profileId:'tw16-single-winner-interception',ruleVersion:'experimental-v1'},
+    {profileId:'tw16-rob-added-kong',ruleVersion:'experimental-v1'},
   ],
   points:{base:0,perTai:1,unit:'abstract-points'},
   settlement:{discard:'discarder-only',selfDraw:'all-other-three',liability:'unsupported',
