@@ -1,0 +1,264 @@
+{
+  "schemaVersion": 1,
+  "kind": "tw16-phase3-r7-independent-release-audit",
+  "asOf": "2026-11-24",
+  "timeZone": "Asia/Taipei",
+  "repository": "https://github.com/kodlbegiko/taiwan-mahjong-trainer",
+  "branch": "integration/mahjong-r7-release-audit",
+  "baseSha": "a29bebfc01e05c05450b964a41ce34cbecf40365",
+  "integratedApplicationSha": null,
+  "sourcePrs": [
+    {
+      "module": "Rules",
+      "pr": 51,
+      "url": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/51",
+      "sha": "633d20faf7f9c305b8d972bd0e3f44b639d4d798",
+      "mergeBase": "a29bebfc01e05c05450b964a41ce34cbecf40365",
+      "behind": 0,
+      "draft": true,
+      "changedFiles": 6,
+      "workflows": {
+        "pass": 3,
+        "fail": 0,
+        "pending": 0,
+        "runIds": [
+          45228200804,
+          45228200664,
+          45228200654
+        ]
+      },
+      "integrated": false
+    },
+    {
+      "module": "Scoring",
+      "pr": 52,
+      "url": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/52",
+      "sha": "202e007de599cd265b1b1b22d645d95914c311c1",
+      "mergeBase": "a29bebfc01e05c05450b964a41ce34cbecf40365",
+      "behind": 0,
+      "draft": true,
+      "changedFiles": 10,
+      "workflows": {
+        "pass": 0,
+        "fail": 1,
+        "pending": 0,
+        "runIds": [
+          45230043177
+        ]
+      },
+      "integrated": false
+    },
+    {
+      "module": "Bot",
+      "pr": 48,
+      "url": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/48",
+      "sha": "e98a7446c13074bcf7aa84d8449449279a4872c8",
+      "mergeBase": "a29bebfc01e05c05450b964a41ce34cbecf40365",
+      "behind": 0,
+      "draft": true,
+      "changedFiles": 5,
+      "workflows": {
+        "pass": 1,
+        "fail": 1,
+        "pending": 0,
+        "runIds": [
+          45228437603,
+          45228437663
+        ]
+      },
+      "integrated": false
+    },
+    {
+      "module": "Replay",
+      "pr": 46,
+      "url": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/46",
+      "sha": "f6da1d2ba15c1938963bbb4096a737319c8f784b",
+      "mergeBase": "a29bebfc01e05c05450b964a41ce34cbecf40365",
+      "behind": 0,
+      "draft": true,
+      "changedFiles": 5,
+      "workflows": {
+        "pass": 2,
+        "fail": 0,
+        "pending": 0,
+        "runIds": [
+          45227229034,
+          45227229029
+        ]
+      },
+      "integrated": false
+    },
+    {
+      "module": "Table UI",
+      "pr": 49,
+      "url": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/49",
+      "sha": "8473586f0ded87c43d34a48fe40c8e6bacd6e7d1",
+      "mergeBase": "a29bebfc01e05c05450b964a41ce34cbecf40365",
+      "behind": 0,
+      "draft": true,
+      "changedFiles": 6,
+      "workflows": {
+        "pass": 1,
+        "fail": 0,
+        "pending": 3,
+        "runIds": [
+          45318151134,
+          45318151099,
+          45318151234,
+          45318151130
+        ]
+      },
+      "integrated": false
+    },
+    {
+      "module": "Academy",
+      "pr": 47,
+      "url": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/47",
+      "sha": "f2cc6e3f5f17acd865c6914b314695c253b6eb97",
+      "mergeBase": "a29bebfc01e05c05450b964a41ce34cbecf40365",
+      "behind": 0,
+      "draft": true,
+      "changedFiles": 4,
+      "workflows": {
+        "pass": 2,
+        "fail": 0,
+        "pending": 0,
+        "runIds": [
+          45228529587,
+          45228529370
+        ]
+      },
+      "integrated": false
+    },
+    {
+      "module": "PWA",
+      "pr": 50,
+      "url": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/pull/50",
+      "sha": "287fb00b65053957dea5795e217f86e53a7ca807",
+      "mergeBase": "a29bebfc01e05c05450b964a41ce34cbecf40365",
+      "behind": 0,
+      "draft": true,
+      "changedFiles": 10,
+      "workflows": {
+        "pass": 8,
+        "fail": 1,
+        "pending": 0,
+        "runIds": [
+          45228712542,
+          45228712475,
+          45228712522,
+          45228712498,
+          45228712558,
+          45228712823,
+          45228712798,
+          45228712608,
+          45228712743
+        ]
+      },
+      "integrated": false
+    }
+  ],
+  "sourceWorkflowTotals": {
+    "pass": 17,
+    "fail": 3,
+    "pending": 3,
+    "total": 23
+  },
+  "uniqueChangedPaths": 45,
+  "overlap": [
+    {
+      "path": "src/table-ui/view.js",
+      "prs": [
+        49,
+        50
+      ],
+      "mergeTest": "NOT_RUN"
+    }
+  ],
+  "findings": [
+    {
+      "id": "R7-001",
+      "status": "FAIL",
+      "owner": "Scoring",
+      "evidence": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/45230043177/job/137886799508",
+      "detail": "S08 exhaustive draw: strict deep equal sees -0 rather than 0. settleExhaustiveDraw maps -fee.points, including zero. Node tests 384, pass 382, fail 1, skip 1. Normalize zero in implementation, not expected values."
+    },
+    {
+      "id": "R7-002",
+      "status": "FAIL",
+      "owner": "Bot/PWA",
+      "evidence": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/45228437663/job/137881146918",
+      "detail": "Chromium full-match gate line 257: offline real R3 result unavailable. decision.js statically imports new strategy-r7.js; SW precache lacks this path. Strong candidate cause, not isolated proof. Replay internal.js also imports new integrity.js missing from PWA branch precache. Add both runtime paths and bump cache version, verify offline cold reload/settlement/Replay."
+    },
+    {
+      "id": "R7-003",
+      "status": "FAIL",
+      "owner": "PWA/Table UI",
+      "evidence": "https://github.com/kodlbegiko/taiwan-mahjong-trainer/actions/runs/45228712475/job/137882121136",
+      "detail": "320x640 baseline passed; 375px Enter selection wait_for_function at line 105 timed out after 30s: activeElement not a hand action button. Diagnose focus/rerender; do not weaken assertion. Include new confirm/cancel controls in focus design."
+    },
+    {
+      "id": "R7-004",
+      "status": "BLOCKED",
+      "owner": "Rules/Scoring/Replay/Bot/Table UI",
+      "detail": "New opt-in rob-added-kong profile and kong_proposed/robAddedKong need cross-owner contract review. Scoring explicitly excludes robbery, multiple winners and other special tai; Replay/Strategy legacy profile and event handling need verification. No production activation."
+    },
+    {
+      "id": "R7-005",
+      "status": "BLOCKED",
+      "owner": "Bot/Table UI",
+      "detail": "full-round.js currently instantiates all opponents as Beginner; R7 changes Intermediate/Advanced only. Public default strategy improvement not demonstrated."
+    },
+    {
+      "id": "R7-006",
+      "status": "BLOCKED",
+      "owner": "Academy",
+      "detail": "12 published / 8 validated, objective-to-scored-SkillTag 10/20 per source PR. No scenario scorer or L4/L5 certification. Keep unpublished."
+    },
+    {
+      "id": "R7-007",
+      "status": "BLOCKED",
+      "owner": "Table UI/PWA",
+      "detail": "Shared view.js ActionBar hunk: preserve revision-bound confirmation, cancel/busy guards and ARIA status/group attributes. Actual merge conflict and runtime behavior not tested. Public HTTPS terminal+Replay and physical devices not run."
+    }
+  ],
+  "gates": {
+    "source_pr_inventory": "PASS",
+    "common_merge_base": "PASS",
+    "main_protection": "PASS",
+    "source_workflows": "FAIL",
+    "source_reviews_and_ownership": "BLOCKED",
+    "textual_merge_and_contract_review": "BLOCKED",
+    "integrated_application_sha": "BLOCKED",
+    "r5_goldens": "NOT_RUN",
+    "strict_100_seed": "NOT_RUN",
+    "oracle_10k_a": "NOT_RUN",
+    "oracle_10k_b": "NOT_RUN",
+    "npm_check": "NOT_RUN",
+    "same_sha_all_actions": "NOT_RUN",
+    "public_https_full_match": "NOT_RUN",
+    "public_https_settlement": "NOT_RUN",
+    "public_https_replay": "NOT_RUN",
+    "daily_reload": "NOT_RUN",
+    "offline": "NOT_RUN",
+    "mobile_viewports": "NOT_RUN",
+    "physical_iphone_android": "NOT_RUN",
+    "voiceover_talkback_installed_update": "NOT_RUN",
+    "profile_legacy_compatibility": "BLOCKED",
+    "private_player_view_security_performance": "NOT_RUN",
+    "full_rules_certification": "BLOCKED"
+  },
+  "decisions": {
+    "EXPERIMENTAL_PREVIEW_GO": false,
+    "FULL_RULES_VERIFIED": false,
+    "FORMAL_RELEASE_GO": false
+  },
+  "changeControl": {
+    "applicationCodeChanged": false,
+    "sourcePrsMerged": [],
+    "mainChanged": false,
+    "productionChanged": false,
+    "releaseCreated": false
+  },
+  "limitations": "Source CI is not integrated CI. Local git DNS resolution failed; no local checkout/merge or browser/device execution. Source failures and contract gaps block integration admission. R5 historical SHA is not R7 evidence."
+}
