@@ -5,7 +5,9 @@ const canonical=x=>x===0?0:x;
 const valid=x=>Number.isSafeInteger(x)&&!Object.is(x,-0);
 const addSafe=(a,b)=>{const n=a+b;if(!valid(n))throw new RangeError('Settlement integer overflow');return canonical(n);};
 export function assertLedgerConservation(ledger){
-  if(!ledger||!Array.isArray(ledger.playerDeltas)||ledger.playerDeltas.length!==4||
+  if(!ledger||!Array.isArray(ledger.playerTransferDeltas)||
+    ledger.playerTransferDeltas.length!==4||!ledger.playerTransferDeltas.every(valid)||
+    !Array.isArray(ledger.playerDeltas)||ledger.playerDeltas.length!==4||
     !ledger.playerDeltas.every(valid)||!valid(ledger.houseDelta)||
     !Array.isArray(ledger.payments)||
     !ledger.payments.every(p=>Number.isInteger(p.payerSeat)&&
