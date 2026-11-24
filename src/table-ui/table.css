@@ -153,3 +153,53 @@ body[data-table-view="daily"] .roadmap { display:none !important; }
   .table-daily-hand .table-tile { width:30px; min-width:30px; min-height:44px; }
   .table-daily-option { min-height:48px; }
 }
+
+/* R7: touch targets, keyboard focus and small-screen reflow. Pure presentation. */
+#full-table-root { overflow-x: visible; }
+#full-table-root :is(button, select, input) { touch-action: manipulation; }
+#full-table-root :is(button, select, input):focus-visible,
+#full-table-navigation button:focus-visible {
+  outline: 3px solid #f5d681;
+  outline-offset: 3px;
+}
+#full-table-root .table-daily-option:focus-within {
+  outline: 3px solid #f5d681;
+  outline-offset: 3px;
+}
+.table-grid :is(.table-seat-heading, .table-concealed, .table-quiet, .table-felt) {
+  overflow-wrap: anywhere;
+}
+.table-river > .table-quiet { white-space: normal; }
+.table-header-tools button, .table-footer-controls button,
+.table-replay-controls button, .table-action-buttons button {
+  min-height: 44px;
+}
+@media (max-width: 900px) {
+  .table-hand button.table-tile {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+@media (max-width: 560px) {
+  .table-heading .table-header-tools { justify-content: flex-start; }
+  .table-selected { align-items: stretch; }
+  .table-selected button { min-height: 44px; }
+  .table-meld { flex-wrap: wrap; }
+  .table-facts span { overflow-wrap: anywhere; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #full-table-root *, #full-table-root *::before, #full-table-root *::after {
+    animation-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* R7 WCAG AA: test against the felt gradient's lightest stop (#296e58).
+   Both status and help text must meet 4.5:1 even when mobile makes titles 16px. */
+.table-felt strong { color: #ffe8ac; }
+.table-felt small { color: #e7f0dd; }
+
+/* R7.1: Agent 1 owns confirmation markup and submission guards. */
+.table-confirmation { border: 1px solid #e8c982; border-radius: 10px; padding: 12px; margin: 12px 0; }
+.table-confirmation p { flex: 1 1 100%; margin: 0; overflow-wrap: anywhere; }
+.table-confirmation button { min-height: 44px; min-width: 44px; }

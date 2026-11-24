@@ -2,8 +2,9 @@
  * Internal-only replay archive format. Never import this module from public UI.
  * A seeded event ledger is sensitive: it can reconstruct the future wall.
  */
-import { replayGame, validateGameState, getRuleProfile, listLegalActions, applyAction,
+import { replayGame, validateGameState, getRuleProfile, getRuleCapabilities, listLegalActions, applyAction,
   RuleCapabilityError, ENGINE_VERSION, COMPLETE_ENGINE_VERSION } from '../rules/index.js';
+import { sha256Utf8, REPLAY_HASH_VERSION } from './integrity.js';
 
 export const CONTRACT_VERSION = 'master-academy/1.0.0';
 export const REPLAY_VERSION = 'tw16-replay/1.0.0';
@@ -39,18 +40,76 @@ export function checksum(value) {
 }
 export const same = (a,b) => canonical(a)===canonical(b);
 
+/** Versioned private deterministic event chain and reconstructed-state digest.
+ * Hashes detect corruption, not authenticated substitution.
+ * Legacy V1 archives remain FNV-1a-only, without silent upgrades.
+ */
+export function replayIntegrityHashes(manifest, events, decisions, state) {
+  const initial={domain:'tw16-replay-chain-seed/v1',gameId:manifest.gameId,
+    ruleRef:manifest.ruleRef,initialSeed:manifest.initialSeed,
+    dealerSeat:manifest.dealerSeat,roundConfig:manifest.roundConfig??null};
+  let eventChain=sha256Utf8(canonical(initial));
+  for(const event of events)
+    eventChain=sha256Utf8(eventChain+'\n'+canonical(event));
+  return {version:REPLAY_HASH_VERSION,eventChain,
+    decisions:sha256Utf8(canonical(decisions)),
+    finalState:sha256Utf8(canonical(state))};
+}
+
 function assertProfile(ruleRef) {
   try { return getRuleProfile(ruleRef?.profileId,ruleRef?.ruleVersion); }
   catch (error) { throw new ReplayError('UNKNOWN_RULE_PROFILE','Replay RuleProfile is unavailable',error); }
 }
 
-/** Both table policies share the complete Rules event/action protocol.
- * Keep the legacy profile's unsupported multi-WIN behavior untouched. */
-const isR3 = ref =>
+/** Only explicitly reviewed complete-table profiles are accepted.
+ * The optional robbery profile shares the canonical Rules action protocol;
+ * no unknown profile is silently interpreted as a legacy sandbox. */
+export const isRobAddedKong = ref =>
+  ref?.profileId==='tw16-rob-added-kong' && ref?.ruleVersion==='experimental-v1';
+const isR3 = ref => isRobAddedKong(ref) ||
   (ref?.profileId==='tw16-configurable-table' &&
     ref?.ruleVersion==='experimental-full-v1') ||
   (ref?.profileId==='tw16-single-winner-interception' &&
     ref?.ruleVersion==='experimental-v1');
+function pinnedScoringVersion(profile,ref) {
+  if(isR3(ref)) {
+    // The pre-release robbery profile originally exposed private trigger
+    // action IDs in derived public events. Do not accept that older runtime.
+    if(isRobAddedKong(ref) &&
+       getRuleCapabilities(ref).publicEventContractVersion!=='tw16-rob-added-kong-public/1.0.0')
+      throw new ReplayError('UNSUPPORTED_PUBLIC_EVENT_CONTRACT','R7 robbery public projection must negotiate the reviewed contract');
+    // The Rules R7 robbery profile still uses minimal discard liability.
+    // Scoring PR #52 is not an authoritative Rules settlement integration.
+    if(profile.scoringPolicy?.mode!=='configured' ||
+       profile.scoringPolicy.configRef!=='tw16-minimal-tai-v1')
+      throw new ReplayError('UNSUPPORTED_SCORING_PROFILE','No historical Rules replay adapter for this scoring policy');
+    return profile.scoringPolicy.configRef;
+  }
+  if(ref?.profileId!=='tw16-four-player-sandbox'||ref?.ruleVersion!=='experimental-move-v1')
+    throw new ReplayError('UNKNOWN_RULE_PROFILE','No replay adapter for this rule profile');
+  return 'unavailable';
+}
+function verifyPinnedSettlement(state,version) {
+  const result=state.extensions?.tw16?.result;
+  if(state.round.phase!=='settled')return;
+  const payload=state.events.at(-1)?.payload;
+  if(version!=='tw16-minimal-tai-v1'||!result||state.events.at(-1)?.type!=='settle'||
+     (result.scoringVersion!==undefined&&result.scoringVersion!==version)||
+     (payload?.scoringVersion!==undefined&&payload.scoringVersion!==version)||
+     !Array.isArray(result.delta)||result.delta.length!==4||
+     !result.delta.every(Number.isSafeInteger)||
+     result.delta.reduce((n,v)=>n+BigInt(v),0n)!==0n||
+     !same(result.delta,state.round.scores)||!same(result.delta,payload.delta)||
+     result.reason!==payload.reason)
+    throw new ReplayError('INVALID_SETTLEMENT','Canonical pinned settlement/deltas do not match');
+  if(result.robAddedKong!==undefined) {
+    const marker=result.robAddedKong;
+    if(!isRobAddedKong(state.ruleRef)||
+       !same(marker,payload.robAddedKong)||
+       !same(marker,state.events.at(-2)?.payload?.robAddedKong))
+      throw new ReplayError('INVALID_SETTLEMENT','Robbery settlement marker mismatch');
+  }
+}
 const replayConfig = (manifest, events) => ({
   gameId:manifest.gameId,seed:manifest.initialSeed,
   dealerSeat:manifest.dealerSeat,ruleRef:manifest.ruleRef,
@@ -59,6 +118,7 @@ const replayConfig = (manifest, events) => ({
 });
 function r3Kind(event) {
   if(event.type==='flower')return 'replace_flower';
+  if(event.type==='kong_proposed')return 'kong';
   if(event.type==='claim' && event.visibility==='seat-private')return event.payload?.kind;
   return event.type;
 }
@@ -133,6 +193,7 @@ export function createReplayArchive(state,{ownerSeat=0,disclosurePolicy='none',u
   if(!Number.isInteger(ownerSeat)||ownerSeat<0||ownerSeat>3)
     throw new ReplayError('INVALID_SEAT','ownerSeat must be 0..3');
   const profile=assertProfile(state?.ruleRef),r3=isR3(state.ruleRef);
+  const scoringVersion=pinnedScoringVersion(profile,state.ruleRef);
   try { validateGameState(state); }
   catch(error) { throw new ReplayError('INVALID_GAME_STATE','Original game is not replayable',error); }
   if(typeof state.rng?.seed!=='string'||!state.rng.seed)
@@ -140,6 +201,7 @@ export function createReplayArchive(state,{ownerSeat=0,disclosurePolicy='none',u
   if(!['none','settled-public-only'].includes(disclosurePolicy) ||
       (disclosurePolicy!=='none' && (!r3||state.round.phase!=='settled')))
     throw new ReplayError('INVALID_DISCLOSURE_POLICY','Only an explicitly settled R3 game permits public-only postgame disclosure');
+  if(r3)verifyPinnedSettlement(state,scoringVersion);
   const unsupported=verifiedUnsupportedSubmission(state,unsupportedSubmission);
   const events=state.events.map(turnEvent=>({...V1,replayEventVersion:REPLAY_VERSION,
     seq:turnEvent.seq,turnEvent:clone(turnEvent)}));
@@ -153,7 +215,7 @@ export function createReplayArchive(state,{ownerSeat=0,disclosurePolicy='none',u
     dealerSeat:state.round.dealerSeat,
     engineVersion:r3?COMPLETE_ENGINE_VERSION:ENGINE_VERSION,
     strategyVersion:'advanced-strategy/1.0.0',
-    scoringVersion:r3?'tw16-minimal-tai-v1':'unavailable',
+    scoringVersion,
     decisionVersion:DECISION_VERSION,completionStatus,
     verificationScope:r3?'experimental-r3-full-round':'experimental-bounded-draw-discard',
     postgameDisclosurePolicy:disclosurePolicy,eventCount:events.length};
@@ -172,7 +234,8 @@ export function createReplayArchive(state,{ownerSeat=0,disclosurePolicy='none',u
   if(r3)m.actionCount=decisions.length;
   m.integrity={algorithm:'fnv1a-32-canonical-checksum-not-signature',
     eventsChecksum:checksum(events),decisionChecksum:checksum(decisions),
-    finalStateChecksum:checksum(state)};
+    finalStateChecksum:checksum(state),
+    sha256:replayIntegrityHashes(m,events,decisions,state)};
   const archive={...V1,replayVersion:REPLAY_VERSION,manifest:m,events,decisions};
   validateReplayArchive(archive);
   return clone(archive);
@@ -193,12 +256,13 @@ export function validateReplayArchive(archive) {
        typeof m.initialSeed!=='string'||!m.initialSeed||
        m.engineVersion!==(r3?COMPLETE_ENGINE_VERSION:ENGINE_VERSION)||
        m.strategyVersion!=='advanced-strategy/1.0.0'||
-       m.scoringVersion!==(r3?'tw16-minimal-tai-v1':'unavailable')||
-       m.decisionVersion!==DECISION_VERSION||
+        m.decisionVersion!==DECISION_VERSION||
        m.eventCount!==archive.events.length||
        m.verificationScope!==(r3?'experimental-r3-full-round':'experimental-bounded-draw-discard'))
       throw new Error('manifest version/identity');
     const profile=assertProfile(m.ruleRef);
+    if(m.scoringVersion!==pinnedScoringVersion(profile,m.ruleRef))
+      throw new Error('Pinned scoring policy mismatch');
     if(!same(m.ruleProfileSnapshot,profile))throw new Error('RuleProfile snapshot mismatch');
     if(r3){
       if(profile.status!=='experimental'||m.ruleProfileVersion!==profile.ruleVersion||
@@ -226,7 +290,13 @@ export function validateReplayArchive(archive) {
     validateGameState(state);
     if(checksum(state)!==m.integrity?.finalStateChecksum)
       throw new Error('canonical final state mismatch');
+    // Older Replay v1 archives remain readable. A present V2 hash object
+    // must exactly match every Rules-canonical event, decision and final state.
+    if(m.integrity.sha256!==undefined &&
+       !same(m.integrity.sha256,replayIntegrityHashes(m,archive.events,archive.decisions,state)))
+      throw new Error('canonical SHA-256 event chain/decision/state mismatch');
     if(r3){
+      verifyPinnedSettlement(state,m.scoringVersion);
       if(m.unsupportedInterruption!==undefined){
         const interruption=m.unsupportedInterruption;
         if(interruption?.kind!=='unsupported-rule-capability' ||
@@ -245,7 +315,7 @@ export function validateReplayArchive(archive) {
     }
     return true;
   } catch(error) {
-    if(error instanceof ReplayError && error.code==='UNKNOWN_RULE_PROFILE')throw error;
+    if(error instanceof ReplayError && ['UNKNOWN_RULE_PROFILE','UNSUPPORTED_SCORING_PROFILE','UNSUPPORTED_PUBLIC_EVENT_CONTRACT'].includes(error.code))throw error;
     throw new ReplayError('CORRUPT_REPLAY','Replay record does not match canonical seeded Rules Engine',error);
   }
 }

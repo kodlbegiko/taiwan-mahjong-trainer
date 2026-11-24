@@ -8,9 +8,9 @@ import { analyzePlayerView, STRATEGY_ENGINE_VERSION } from '../strategy/index.js
 import { readPlayerView } from '../strategy/view.js';
 import { getSkillTag } from '../academy/registry.js';
 import { createUnscoredScenario } from '../scenario/index.js';
-import { V1, clone, checksum, ReplayError, REPLAY_VERSION, FRAME_VERSION,
+import { V1, clone, checksum, same, ReplayError, REPLAY_VERSION, FRAME_VERSION,
   DECISION_VERSION, ANALYSIS_VERSION, FINDING_VERSION,
-  createReplayArchive, validateReplayArchive, replayStateAt, publicManifest } from './internal.js';
+  createReplayArchive, validateReplayArchive, replayStateAt, publicManifest, isRobAddedKong } from './internal.js';
 
 export { ReplayError, REPLAY_VERSION, FRAME_VERSION, DECISION_VERSION,
   ANALYSIS_VERSION, FINDING_VERSION } from './internal.js';
@@ -55,6 +55,17 @@ function readArchive(store,replayId) {
 function ownerOnly(m,viewerSeat) {
   if (viewerSeat!==m.ownerSeat) throw new ReplayError('VIEW_FORBIDDEN','Historical opponent concealed tiles are not accessible');
 }
+function strategyUnavailableReason(view) {
+  // Strategy V1 has no proposal/robbery event or visible-proposed-tile
+  // semantics. Keep the Rules projection intact; never strip events to force
+  // it through the old parser. All R7 robbery coaching is legal-only.
+  if(isRobAddedKong(view.ruleRef))return 'R7 robbery PlayerView is outside the Strategy V1 contract; legal actions only.';
+  if(['tw16-configurable-table','tw16-single-winner-interception'].includes(view.ruleRef.profileId) &&
+     (view.self.concealed.some(x=>x.kind==='flower') ||
+      view.legalActions.some(a=>a.kind==='replace_flower')))
+    return 'Unreplaced flowers are outside the Strategy V1 standard-tile parser; legal actions only.';
+  return null;
+}
 function frameFrom(archive,seq) {
   const m=archive.manifest;
   const state=replayStateAt(archive,seq);
@@ -63,10 +74,26 @@ function frameFrom(archive,seq) {
   // Strategy V1's standard-only view parser does not model that legal phase.
   // In that case the authoritative Rules projection above is used as-is,
   // with no Strategy access until flowers are resolved.
-  const pendingR3Flower=['tw16-configurable-table','tw16-single-winner-interception'].includes(view.ruleRef.profileId) &&
-    (view.self.concealed.some(x=>x.kind==='flower') ||
-      view.legalActions.some(a=>a.kind==='replace_flower'));
-  if(!pendingR3Flower)readPlayerView(view);
+  if(view.audienceSeat!==m.ownerSeat||view.asOfEventSeq!==seq||
+     view.opponents.some(p=>Object.hasOwn(p,'concealed'))||
+     view.publicEvents.some(e=>e.visibility!=='public'||e.seq>seq)||
+     view.legalActions.some(a=>a.actorSeat!==m.ownerSeat||a.expectedRevision!==seq)||
+     Object.hasOwn(view,'wall')||Object.hasOwn(view,'rng'))
+    throw new ReplayError('VIEW_FORBIDDEN','Rules historical view violates the replay disclosure boundary');
+  if(isRobAddedKong(m.ruleRef)){
+    // Rules v1 redacts anonymous replies and the private trigger provenance
+    // of any public event derived from one. Check that boundary explicitly.
+    const replies=state.events.filter(e=>e.visibility==='seat-private'&&
+      (e.type==='claim'||e.type==='pass'));
+    const privateIds=new Set(replies.map(e=>e.causedByActionId));
+    const replySeqs=new Set(replies.map(e=>e.seq));
+    if(view.publicEvents.some(e=>
+      privateIds.has(e.causedByActionId)||
+      (replySeqs.has(e.seq)&&(e.type!=='claim'||Object.hasOwn(e,'actorSeat')||
+        Object.hasOwn(e,'causedByActionId')||Object.keys(e.payload).length!==0))))
+      throw new ReplayError('VIEW_FORBIDDEN','Private claim provenance escaped R7 Rules projection');
+  }
+  if(!strategyUnavailableReason(view))readPlayerView(view);
   return {...V1,frameVersion:FRAME_VERSION,replayId:m.replayId,
     perspective:'player-at-time',asOfEventSeq:seq,
     playerView:clone(view),publicEvent:clone(view.publicEvents.at(-1)),
@@ -109,18 +136,46 @@ function findingsFor(analysis) {
  */
 export function createReplayService({storage=null}={}) {
   const store=createStorage(storage);
+  function indexVerifiedArchive(id,ids=indexFrom(store)) {
+    if(!ids.includes(id)) store.write(INDEX_KEY,JSON.stringify([...ids,id].sort()));
+  }
+  function sameReplayHistory(previous,next) {
+    if(same(previous,next)) return true;
+    // R5 created legitimate Replay V1 archives before SHA-256 was added.
+    // Preserve those original bytes, while permitting a retry that differs
+    // solely in the new optional integrity digest. Never upgrade on read.
+    if(previous.manifest?.integrity?.sha256!==undefined ||
+       next.manifest?.integrity?.sha256===undefined) return false;
+    const withoutNewDigest=clone(next);
+    delete withoutNewDigest.manifest.integrity.sha256;
+    return same(previous,withoutNewDigest);
+  }
   function saveReplay(gameState,{ownerSeat=0,disclosurePolicy='none',unsupportedSubmission=null}={}) {
     const archive=createReplayArchive(gameState,{ownerSeat,disclosurePolicy,unsupportedSubmission});
     const id=archive.manifest.replayId;
-    if(store.read(DATA_PREFIX+id)!==null && store.read(DATA_PREFIX+id)!==undefined) {
+    // Preflight the index BEFORE writing sensitive archive bytes. A damaged
+    // index must not silently trigger a partially successful new save.
+    const ids=indexFrom(store);
+    const existing=store.read(DATA_PREFIX+id);
+    if(existing!==null && existing!==undefined) {
       const previous=readArchive(store,id);
-      if(checksum(previous)!==checksum(archive))
+      if(!sameReplayHistory(previous,archive))
         throw new ReplayError('REPLAY_ALREADY_EXISTS','Cannot overwrite a replay with a different event ledger');
+      // Repair only the index: a previously validated archive can exist even
+      // when an earlier quota/IO failure prevented its index write.
+      indexVerifiedArchive(id,ids);
       return publicManifest(previous);
     }
     store.write(DATA_PREFIX+id,JSON.stringify(archive));
-    const ids=indexFrom(store);
-    if(!ids.includes(id)) store.write(INDEX_KEY,JSON.stringify([...ids,id].sort()));
+    indexVerifiedArchive(id,ids);
+    return publicManifest(archive);
+  }
+  function recoverReplay(replayId,{viewerSeat}={}) {
+    // Caller supplies the exact replay ID. Do not fabricate missing events,
+    // regenerate a seed, or auto-discover/accept unvalidated archive bytes.
+    const archive=readArchive(store,replayId);
+    ownerOnly(archive.manifest,viewerSeat??archive.manifest.ownerSeat);
+    indexVerifiedArchive(replayId);
     return publicManifest(archive);
   }
   function listReplays() {
@@ -149,6 +204,11 @@ export function createReplayService({storage=null}={}) {
       winnerSeat:result.winnerSeat??null,
       delta:clone(result.delta),
       ...(Number.isInteger(result.tai)?{experimentalTai:result.tai}:{}),
+      ...(isRobAddedKong(m.ruleRef)&&result.robAddedKong?{robAddedKong:{
+        proposalEventId:result.robAddedKong.proposalEventId,
+        fromSeat:result.robAddedKong.fromSeat,
+        tileId:result.robAddedKong.tileId,
+      }}:{}),
       ...(result.claimResolution?{singleWinnerArbitration:{
         selectedSeat:result.claimResolution.selectedSeat,
         declaredWinSeats:clone(result.claimResolution.declaredWinSeats),
@@ -206,16 +266,14 @@ export function createReplayService({storage=null}={}) {
     if(!legal || legal.kind!==decision.kind) throw new ReplayError('INVALID_ACTION_ID','Recorded action is not legal at the original decision point');
     if(actionId!==undefined && actionId!==decision.actionId)
       throw new ReplayError('INVALID_ACTION_ID','Requested action is not the recorded decision');
-    const pendingR3Flower=['tw16-configurable-table','tw16-single-winner-interception'].includes(view.ruleRef.profileId) &&
-      (view.self.concealed.some(x=>x.kind==='flower') ||
-        view.legalActions.some(a=>a.kind==='replace_flower'));
-    const strategy=pendingR3Flower?{
+    const unavailableReason=strategyUnavailableReason(view);
+    const strategy=unavailableReason?{
       engineVersion:STRATEGY_ENGINE_VERSION,
       viewRef:{gameId:view.gameId,viewId:view.viewId,asOfEventSeq:view.asOfEventSeq,
         audienceSeat:view.audienceSeat},
       legalActionIds:view.legalActions.map(a=>a.actionId),
       recommendations:[],
-      limitations:['Unreplaced flowers are valid R3 Rules state but outside Strategy V1 standard-tile parser; no official scorer.'],
+      limitations:[unavailableReason],
     }:analyzePlayerView(view,{seed:'replay-coach-v1',samples:0,maxSimulatedRoutes:0});
     if(strategy.engineVersion!==STRATEGY_ENGINE_VERSION ||
        strategy.viewRef.viewId!==view.viewId ||
@@ -246,7 +304,8 @@ export function createReplayService({storage=null}={}) {
         ]});
     }
     const chosen=candidates.find(r=>r.actionId===decision.actionId);
-    const best=decision.kind==='discard'?strategy.recommendations[0]:null;
+    const structural=decision.kind==='discard'&&!unavailableReason;
+    const best=structural?strategy.recommendations[0]:null;
     const s=exactValue(chosen,'postDiscardShanten'),b=exactValue(best,'postDiscardShanten');
     const u=exactValue(chosen,'oneTurnEffectiveCopies'),v=exactValue(best,'oneTurnEffectiveCopies');
     const basic={...V1,analysisVersion:ANALYSIS_VERSION,replayId,eventSeq,
@@ -262,10 +321,10 @@ export function createReplayService({storage=null}={}) {
         shantenDifference:s===null||b===null?null:s-b,
         chosenEffectiveCopies:u,bestEffectiveCopies:v,
         effectiveCopyDifference:u===null||v===null?null:v-u,
-        epistemic:decision.kind==='discard'?'exact':'unknown',scope:'structural-only'},
-      epistemic:{structural:decision.kind==='discard'?'exact':'unknown',shape:'heuristic',twoTurn:'unknown',
+        epistemic:structural?'exact':'unknown',scope:'structural-only'},
+      epistemic:{structural:structural?'exact':'unknown',shape:unavailableReason?'unknown':'heuristic',twoTurn:'unknown',
         dealInRisk:'unknown',winRate:'unknown',expectedTai:'unknown'},
-      analysisStatus:chosen?(decision.kind==='discard'?'advisory-structural':'advisory-legal-only'):'unavailable',
+      analysisStatus:chosen?(structural?'advisory-structural':'advisory-legal-only'):'unavailable',
       recommendationAuthority:'advisory',officialScorerVerified:false,
       limitations:clone(strategy.limitations)};
     const analysis={...basic,analysisId:'decision-analysis:'+checksum(basic)};
@@ -280,13 +339,13 @@ export function createReplayService({storage=null}={}) {
   }
   function createReviewQuestion(replayId,eventSeq) {
     const analysis=getDecisionAnalysis(replayId,eventSeq);
-    if(analysis.decisionKind!=='discard')
+    if(analysis.decisionKind!=='discard'||analysis.analysisStatus!=='advisory-structural')
       throw new ReplayError('UNSCORABLE_DECISION','Only current supported discard decisions can produce review scenarios');
     const frame=getReplayFrame(replayId,eventSeq-1);
     return createUnscoredScenario({playerView:frame.playerView,decisionAnalysis:analysis,
       source:{replayId,eventSeq}});
   }
-  return Object.freeze({apiVersion:REPLAY_API_VERSION,saveReplay,
+  return Object.freeze({apiVersion:REPLAY_API_VERSION,saveReplay,recoverReplay,
     listReplays,loadReplay,getReplayFrame,listReplayFrameBoundaries,getPlayerDecision,getDecisionAnalysis,
     listCoachingFindings,createReviewQuestion});
 }

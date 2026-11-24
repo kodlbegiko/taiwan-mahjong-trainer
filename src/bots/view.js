@@ -4,7 +4,7 @@
  * cannot read a dealer hand still holding physical flowers.  Never weaken
  * that canonical validator: use this narrow fail-closed replacement adapter.
  */
-import { readPlayerView } from '../strategy/view.js';
+import { readPlayerView, isRobAddedKongRuleRef, validateRobKongPublicEvent } from '../strategy/view.js';
 
 // Exact, versioned table profiles only. Never infer policy from a profile name
 // prefix or accept an unreviewed future version.
@@ -12,7 +12,7 @@ export function isSupportedBotTableProfile(ref) {
   return (ref?.profileId === 'tw16-configurable-table' &&
     ref?.ruleVersion === 'experimental-full-v1') ||
     (ref?.profileId === 'tw16-single-winner-interception' &&
-    ref?.ruleVersion === 'experimental-v1');
+    ref?.ruleVersion === 'experimental-v1') || isRobAddedKongRuleRef(ref);
 }
 
 const rootKeys = ['schemaVersion','contractVersion','viewId','gameId','ruleRef',
@@ -146,7 +146,8 @@ function replacementView(input) {
   required(Array.isArray(v.publicEvents), 'public events');
   for (const e of v.publicEvents) {
     allow(e,publicEventKeys,'event');
-    allow(e.payload,publicPayloadKeys,'event payload');
+    if(!validateRobKongPublicEvent(e,v.publicEvents,v.ruleRef))
+      allow(e.payload,publicPayloadKeys,'event payload');
     allow(e.ruleRef,['profileId','ruleVersion'],'event ruleRef');
     required(e.visibility==='public' && e.gameId===v.gameId &&
       Number.isInteger(e.seq) && e.seq<=v.asOfEventSeq &&
@@ -218,7 +219,8 @@ export function readSettledBotView(input) {
   }
   for (const event of v.publicEvents) {
     allow(event, publicEventKeys, 'settled event');
-    allow(event.payload, [...publicPayloadKeys, 'claimResolution'],
+    const robEvent=validateRobKongPublicEvent(event,v.publicEvents,v.ruleRef,true);
+    if(!robEvent)allow(event.payload, [...publicPayloadKeys, 'claimResolution'],
       'settled public payload');
     required(event.visibility === 'public' &&
       event.ruleRef?.profileId === v.ruleRef.profileId &&

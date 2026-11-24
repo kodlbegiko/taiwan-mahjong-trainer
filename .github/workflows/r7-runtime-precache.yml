@@ -1,0 +1,108 @@
+name: R7 Runtime Precache Contract
+on:
+  pull_request:
+    branches: [integration/mahjong-full-game]
+    paths:
+      - 'src/**'
+      - 'public/**'
+      - 'data/**'
+      - 'index.html'
+      - 'sw.js'
+      - 'scripts/runtime-precache.mjs'
+      - '.github/workflows/r7-runtime-precache.yml'
+  push:
+    branches: [integration/mahjong-full-game]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  graph:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-save --package-lock=false --ignore-scripts acorn@8.15.0
+      - name: Audit actual checkout ESM graph and complete cache inventory
+        run: |
+          mkdir -p r7-graph
+          git rev-parse HEAD > r7-graph/tested-sha.txt
+          node scripts/runtime-precache.mjs > r7-graph/runtime-graph.json
+      - name: Prove a newly added uncached module fails the gate
+        run: |
+          set -euo pipefail
+          probe=src/r7-precache-omission-probe.js
+          test ! -e "$probe"
+          trap 'rm -f "$probe"' EXIT
+          printf 'export const uncached = true;\n' > "$probe"
+          if node scripts/runtime-precache.mjs > r7-graph/negative-probe.txt 2>&1; then
+            echo "Uncached module incorrectly passed" >&2
+            exit 1
+          fi
+          grep -q 'Runtime JS inventory differs' r7-graph/negative-probe.txt
+          echo "PASS: uncached runtime module rejected" >> r7-graph/negative-probe.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r7-runtime-graph
+          path: r7-graph
+
+  combined-candidate:
+    # Snapshot of separately owned R7.1 PRs. This job never pushes or resolves conflicts.
+    if: github.event_name == 'pull_request' && github.event.pull_request.number == 50
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: npm install --no-save --package-lock=false --ignore-scripts acorn@8.15.0
+      - run: python -m pip install playwright==1.56.0
+      - name: Compose pinned candidate in runner only; fail on any merge conflict
+        id: compose
+        run: |
+          set -euo pipefail
+          mkdir -p r7-combined-evidence
+          git rev-parse HEAD > r7-combined-evidence/pr50-sha.txt
+          git config user.name "R7 integration QA"
+          git config user.email "r7-qa@example.invalid"
+          for pair in '46:797b7c8849529701aa3496ba500e37a8a6b25b5b' '47:d411cfcb6c7ddbd687d38be27ab041cabcaed8ea' '48:bb89c5ccd1aadeecfe2864cdfd0e48dd31961260' '49:d471f020d673de0e8916ae44b83b8d4a1db0aa04' '51:ff27c52526acfdf5fb905b4dd72a229289b8d734' '52:7a63b1e2fba602b9f92963cee62e601bbfcb4c8b'; do
+            pr="${pair%%:*}"; sha="${pair#*:}"
+            echo "$pr $sha" | tee -a r7-combined-evidence/pinned-prs.txt
+            git cat-file -e "$sha^{commit}" || git fetch --no-tags origin "$sha"
+            if ! git merge --no-ff --no-edit "$sha"; then
+              git status --short > r7-combined-evidence/merge-conflicts.txt
+              exit 1
+            fi
+          done
+          git rev-parse HEAD > r7-combined-evidence/composed-source-sha.txt
+          node scripts/runtime-precache.mjs --write > r7-combined-evidence/runtime-graph.json
+          node scripts/runtime-precache.mjs > /dev/null
+          cp sw.js r7-combined-evidence/generated-sw.txt
+          git hash-object sw.js > r7-combined-evidence/generated-sw-blob.txt
+      - name: Candidate viewport and accessibility regression
+        if: steps.compose.outcome == 'success'
+        run: python tests/browser/mobile-pwa-a11y-gates.py --evidence r7-combined-evidence/viewport
+      - name: Candidate PWA cold start and update rollback
+        if: always() && steps.compose.outcome == 'success'
+        run: python tests/pwa/mobile-update-gates.py --evidence r7-combined-evidence/pwa
+      - name: Candidate full round, settlement, Replay, Daily and offline reload
+        if: always() && steps.compose.outcome == 'success'
+        run: PHASE3_REQUIRE_SINGLE_WINNER=1 python tests/browser/full-table-ui-r3-gates.py --screenshots r7-combined-evidence/full-match
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r7-combined-candidate-evidence
+          path: r7-combined-evidence
+          if-no-files-found: warn
+          retention-days: 14

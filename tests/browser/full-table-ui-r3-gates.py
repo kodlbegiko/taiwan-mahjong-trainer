@@ -27,25 +27,105 @@ def open_game(page):
         page.locator('#table-profile').select_option(r5)
         require(page.locator('#table-profile').input_value()==r5,
                 'R5 Profile selection failed')
+    difficulty=os.environ.get('PHASE3_BOT_DIFFICULTY','Beginner')
+    selector=page.locator('#table-bot-difficulty')
+    require(selector.input_value()=='Beginner','Historical Beginner default changed')
+    selector.select_option(difficulty)
     page.locator('#full-table-root [data-start-new]').click()
     page.wait_for_selector('.table-hand', timeout=25000)
+    require(page.locator('[data-bot-difficulty]').get_attribute('data-bot-difficulty')==difficulty,
+            'Selected difficulty did not reach real host')
 
-def make_human_decision(page):
+def probe_inline_confirmation(page, folder):
+    """Negative tests use public DOM clicks; no GameState/Rules fixtures."""
+    initial_revision=page.locator('.table-version').inner_text()
+    option=page.locator('.table-action-buttons [data-submit-action]:enabled').first
+    action_id=option.get_attribute('data-submit-action')
+    option.click()
+    require(page.locator('[data-action-confirmation]').count()==1,
+            'Legal declaration must open an in-page confirmation')
+    require(page.locator('.table-version').inner_text()==initial_revision,
+            'Opening a declaration confirmation mutated Rules revision')
+    require(page.locator('[data-confirm-action]').evaluate(
+                '(el) => document.activeElement===el'),
+            'Keyboard focus must move to the explicit confirmation')
+    page.screenshot(path=str(folder/'table-390-r7-declaration-confirm.png'),full_page=True)
+    page.locator('[data-cancel-action]').click()
+    require(page.locator('[data-action-confirmation]').count()==0,
+            'Cancel left a pending confirmation visible')
+    require(page.locator('.table-version').inner_text()==initial_revision,
+            'Cancelled declaration committed a Rules event')
+    require(page.evaluate('(id)=>document.activeElement?.dataset.submitAction===id',action_id),
+            'Cancel must return focus to the exact still-legal declaration')
+    # Exercise rejection of a tampered DOM token, not a fabricated GameState.
+    page.locator('.table-action-buttons [data-submit-action]:enabled').first.click()
+    require(page.locator('[data-confirm-action]').count()==1,
+            'Retry did not restore the same legal declaration')
+    page.locator('[data-confirm-action]').evaluate(
+        "(el) => el.dataset.confirmAction='__r7_invalid_action_id__'")
+    page.locator('[data-confirm-action]').click()
+    require('確認動作已過期' in page.locator('[role="alert"]').last.inner_text(),
+            'Forged DOM confirmation was not refused')
+    require(page.locator('.table-version').inner_text()==initial_revision,
+            'Forged confirmation mutated Rules revision')
+    require(page.locator('[data-action-confirmation]').count()==0,
+            'Invalid confirmation left a replayable pending token')
+    # The next ordinary UI action is the legitimate retry.
+
+def make_human_decision(page, coverage, folder):
     # Only click currently issued UI LegalAction controls. Never fabricate IDs.
+    # Intermediate/Advanced may need longer than the original 100ms pacing.
+    # Observe the real busy state; never click a disabled or pending action.
+    page.locator('[data-table-busy="false"]').wait_for(timeout=25000)
     if page.locator('.table-round-summary').count():
         return 'settled'
+    if coverage.get('consumed_id') and not coverage.get('expired_dom'):
+        # Re-submit the actual prior Rules-issued token through a DOM control.
+        # Never change GameState, storage, or the Rules/Bot authority.
+        stale=page.locator('.table-action-buttons [data-submit-action]:enabled')
+        if stale.count():
+            revision=page.locator('.table-version').inner_text()
+            stale.first.evaluate('(el,id)=>el.dataset.submitAction=id',coverage['consumed_id'])
+            stale.first.click()
+            require('過期' in page.locator('[role="alert"]').last.inner_text(),
+                    'Previously consumed LegalAction was not explicitly rejected')
+            require(page.locator('.table-version').inner_text()==revision,
+                    'Expired action changed Rules revision')
+            require(page.locator('[data-action-confirmation]').count()==0,'Expired action was staged')
+            coverage['expired_dom']=True
     cont=page.locator('[data-continue-bots]:enabled')
     if cont.count():
         cont.click()
         return 'continue-bots'
     options=page.locator('.table-action-buttons [data-submit-action]:enabled')
     if options.count():
+        if not coverage['declaration_negative_paths']:
+            probe_inline_confirmation(page,folder)
+            coverage['declaration_negative_paths']=True
+            options=page.locator('.table-action-buttons [data-submit-action]:enabled')
         labels=options.all_text_contents()
-        preference=['胡牌','補花','摸牌','放棄宣告','明槓','暗槓','加槓','碰','吃']
+        preference=(['胡牌','補花','明槓','暗槓','加槓','碰','吃','摸牌','放棄宣告']
+                    if os.environ.get('PHASE3_R71_CLAIMS')=='1' else
+                    ['胡牌','補花','摸牌','放棄宣告','明槓','暗槓','加槓','碰','吃'])
         chosen=next((i for word in preference for i,label in enumerate(labels) if word in label),0)
         selected=options.nth(chosen)
         label=labels[chosen]
         selected.click()
+        require(page.locator('[data-action-confirmation]').count()==1,
+                'Legal non-discard action must require an in-page confirmation')
+        if not coverage.get('double_confirm'):
+            # Two real click events on the same rendered button, no Rules injection.
+            before=page.locator('.table-version').inner_text()
+            coverage['consumed_id']=page.locator('[data-confirm-action]').get_attribute('data-confirm-action')
+            page.locator('[data-confirm-action]').evaluate('(el)=>{el.click();el.click()}')
+            page.wait_for_function('''before=>document.querySelector('[data-table-busy="false"]') &&
+                document.querySelector('.table-version')?.innerText!==before''',arg=before,timeout=25000)
+            require(page.locator('.table-version').inner_text()!=before,'Confirmed action did not advance')
+            require(page.locator('[data-action-confirmation]').count()==0,'Duplicate left stale confirmation')
+            require(page.locator('[role="alert"]').count()==0,'Duplicate confirmation caused error')
+            coverage['double_confirm']=True
+        else:
+            page.locator('[data-confirm-action]').click()
         return label
     tile=page.locator('.table-hand button[data-pick-action]:enabled')
     if tile.count():
@@ -57,19 +137,48 @@ def make_human_decision(page):
     return 'waiting'
 
 def full_round(page, folder):
-    page.on('dialog', lambda dialog: dialog.accept())
+    native_dialogs=[]
+    def on_unexpected_dialog(dialog):
+        native_dialogs.append(dialog.message)
+        dialog.dismiss()
+    page.on('dialog', on_unexpected_dialog)
     open_game(page)
+    page.locator('.table-header-tools [data-start-new]:enabled').wait_for(timeout=25000)
+    original_revision=page.locator('.table-version').inner_text()
+    require(page.locator('[data-table-busy="false"]').count()==1,
+            'The real UI is still busy after opening the game')
+    page.locator('.table-header-tools [data-start-new]').click()
+    require(page.locator('[data-restart-confirmation]').count()==1,
+            'Restart must require an in-page confirmation')
+    require(page.locator('.table-version').inner_text()==original_revision,
+            'Opening restart confirmation mutated state')
+    restart_level=page.locator('#table-bot-difficulty')
+    require(restart_level.input_value()==os.environ.get('PHASE3_BOT_DIFFICULTY','Beginner'),'Restart did not retain current difficulty')
+    restart_level.select_option('Advanced' if restart_level.input_value()!='Advanced' else 'Intermediate')
+    page.locator('[data-cancel-new]').click()
+    require(page.locator('[data-bot-difficulty]').get_attribute('data-bot-difficulty')==os.environ.get('PHASE3_BOT_DIFFICULTY','Beginner'),
+            'Cancelled restart changed current difficulty')
+    require(page.locator('.table-version').inner_text()==original_revision,
+            'Cancelling restart mutated the ongoing match')
+    page.locator('[data-show-replay]').click()
+    page.locator('#full-table-root [role="alert"]').wait_for(timeout=10000)
+    require('只支援已結束' in page.locator('#full-table-root [role="alert"]').last.inner_text(),
+            'Pre-settlement Replay should report an explicit guarded refusal')
+    page.locator('[data-return-table]').click()
+    require(page.locator('.table-version').inner_text()==original_revision,
+            'Replay refusal / recovery modified the live Rules revision')
     require('EXPERIMENTAL' in page.locator('#full-table-root').inner_text(),
             'experimental warning missing')
     require(page.locator('.table-opponent .table-hand').count()==0,
             'opponent concealed leaked')
     page.screenshot(path=str(folder/'table-390-real-r3.png'),full_page=True)
     history=[]
+    coverage={'declaration_negative_paths':False}
     for step in range(MAX_HUMAN_DECISIONS):
         page.wait_for_timeout(100)
         if page.locator('.table-round-summary').count():
             break
-        label=make_human_decision(page)
+        label=make_human_decision(page,coverage,folder)
         history.append(label)
         # Debounce: subsequent actions need a fresh Rules revision.
         page.wait_for_timeout(80)
@@ -82,6 +191,12 @@ def full_round(page, folder):
                                  page.locator('[role="alert"]').last.inner_text())
     else:
         raise AssertionError('No real terminal outcome after 320 UI decision steps: '+str(history[-20:]))
+    require(coverage['declaration_negative_paths'],
+            'No real flower/claim declaration exercised cancellation, refusal and retry')
+    require(coverage.get('double_confirm'),'No genuine duplicate confirmation exercised')
+    require(coverage.get('expired_dom'),'No real consumed LegalAction retry exercised')
+    require(not native_dialogs,
+            'Native browser dialog appeared in full-match table UI: '+str(native_dialogs))
     result=page.locator('.table-round-summary').inner_text()
     require('tw16-minimal-tai-v1' in result,'experimental scoring policy missing')
     require('四家分數變化' in result,'authoritative zero-sum result missing')
@@ -93,6 +208,10 @@ def full_round(page, folder):
     page.reload(wait_until='networkidle')
     page.locator('[data-table-nav="play"]').click()
     require(page.locator('.table-round-summary').count()==1,'R3 persisted result not restored')
+    require(page.locator('.table-round-summary').inner_text()==result,'Reload altered authoritative settlement')
+    require(page.locator('[data-bot-difficulty]').get_attribute('data-bot-difficulty')==os.environ.get('PHASE3_BOT_DIFFICULTY','Beginner'),
+            'Reload altered selected Bot difficulty')
+    page.screenshot(path=str(folder/'table-390-real-settled-reloaded.png'),full_page=True)
     page.locator('[data-table-nav="replay"]').click()
     page.wait_for_selector('.table-replay',timeout=20000)
     require('當時你的手牌' in page.locator('.table-replay').inner_text(),
@@ -106,6 +225,12 @@ def full_round(page, folder):
     require('事件 1 /' in page.locator('.table-replay').inner_text(),
             'Replay jump to historical event failed')
     page.screenshot(path=str(folder/'table-390-real-replay.png'),full_page=True)
+    (folder/'r7-confirmation-coverage.json').write_text(json.dumps({
+        'declaration_cancel_reject_retry':coverage['declaration_negative_paths'],
+        'duplicate_click':coverage['double_confirm'],'expired_actual_token':coverage['expired_dom'],
+        'native_dialogs':native_dialogs,'difficulty':os.environ.get('PHASE3_BOT_DIFFICULTY','Beginner'),
+        'restored_settlement_and_difficulty':True,'humanActionHistogram':{h:history.count(h) for h in set(history)}
+    },ensure_ascii=False,indent=2),encoding='utf-8')
     return history
 
 def daily_roundtrip(page,folder):
@@ -243,7 +368,11 @@ def run(folder):
                 page.on('pageerror',lambda e:errors.append(str(e)))
                 page.goto(url,wait_until='networkidle')
                 if width==390:
-                    history=full_round(page,folder)
+                    ctx.tracing.start(screenshots=True,snapshots=True,sources=True)
+                    try:
+                        history=full_round(page,folder)
+                    finally:
+                        ctx.tracing.stop(path=str(folder/'table-390-r7-full-round.trace.zip'))
                     daily_roundtrip(page,folder)
                     # One cold new tab after activation, with network disabled.
                     page.goto(url,wait_until='networkidle')
@@ -281,6 +410,8 @@ def run(folder):
     (folder/'real-r3-verification.txt').write_text(
         'R3 terminal round via real UI, Bots, Rules, settlement, Replay, Daily, offline, 34 SVG.\n'
         'Browser Chromium emulation only, NOT physical iPhone evidence.\n'
+        'R7: inline non-discard confirmation, cancel, tampered DOM token refusal, retry,\n'
+        'restart cancellation, nonterminal Replay error/recovery, trace ZIP.\n'
         'Human action histogram: '+str({x:history.count(x) for x in set(history)}),
         encoding='utf-8')
 
