@@ -4,11 +4,15 @@ import { LESSONS, getSkillTag, VERIFIED_SCENARIO_SCORER_COUNT,
   submitAcademyAnswer, validateAcademyDecisionRecord } from '../../src/academy/index.js';
 import { getCanonicalExercise } from '../../src/academy/question-internal.js';
 import { R71_ASSESSMENT_VERSION, R71_QUESTION_REFS, listR71QuestionRefs,
-  getR71Question, gradeR71Question, validateR71Question, getR71Coverage } from '../../src/academy/r71-assessments.js';
+  getR71Question, gradeR71Question, validateR71Question, getR71Coverage, getR71LessonPlan, R71_LESSON_PLAN_VERSION } from '../../src/academy/r71-assessments.js';
 import { auditAcademyContent } from '../../src/academy/content-audit.js';
 import { readPlayerView } from '../../src/strategy/view.js';
 import { analyzeDiscards } from '../../src/core/efficiency.js';
 import { validateScoredRecord } from '../../src/adaptive/records.js';
+import { createDailyTrainingController } from '../../src/adaptive/daily-training.js';
+import * as academy from '../../src/academy/index.js';
+import { APPROVED_LEGACY_REGISTRY } from '../../src/integration/master-academy-facade.js';
+import { ARCHIVE_STORAGE_KEY } from '../../src/storage/archive.js';
 
 const ref=k=>({questionId:'academy-r71-'+k,questionVersion:'1.0.0'});
 const clone=x=>JSON.parse(JSON.stringify(x));
@@ -149,4 +153,44 @@ test('R7.1: freeze all 27 version-1 public snapshots and all 222 scoring outputs
     assert.equal(hash.toString(16).padStart(8,'0'),pin,'Versioned snapshot changed: '+id);
   }
   assert.equal(choices,222);
+});
+
+test('R7.1 lesson supplements preserve all prerequisites and do not mark a course complete',()=>{
+  for(const lesson of LESSONS){
+    const plan=getR71LessonPlan(lesson.lessonId);
+    assert.equal(plan.supplementVersion,R71_LESSON_PLAN_VERSION);
+    assert.deepEqual(plan.prerequisiteLessonIds,lesson.prerequisiteLessonIds);
+    assert.deepEqual(plan.lessonRef,{lessonId:lesson.lessonId,lessonVersion:lesson.lessonVersion});
+    assert.equal(plan.status,lesson.status);
+    assert.equal(plan.officialCredit,false);
+    assert.equal(plan.publicationStatus,'instructor-review');
+    assert.ok(plan.teachingZhTW.length>20&&plan.practiceZhTW.length>20);
+    assert.deepEqual(plan.questionRefs,listR71QuestionRefs({lessonId:lesson.lessonId}));
+    assert.ok(plan.questionRefs.length>0);
+  }
+  const plan=getR71LessonPlan('academy-l1-01');plan.questionRefs.length=0;
+  assert.equal(getR71LessonPlan('academy-l1-01').questionRefs.length,1);
+  assert.throws(()=>getR71LessonPlan('unknown'));
+});
+test('R7.1 preview never enters Daily or creates a duplicate archive record after reload',()=>{
+  const map=new Map(),storage={getItem:k=>map.get(k)??null,setItem:(k,v)=>map.set(k,String(v)),removeItem:k=>map.delete(k)};
+  const make=()=>createDailyTrainingController(storage,{learning:academy,registry:APPROVED_LEGACY_REGISTRY,
+    validateAcademyDecisionRecord:academy.validateAcademyDecisionRecord});
+  const at='2026-11-20T01:00:00.000Z',later='2026-11-20T11:00:00.000Z',controller=make();
+  const day=controller.ensureToday({asOf:at,minutes:10});
+  assert.ok(day.questionRefs.every(r=>!r.questionId.startsWith('academy-r71-')));
+  const before=JSON.stringify([...map]);
+  const candidate=getR71Question(ref('chi'));
+  gradeR71Question(candidate,candidate.options[0].id);
+  assert.equal(JSON.stringify([...map]),before);
+  assert.throws(()=>controller.getQuestion(ref('chi'),{asOf:at}));
+  const r=day.questionRefs[0],q=controller.getQuestion(r,{asOf:at});
+  const choice=q.taskType==='discard'?Number(q.prompt.options[0]):[];
+  const answer=controller.submit(r,choice,{asOf:at,durationMs:1000,attemptId:'r71-daily-first'});
+  assert.equal(answer.status,'saved');
+  const bytes=storage.getItem(ARCHIVE_STORAGE_KEY);
+  const again=make().submit(r,choice,{asOf:later,durationMs:1000,attemptId:'r71-daily-retry'});
+  assert.equal(again.status,'already-answered');
+  assert.equal(storage.getItem(ARCHIVE_STORAGE_KEY),bytes);
+  assert.equal(make().progress({asOf:later}).completed,1);
 });
