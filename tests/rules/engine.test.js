@@ -19,7 +19,18 @@ const next = (state, seat, action) => {
 
 test('V1 contract: verified structural profile is not verified four-player gameplay', () => {
   const profiles = listRuleProfiles();
-  assert.equal(profiles.length, 4, 'additive R5 profile must be listed without changing the three prior profiles');
+  // R7 is additive: guard original profile IDs and versions instead of freezing a count.
+  const expected = [
+    ['tw16-structural-verified','structural-only-v1'],
+    ['tw16-four-player-sandbox','experimental-move-v1'],
+    ['tw16-configurable-table','experimental-full-v1'],
+    ['tw16-single-winner-interception','experimental-v1'],
+    ['tw16-rob-added-kong','experimental-v1'],
+    ['tw16-authoritative-scoring','experimental-v1'],
+  ];
+  assert.deepEqual(profiles.map(p=>[p.profileId,p.ruleVersion]),expected,
+    'R7 must be strictly additive and preserve all four original profile versions');
+  assert.equal(profiles.at(-1).status,'experimental');
   assert.equal(profiles.find(p=>p.profileId==='tw16-configurable-table')?.status,'experimental');
   assert.equal(profiles.find(p=>p.profileId==='tw16-single-winner-interception' &&
     p.ruleVersion==='experimental-v1')?.status,'experimental');

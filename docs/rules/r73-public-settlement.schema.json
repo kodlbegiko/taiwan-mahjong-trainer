@@ -1,0 +1,316 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "R7.3 Rules public settlement summary (private scorer ledger is not this DTO)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contractVersion",
+    "settlementId",
+    "scoringVersion",
+    "status",
+    "unit",
+    "reason",
+    "winType",
+    "winnerSeat",
+    "sourceSeat",
+    "payerSeats",
+    "publicEvidenceEventIds",
+    "tai",
+    "breakdown",
+    "payments",
+    "playerTransferDeltas",
+    "playerDeltas",
+    "fees",
+    "houseDelta"
+  ],
+  "properties": {
+    "contractVersion": {
+      "const": "tw16-pre-settlement/1.0.0"
+    },
+    "settlementId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scoringVersion": {
+      "const": "tw16-gametower-authoritative@1.0.0-experimental"
+    },
+    "status": {
+      "const": "experimental-not-rule-certified"
+    },
+    "unit": {
+      "const": "abstract-points"
+    },
+    "reason": {
+      "enum": [
+        "win",
+        "exhaustive-draw"
+      ]
+    },
+    "winType": {
+      "enum": [
+        "self-draw",
+        "discard",
+        "rob-added-kong",
+        null
+      ]
+    },
+    "winnerSeat": {
+      "oneOf": [
+        {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "sourceSeat": {
+      "oneOf": [
+        {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "payerSeats": {
+      "type": "array",
+      "uniqueItems": true,
+      "maxItems": 3,
+      "items": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 3
+      }
+    },
+    "publicEvidenceEventIds": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "tai": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "breakdown": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "name",
+          "tai",
+          "ruleVersion",
+          "source",
+          "scope"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "tai": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "ruleVersion": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "scope": {
+            "enum": [
+              "hand",
+              "payment"
+            ]
+          }
+        }
+      }
+    },
+    "payments": {
+      "type": "array",
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "payerSeat",
+          "payeeSeat",
+          "points",
+          "handTai",
+          "appliedTai",
+          "dealerItems"
+        ],
+        "properties": {
+          "payerSeat": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 3
+          },
+          "payeeSeat": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 3
+          },
+          "points": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "handTai": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "appliedTai": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "dealerItems": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "code",
+                "name",
+                "tai",
+                "ruleVersion",
+                "source",
+                "scope"
+              ],
+              "properties": {
+                "code": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "tai": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "ruleVersion": {
+                  "type": "string"
+                },
+                "source": {
+                  "type": "string"
+                },
+                "scope": {
+                  "enum": [
+                    "hand",
+                    "payment"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "playerTransferDeltas": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {
+        "type": "integer"
+      }
+    },
+    "playerDeltas": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {
+        "type": "integer"
+      }
+    },
+    "fees": {
+      "const": []
+    },
+    "houseDelta": {
+      "const": 0
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "reason": {
+            "const": "exhaustive-draw"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "winType": {
+            "const": null
+          },
+          "winnerSeat": {
+            "const": null
+          },
+          "sourceSeat": {
+            "const": null
+          },
+          "payerSeats": {
+            "const": []
+          },
+          "payments": {
+            "const": []
+          },
+          "tai": {
+            "const": 0
+          },
+          "breakdown": {
+            "const": []
+          },
+          "playerTransferDeltas": {
+            "const": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "playerDeltas": {
+            "const": [
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "winType": {
+            "enum": [
+              "self-draw",
+              "discard",
+              "rob-added-kong"
+            ]
+          },
+          "winnerSeat": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 3
+          },
+          "sourceSeat": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 3
+          }
+        }
+      }
+    }
+  ]
+}
