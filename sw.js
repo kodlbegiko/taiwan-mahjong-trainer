@@ -1,7 +1,7 @@
 /* Offline-first, atomic shell for GitHub Pages root or /repo/ deployments.
  * IMPORTANT: change CACHE_VERSION whenever any precached file changes.
  * The install event only succeeds if the entire listed release is cached. */
-const CACHE_VERSION = 'tmt-v02-realistic-tiles-r74-authority-browser-2cc4429f';
+const CACHE_VERSION = 'tmt-v02-realistic-tiles-r74-authority-block-3123ca1f';
 const SHELL_CACHE = `tmt-shell-${CACHE_VERSION}`;
 const BASE = new URL('./', self.location.href);
 const SHELL = [

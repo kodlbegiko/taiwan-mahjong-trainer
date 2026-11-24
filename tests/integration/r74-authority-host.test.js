@@ -64,3 +64,110 @@ test('damaged authority checkpoint fails closed without overwriting either names
   assert.equal(s.restore(),false);assert.throws(()=>s.start(ref));
   assert.equal(storage.getItem(AUTHORITY_EXPERIMENT_KEY),raw);assert.equal(storage.getItem(legacyKey),'keep');
 });
+
+// Real deterministic competing-robber fixture from r74-authority-bot.test.js.
+const {createGame,createDeck,getRuleProfile,listLegalActions,listPendingClaimResponders,applyAction,AUTHORITATIVE_RULE_REF}=Rules;
+const activeRuntime=opts.settlementRuntime;
+const R7=AUTHORITATIVE_RULE_REF;
+const cp=x=>JSON.parse(JSON.stringify(x));
+const actions=(s,seat,kind)=>listLegalActions(s,seat).filter(a=>!kind||a.kind===kind);
+const choose=(s,seat,kind,id,reason)=>{
+  const a=actions(s,seat,kind).find(a=>(id===undefined||a.tileIds.includes(id))&&
+    (reason===undefined||a.legalityBasis.reasonCodes.includes(reason)));
+  assert.ok(a,'Missing '+kind+' '+id+' '+reason+' seat '+seat);return a;
+};
+const take=(s,a,runtime=activeRuntime)=>applyAction(s,{actorSeat:a.actorSeat,actionId:a.actionId,
+  expectedRevision:a.expectedRevision},{settlementRuntime:runtime}).state;
+const triplets=start=>Array.from({length:4},(_,t)=>
+  Array.from({length:3},(_,i)=>'t:'+(start+t)+':'+i)).flat();
+const robber=(start,pair,i=0)=>[...triplets(start),'t:6:'+i,'t:7:'+i,
+  't:'+pair+':0','t:'+pair+':1'];
+function fixtureDeck(tiles,live,{tail=[],liveLast=[]}={}){
+  const all=createDeck(getRuleProfile(R7.profileId,R7.ruleVersion)),seen=new Set();
+  const hands=Array.from({length:4},(_,i)=>[...(tiles[i]||[])]);
+  for(const id of [...hands.flat(),...live,...liveLast,...tail]){
+    assert.ok(all.includes(id)&&!seen.has(id),'duplicate/unknown fixture '+id);seen.add(id);
+  }
+  for(let seat=0;seat<4;seat++){
+    const quota=seat===0?17:16;
+    for(const id of all){
+      if(hands[seat].length>=quota)break;
+      if(id.startsWith('f:')||seen.has(id))continue;
+      hands[seat].push(id);seen.add(id);
+    }
+    assert.equal(hands[seat].length,quota);
+  }
+  const extra=hands[0].pop();
+  const deck=[...hands.flat(),extra,...live,...all.filter(id=>!seen.has(id)),...liveLast,...tail];
+  assert.equal(new Set(deck).size,144);return deck;
+}
+function respond(s,kinds={}){
+  for(const seat of listPendingClaimResponders(s))s=take(s,choose(s,seat,kinds[seat]||'pass'));
+  return s;
+}
+function prepared(two=false,{tail=[],three=false}={}){
+  const live=['t:31:3','t:32:3','t:33:3','t:5:2'];
+  const seats={0:['t:5:3'],1:['t:5:0','t:5:1'],2:robber(9,27)};
+  if(two||three)seats[3]=robber(18,28,1);
+  if(three)seats[0]=['t:5:3',...robber(0,29,2)];
+  let s=createGame({gameId:'r7-rob-'+(two?'multi':'one'),seed:'r7-seed',
+    fixtureDeck:fixtureDeck(seats,live,{tail}),...R7},{settlementRuntime:activeRuntime});
+  s=take(s,choose(s,0,'discard','t:5:3'));
+  s=respond(s,{1:'pong'});
+  assert.equal(s.players[1].melds.at(-1).kind,'triplet');
+  assert.equal(actions(s,1,'kong').length,0,'no immediate post-pong kong');
+  s=take(s,choose(s,1,'discard'));
+  for(const [i,seat] of [2,3,0].entries()){
+    s=respond(s);
+    assert.equal(s.round.currentSeat,seat);
+    s=take(s,choose(s,seat,'draw'));
+    assert.ok(s.players[seat].concealed.includes(live[i]));
+    s=take(s,choose(s,seat,'discard',live[i]));
+  }
+  s=respond(s);
+  assert.equal(s.round.currentSeat,1);
+  s=take(s,choose(s,1,'draw'));
+  assert.ok(s.players[1].concealed.includes('t:5:2'));
+  const added=choose(s,1,'kong','t:5:2','ADDED_KONG');
+  return {before:s,proposal:added,open:take(s,added)};
+}
+
+
+test('authority host preserves real multiwinner capability stop across reload without retry or settlement',async()=>{
+  const storage=memory();
+  const {open}=prepared(true);
+  storage.setItem(AUTHORITY_EXPERIMENT_KEY,JSON.stringify({version:1,gameState:open,botCheckpoint:{paused:false},botDifficulty:'Intermediate'}));
+  storage.setItem(legacyKey,'preserve-legacy');
+  const s=await createFullRoundSession({storage,enableAuthoritative:true});
+  assert.equal(s.restore(),true);
+  assert.equal((await s.advanceBots()).status,'human-turn');
+  const before=JSON.parse(storage.getItem(AUTHORITY_EXPERIMENT_KEY));
+  const a=s.snapshot().view.legalActions.find(a=>a.kind==='pass');
+  assert.ok(a);
+  const isBlocked=e=>e.code==='UNSUPPORTED_RULE_CAPABILITY'&&e.capability==='multiple_winners';
+  await assert.rejects(s.submit(a),isBlocked);
+  const raw=storage.getItem(AUTHORITY_EXPERIMENT_KEY),saved=JSON.parse(raw);
+  assert.deepEqual(saved.gameState,before.gameState);
+  assert.equal(saved.botCheckpoint.blocked.capability,'multiple_winners');
+  assert.equal(saved.botCheckpoint.blocked.expectedRevision,saved.gameState.revision);
+  const reopened=await createFullRoundSession({storage,enableAuthoritative:true});
+  assert.equal(reopened.restore(),true);
+  const snap=reopened.snapshot();
+  assert.equal(snap.result,null);
+  assert.equal(snap.replayConnected,false);
+  assert.equal(snap.capabilityBlock.capability,'multiple_winners');
+  const html=TableView(snap);
+  assert.match(html,/data-authority-capability-block/);
+  assert.doesNotMatch(html,/data-(?:submit-action|pick-action|continue-bots|resume-bots|pause-bots)/);
+  await assert.rejects(reopened.submit(a),isBlocked);
+  await assert.rejects(reopened.advanceBots(),isBlocked);
+  assert.throws(()=>reopened.resume(),isBlocked);
+  assert.equal(storage.getItem(AUTHORITY_EXPERIMENT_KEY),raw);
+  assert.equal(storage.getItem(legacyKey),'preserve-legacy');
+  assert.ok(![...storage.m.keys()].some(k=>k.includes('replay:archive:')));
+  const tampered=structuredClone(saved);tampered.botCheckpoint.blocked.expectedRevision++;
+  const badRaw=JSON.stringify(tampered);storage.setItem(AUTHORITY_EXPERIMENT_KEY,badRaw);
+  const bad=await createFullRoundSession({storage,enableAuthoritative:true});
+  assert.equal(bad.restore(),false);assert.equal(bad.snapshot(),null);assert.throws(()=>bad.start(ref));
+  assert.equal(storage.getItem(AUTHORITY_EXPERIMENT_KEY),badRaw);
+});

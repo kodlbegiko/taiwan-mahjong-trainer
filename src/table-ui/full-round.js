@@ -81,12 +81,32 @@ export async function createFullRoundSession({storage,enableAuthoritative=false}
   function persist(next,{paused=controller?.isPaused()??false,difficulty=botDifficulty}={}) {
     if (blocked) throw new Error('舊紀錄損壞，禁止覆蓋');
     try {
-      storage.setItem(key, JSON.stringify({version:1, gameState:next, botCheckpoint:{paused}, botDifficulty:checkedDifficulty(difficulty)}));
+      // A rejection never advances Rules revision. Persist the Controller's
+      // bound stop alongside that exact state, never into a newly started game.
+      const stopped=enableAuthoritative&&next===state?controller?.checkpoint()?.blocked:undefined;
+      storage.setItem(key, JSON.stringify({version:1, gameState:next,
+        botCheckpoint:{paused,...(stopped?{blocked:stopped}:{})},botDifficulty:checkedDifficulty(difficulty)}));
       storageWarning = '';
     } catch (e) {
       storageWarning = 'R3 對局儲存失敗，重新整理可能遺失進度：' + e.message;
       throw e;
     }
+  }
+  function capabilityError(stop){
+    const error=new Error('實驗桌規尚未支援：'+stop.capability+'；對局已停止，未完成結算。');
+    error.code=stop.code;error.capability=stop.capability;
+    return error;
+  }
+  function currentBlock(){
+    return enableAuthoritative?controller?.checkpoint()?.blocked:null;
+  }
+  function refuseBlocked(){
+    const stop=currentBlock();
+    if(stop)throw capabilityError(stop);
+  }
+  function saveBlockAndRefuse(){
+    const stop=currentBlock();
+    if(stop){persist(state);throw capabilityError(stop);}
   }
   function legal(submission, seat) {
     if (!state || !submission || submission.actorSeat !== seat ||
@@ -149,13 +169,18 @@ export async function createFullRoundSession({storage,enableAuthoritative=false}
         obj.gameState.ruleRef?.profileId,obj.gameState.ruleRef?.ruleVersion
       ))) throw new Error('Invalid R3 checkpoint');
       rules.validateGameState(obj.gameState,opts);
+      const stop=obj.botCheckpoint?.blocked;
+      if(stop!==undefined&&(!enableAuthoritative||stop?.gameId!==obj.gameState.gameId||
+         stop.expectedRevision!==obj.gameState.revision||obj.gameState.round.phase==='settled'||
+         !rules.listLegalActions(obj.gameState,stop.seat).length))
+        throw new Error('Blocked checkpoint does not bind to the current Rules state');
       botDifficulty=checkedDifficulty(Object.hasOwn(obj,'botDifficulty')?obj.botDifficulty:'Beginner');
       state=obj.gameState;
       setupController(obj.botCheckpoint??null);
       if (state.round.phase==='settled') archive();
       return true;
     } catch (e) {
-      blocked=true;
+      blocked=true;state=null;controller=null;
       storageWarning='既有 R3 對局驗證失敗，原始紀錄保留、不會覆寫：'+e.message;
       return false;
     }
@@ -222,17 +247,20 @@ export async function createFullRoundSession({storage,enableAuthoritative=false}
       wallRemaining:state.wall.length, botConnected:true,botDifficulty,
       replayConnected:!!replayId,storageWarning,
       replayWarning,phase:'experimental-full',result,
-      paused:controller?.isPaused()??false
+      paused:controller?.isPaused()??false,
+      ...(currentBlock()?{capabilityBlock:currentBlock()}: {})
     });
   }
   async function submit({actionId,actorSeat,expectedRevision}={}) {
     if (!state || !controller) throw new Error('尚未開始 R3 對局');
+    refuseBlocked();
     if (!legal({actionId,actorSeat,expectedRevision},HUMAN))
       throw new Error('過期或不合法的玩家 Action');
     if(submitting)throw new Error('玩家 Action 已在提交中');
     submitting=true;
     try{
       const r=await controller.submitHumanAction({actionId,expectedRevision});
+      if(r.status==='unsupported')saveBlockAndRefuse();
       if (r.status!=='acted')
         throw new Error('Bot Controller 拒絕：'+r.status+(r.reason?' / '+r.reason:''));
       return snapshot();
@@ -240,11 +268,13 @@ export async function createFullRoundSession({storage,enableAuthoritative=false}
   }
   async function advanceBots({maxActions=1024,onProgress=()=>{}}={}) {
     if (!state || !controller) return {status:'not-started',snapshot:snapshot()};
+    refuseBlocked();
     let remaining=maxActions, total=0;
     while (remaining>0) {
       const batch=Math.min(32,remaining);
       const r=await controller.runUntilHuman({maxActions:batch});
       total+=r.actions??0;remaining-=r.actions??0;
+      if(r.status==='unsupported')saveBlockAndRefuse();
       onProgress({actions:total,status:r.status,revision:state.revision});
       if (r.status==='action-budget-reached') {
         if (r.actions===0) throw new Error('Bot 未前進，已安全停止');
@@ -294,8 +324,8 @@ export async function createFullRoundSession({storage,enableAuthoritative=false}
   }
   return Object.freeze({
     start,restore,snapshot,submit,advanceBots,replay,
-    pause(){controller?.pause();if(state)persist(state);return snapshot();},
-    resume(){controller?.resume();if(state)persist(state);return snapshot();},
+    pause(){refuseBlocked();controller?.pause();if(state)persist(state);return snapshot();},
+    resume(){refuseBlocked();controller?.resume();if(state)persist(state);return snapshot();},
     availableProfiles(){return rules.listRuleProfiles().filter(supported);}
   });
 }

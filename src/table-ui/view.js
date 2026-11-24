@@ -153,12 +153,13 @@ export function TableView(snapshot,{selection=null,busy=false,error='',botStatus
   const {view,profile,wallRemaining,botConnected,replayConnected,storageWarning,replayWarning}=snapshot;
   const opponents=new Map(view.opponents.map(p=>[p.seat,p]));
   const robbery=RobberyNotice(view,snapshot.robbery);
-  const actions=robbery.valid?view.legalActions.filter(a=>a.actorSeat===view.audienceSeat &&
+  const stopped=snapshot.capabilityBlock;
+  const actions=robbery.valid&&!stopped?view.legalActions.filter(a=>a.actorSeat===view.audienceSeat &&
     a.expectedRevision===view.asOfEventSeq&&typeof a.actionId==='string'):[];
   const humanCanAct=actions.length>0;
   const ended=view.round.phase==='settled';
   const claim=view.round.phase==='claim_window';
-  const phaseLabel=snapshot.paused?'對局已暫停':ended?'本局已結束':humanCanAct?
+  const phaseLabel=stopped?'實驗規則不支援，已停止':snapshot.paused?'對局已暫停':ended?'本局已結束':humanCanAct?
     (claim?'請回應合法宣告':'輪到你'):botConnected?'等待三位 Bot':'等待 Bot API';
   return '<header class="table-heading"><div><span class="table-overline">EXPERIMENTAL / '+
     escapeHtml(profile.ruleVersion)+'</span><h1 id="table-heading" tabindex="-1">四人牌桌</h1>'+
@@ -194,7 +195,9 @@ export function TableView(snapshot,{selection=null,busy=false,error='',botStatus
     '</span><small>僅顯示當下的公開牌面與本人手牌</small></div>'+
     OpponentSeat(opponents.get(1),view.round.currentSeat,view.round.dealerSeat)+'</div>'+
     robbery.html+PlayerHand(view.self,actions,selection)+
-    (!robbery.valid?'<section class="table-actions" aria-label="契約不相容">操作已停止</section>':ended?'<section class="table-actions"><h3>正式 Rules 已結算本局</h3></section>':
+    (stopped?'<section class="table-actions" role="alert" data-authority-capability-block>實驗桌規尚未支援：'+
+      escapeHtml(stopped.capability)+'；本局未結算，保留當前紀錄。請重新開局。</section>':
+      !robbery.valid?'<section class="table-actions" aria-label="契約不相容">操作已停止</section>':ended?'<section class="table-actions"><h3>正式 Rules 已結算本局</h3></section>':
       humanCanAct?ActionBar(actions,selection,busy||snapshot.paused,confirmation):
         '<section class="table-actions" aria-label="等待其他玩家"><h3>'+
         (botConnected?'三名 Bot 自動執行中':'Bot API 尚未連接')+'</h3><p>'+
@@ -211,7 +214,7 @@ export function TableView(snapshot,{selection=null,busy=false,error='',botStatus
     (replayConnected?' 已建立官方 Replay 歷史封存。':' 尚無完成的 Replay。')+'</p>'+
     RoundSummary(snapshot.result)+
     '<div class="table-footer-controls">'+
-    (botConnected&&!ended?'<button type="button" class="secondary" data-'+
+    (botConnected&&!ended&&!stopped?'<button type="button" class="secondary" data-'+
       (snapshot.paused?'resume-bots':'pause-bots')+'>'+
       (snapshot.paused?'繼續 Bot／玩家':'暫停 Bot')+'</button>':'')+
     '<button type="button" class="secondary" data-show-replay>'+
