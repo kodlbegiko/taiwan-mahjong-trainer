@@ -42,6 +42,7 @@ export function createAdaptiveLearningAdapter(storage, {
   // legacy write must not poison retries with an in-memory phantom record.
   const academy = createAcademyStore(storage, {
     learning, registry, validateAcademyDecisionRecord, profileId, timezone,
+    validateAcademyQuestion:learning.validateScenarioQuestion ? q=>learning.validateScenarioQuestion(q,{publicOnly:true}) : undefined,
   });
   const persisted = ref => {
     const { archive, hasCanonicalV3 } = academy.readLegacy();
@@ -132,6 +133,24 @@ export function createAdaptiveLearningAdapter(storage, {
           questionRef: { ...link.academyQuestionRef } };
       }
     }
+    // Scenario provenance is the semantically verified academy-v1 record and
+    // its immutable question snapshot, not a legacy-v3 provenance alias.
+    const scenarioRef=item.sourceRecordRefs.find(r=>r.kind==='academy-v1');
+    if(scenarioRef){
+      try{
+        const record=state.academyRecords.find(r=>r.id===scenarioRef.id);
+        if(!record||record.questionRef.questionId!==item.questionId||
+           record.questionRef.questionVersion!==item.questionVersion)
+          return {available:false,reason:'scenario-record-mismatch'};
+        const question=state.academyQuestions.find(q=>q.questionId===item.questionId&&q.questionVersion===item.questionVersion);
+        validateScoredRecord(scenarioRef,record,{validateAcademyDecisionRecord,question});
+        if(!question||!same(question,learning.toPublicQuestion(record.questionRef)))
+          return {available:false,reason:'scenario-version-unavailable'};
+        return {available:true,source:'academy-scenario',question,lesson:learning.getLessonPublic(question.lessonRef.lessonId),
+          questionRef:{...record.questionRef},recordRef:{...scenarioRef},skillTagIds:[...record.skillTagIds],
+          scoringVersion:record.scoringVersion};
+      }catch{return {available:false,reason:'scenario-version-unavailable'};}
+    }
     // Never fabricate an Academy lesson from an orphan ex3-* v3 record.
     if (item.questionVersion !== 'legacy-exercise-v3') {
       return { available: false, reason: 'unlinked-academy-question' };
@@ -156,7 +175,28 @@ export function createAdaptiveLearningAdapter(storage, {
   } = {}) {
     const at = requireUtc(asOf);
     const graded = learning.submitAcademyAnswer(ref, choice, { timestamp, durationMs, attemptId });
-    if (graded.recordRef.kind !== 'legacy-v3') throw new RangeError('No verified scenario scorer installed');
+    if(graded.recordRef.kind==='academy-v1'){
+      if(typeof learning.validateScenarioQuestion!=='function'||!graded.question||
+         learning.validateScenarioQuestion(graded.question,{publicOnly:true})!==true)
+        throw new RangeError('No verified scenario scorer installed');
+      validateScoredRecord(graded.recordRef,graded.record,{validateAcademyDecisionRecord,question:graded.question});
+      const lesson=learning.getLessonPublic(graded.question.lessonRef.lessonId);
+      const state=academy.load();
+      const refs=new Set((state.provenanceLinks??[]).map(p=>p.academyQuestionRef.questionId+'@'+p.academyQuestionRef.questionVersion));
+      if(!lesson||lesson.lessonVersion!==graded.question.lessonRef.lessonVersion||
+         !['published','validated'].includes(lesson.status)||
+         !lesson.prerequisiteLessonIds.every(id=>{
+           const pre=learning.getLessonPublic(id);
+           return pre&&pre.questionRefs.every(q=>refs.has(q.questionId+'@'+q.questionVersion));
+         }))throw new RangeError('Scenario prerequisites are not complete');
+      const result=academy.persistScoredRecord({kind:'academy-v1',record:graded.record,question:graded.question},
+        {asOf:at,sessionId});
+      // Return proof only after raw sidecar and derived readback.
+      return {...result,gradingResult:graded.gradingResult,provenanceDurable:result.durable===true,
+        sessionFresh:result.durable===true&&(!sessionId||
+          academy.getSession(sessionId)?.recordRefs.some(r=>same(r,graded.recordRef)))};
+    }
+    if (graded.recordRef.kind !== 'legacy-v3') throw new RangeError('Unknown scored record family');
     validateScoredRecord(graded.recordRef, graded.record);
     // Fully validate the trusted curriculum source BEFORE touching the old archive.
     const link = createLearningProvenance({ record: graded.record,

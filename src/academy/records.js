@@ -1,6 +1,6 @@
 /** Independent AcademyDecisionRecord V1 family; never put these in v3 archives. */
 import { CONTRACT_VERSION, SCHEMA_VERSION, assertContract, getErrorType, getSkillTag } from './registry.js';
-import { verifiedScenarioFixture } from './scenario-scorers.js';
+import { verifiedScenarioFixture, validateScenarioQuestion } from './scenario-scorers.js';
 
 const json=x=>JSON.stringify(x);
 const clone=x=>JSON.parse(json(x));
@@ -38,6 +38,8 @@ function scoreFixture(f,actionId) {
 export function createAcademyDecisionRecord(question,chosenActionId,{timestamp,durationMs,attemptId}={}) {
   const view=assertScenarioSource(question);
   const f=fixtureFor(question);
+  validateScenarioQuestion(question);
+  if(json(question)!==json(f.question))throw new RangeError('Immutable full scenario question required');
   if(!nonempty(chosenActionId) || !utc(timestamp) ||
      !Number.isSafeInteger(durationMs)||durationMs<0 || (attemptId!==undefined&&!nonempty(attemptId)))
     throw new RangeError('情境作答輸入無效');
@@ -64,7 +66,7 @@ export function createAcademyDecisionRecord(question,chosenActionId,{timestamp,d
   validateAcademyDecisionRecord(rec);
   return rec;
 }
-export function validateAcademyDecisionRecord(record) {
+export function validateAcademyDecisionRecord(record,{question}={}) {
   assertContract(record);
   if(record.recordKind!=='academy-scenario'||!nonempty(record.id) ||
      !nonempty(record.questionRef?.questionId)||!nonempty(record.questionRef?.questionVersion)||
@@ -85,6 +87,16 @@ export function validateAcademyDecisionRecord(record) {
     throw new RangeError('AcademyDecisionRecord 欄位無效');
   const f=verifiedScenarioFixture(record.scoringEvidence.fixtureId);
   if(!f || !f.verified)throw new RangeError('沒有原版 verified scorer，紀錄不可重算及計分');
+  const allowed=['schemaVersion','contractVersion','id','questionRef','ruleRef','scorerId','scoringVersion','engineVersion',
+    'sourceViewRef','chosenActionId','legalActionIds','timestamp','durationMs','grade','score','errorTypeIds','skillTagIds','scoringEvidence','recordKind'];
+  if(Object.keys(record).some(k=>!allowed.includes(k))||Object.keys(record).length!==allowed.length||
+     Object.keys(record.questionRef).sort().join(',')!=='questionId,questionVersion'||
+     Object.keys(record.scoringEvidence).sort().join(',')!=='answerSnapshotDigest,basis,fixtureId')
+    throw new RangeError('Unexpected scenario record fields');
+  if(question!==undefined){
+    validateScenarioQuestion(question,{publicOnly:true});
+    if(json(question)!==json(f.publicQuestion))throw new RangeError('Scenario stored public snapshot mismatch');
+  }
   const scored=scoreFixture(f,record.chosenActionId);
   if(f.questionId!==record.questionRef.questionId ||
      f.questionVersion!==record.questionRef.questionVersion ||

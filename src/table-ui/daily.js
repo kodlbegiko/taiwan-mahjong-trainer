@@ -57,12 +57,12 @@ export async function createDailyPanel(storage) {
       return progress;
     }catch(e){state='failed';error=e.message;throw e;}
   }
-  async function start(minutes=30) {
+  async function start(minutes=30,mode='structural') {
     if(pending)throw new Error('提交尚未結束');
     if(![10,20,30,60].includes(minutes))throw new Error('不支援的訓練長度');
     state='loading';
     try {
-      await ctrl.ensureTodayLocked({asOf:now(),minutes});
+      await ctrl.ensureTodayLocked({asOf:now(),minutes,mode});
       lastGrade=null;lastSaved=null;
       setProgress(await ctrl.getDailyProgressLocked({asOf:now()}));
       state='ready';error='';return progress;
@@ -95,8 +95,12 @@ export async function createDailyPanel(storage) {
     }catch(e){state='failed';error=e.message;throw e;}
   }
   function getChoice(root) {
-    const checked=[...root.querySelectorAll('[name="daily-answer"]:checked')]
-      .map(x=>Number(x.value));
+    const chosen=[...root.querySelectorAll('[name="daily-answer"]:checked')].map(x=>x.value);
+    if(question.taskType==='scenario'){
+      if(chosen.length!==1||!question.prompt.options.includes(chosen[0]))throw new Error('非法情境選項');
+      return chosen[0];
+    }
+    const checked=chosen.map(Number);
     if(!checked.length)throw new Error('尚未選擇答案');
     if(checked.some(x=>t(x)===null))throw new Error('非法選項');
     return question.taskType==='discard'?checked[0]:checked;
@@ -167,7 +171,7 @@ export async function createDailyPanel(storage) {
     const header='<section class="table-daily-state" data-daily-state="'+esc(state)+'"'+
       (lastSaved&&state==='saved'?' data-daily-record-id="'+esc(lastSaved.recordRef.id)+'"':'')+
       '><header class="table-heading"><h1 id="table-heading" tabindex="-1">今日正式訓練</h1>'+
-      '<span class="table-overline">ACADEMY DAILY / 正式 v3 作答</span></header>'+
+      '<span class="table-overline">ACADEMY DAILY / 正式 v3 或 Academy 情境作答</span></header>'+
       '<p class="table-muted">進度與成績只以 Adaptive / Learning 的持久化結果為準；不另建 UI 資料庫。</p>'+
       '<p role="status" aria-live="polite">提交狀態：'+
       esc({loading:'讀取中',ready:'可操作',submitting:'正在透過正式 API 儲存',
@@ -183,7 +187,9 @@ export async function createDailyPanel(storage) {
     if (p.status==='not-started')return header+'<section class="table-empty"><h2>開始今日課表</h2>'+
       '<label for="daily-minutes">訓練長度</label><select id="daily-minutes">'+
       [10,20,30,60].map(n=>'<option value="'+n+'"'+(n===30?' selected':'')+'>'+n+' 分鐘</option>').join('')+
-      '</select><button type="button" class="primary" data-daily-start>正式建立 Session</button>'+
+      '</select><label for="daily-mode">訓練模式</label><select id="daily-mode">'+
+      '<option value="structural">正式結構題（v3）</option><option value="scenario">客觀情境題（Academy V1）</option></select>'+
+      '<button type="button" class="primary" data-daily-start>正式建立 Session</button>'+
       '</section></section>';
     let html=header+progressText+
       '<div class="table-footer-controls"><button type="button" data-daily-resume>恢復／刷新 Session</button>';
@@ -201,16 +207,19 @@ export async function createDailyPanel(storage) {
         '<p>官方已確認作答紀錄；此提交沒有重新回傳評分明細。</p>')+'</section>';
     if (question && p.nextStep==='answer') {
       const q=question,options=q.prompt?.options??[];
-      const multiple=q.taskType!=='discard';
+      const scenario=q.taskType==='scenario';
+      const multiple=!scenario&&q.taskType!=='discard';
       html+='<section class="table-actions table-daily-question" data-daily-question-ref="'+
         esc(short(q))+'"><h2>'+esc(q.taskType)+
         ' · '+esc(q.questionId)+'</h2><p>題型由已發布 Learning QuestionPublic 提供。'+
-        (multiple?'可複選有效牌。':'請選擇一張捨牌。')+'</p>'+
+        esc(scenario?q.instructionsZhTW:multiple?'可複選有效牌。':'請選擇一張捨牌。')+'</p>'+
         '<div class="table-daily-hand" aria-label="題目手牌">'+
         (q.prompt?.legacyHand??[]).map(tile).join('')+'</div>'+
+        (scenario?'<p>固定面子：'+esc(q.prompt.playerView.self.melds.length)+'；其他已知牌：</p><div class="table-daily-hand">'+
+          q.prompt.visibleTiles.map(tile).join('')+'</div>':'')+
         '<div class="table-action-buttons" role="group" aria-label="正式題目選項">'+
         options.map(x=>'<label class="table-daily-option"><input name="daily-answer" type="'+
-          (multiple?'checkbox':'radio')+'" value="'+esc(x)+'"/>'+tile(x)+'</label>').join('')+
+          (multiple?'checkbox':'radio')+'" value="'+esc(x)+'"/>'+(scenario?esc(q.prompt.optionLabels[x]):tile(x))+'</label>').join('')+
         '</div><button type="button" class="primary" data-daily-submit '+
         (pending||state==='recovery-required'?'disabled':'')+
         '>提交正式答案</button></section>';

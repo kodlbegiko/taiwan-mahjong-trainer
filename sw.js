@@ -1,7 +1,7 @@
 /* Offline-first, atomic shell for GitHub Pages root or /repo/ deployments.
  * IMPORTANT: change CACHE_VERSION whenever any precached file changes.
  * The install event only succeeds if the entire listed release is cached. */
-const CACHE_VERSION = 'tmt-v02-realistic-tiles-r74-authority-host-e7477e82-v1';
+const CACHE_VERSION = 'tmt-v02-realistic-tiles-r74-combined-358afd98-d4cbb328-d7fdc5fb';
 const SHELL_CACHE = `tmt-shell-${CACHE_VERSION}`;
 const BASE = new URL('./', self.location.href);
 const SHELL = [
@@ -57,6 +57,7 @@ const SHELL = [
   './src/academy/questions.js',
   './src/academy/records.js',
   './src/academy/registry.js',
+  './src/academy/scenario-bank-v1.js',
   './src/academy/scenario-scorers.js',
   './src/adaptive/ability.js',
   './src/adaptive/core.js',
@@ -198,6 +199,22 @@ self.addEventListener('activate', event => {
 });
 
 self.addEventListener('message', event => {
+  // Read-only version attestation from the actual controller, not a guess
+  // based on the presence of a cache. Do not create or repair a missing cache.
+  if (event.data?.type === 'GET_RELEASE_STATUS' && event.ports?.length === 1) {
+    const port=event.ports[0];
+    event.waitUntil((async () => {
+      try {
+        await verifyRelease();
+        port.postMessage({type:'RELEASE_STATUS',version:CACHE_VERSION,
+          cacheName:SHELL_CACHE,scope:BASE.href,assetCount:SHELL.length,complete:true});
+      } catch {
+        port.postMessage({type:'RELEASE_STATUS',version:CACHE_VERSION,
+          cacheName:SHELL_CACHE,scope:BASE.href,assetCount:SHELL.length,complete:false});
+      }
+    })());
+    return;
+  }
   if (event.data?.type === 'SKIP_WAITING') {
     event.waitUntil((async () => {
       await verifyRelease();
