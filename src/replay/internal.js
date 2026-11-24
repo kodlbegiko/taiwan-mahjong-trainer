@@ -91,17 +91,58 @@ function pinnedScoringVersion(profile,ref) {
 }
 function verifyPinnedSettlement(state,version) {
   const result=state.extensions?.tw16?.result;
-  if(state.round.phase!=='settled')return;
-  const payload=state.events.at(-1)?.payload;
-  if(version!=='tw16-minimal-tai-v1'||!result||state.events.at(-1)?.type!=='settle'||
+  const settlements=state.events.filter(e=>e.type==='settle');
+  const wins=state.events.filter(e=>e.type==='win');
+  if(state.round.phase!=='settled'){
+    if(result!==null||settlements.length||wins.length)
+      throw new ReplayError('INVALID_SETTLEMENT','Unfinished round contains terminal scoring evidence');
+    return;
+  }
+  const terminal=state.events.at(-1),payload=terminal?.payload;
+  if(version!=='tw16-minimal-tai-v1'||!result||terminal?.type!=='settle'||
+     terminal.visibility!=='public'||settlements.length!==1||
      (result.scoringVersion!==undefined&&result.scoringVersion!==version)||
      (payload?.scoringVersion!==undefined&&payload.scoringVersion!==version)||
      !Array.isArray(result.delta)||result.delta.length!==4||
-     !result.delta.every(Number.isSafeInteger)||
+     !result.delta.every(n=>Number.isSafeInteger(n)&&!Object.is(n,-0))||
      result.delta.reduce((n,v)=>n+BigInt(v),0n)!==0n||
      !same(result.delta,state.round.scores)||!same(result.delta,payload.delta)||
      result.reason!==payload.reason)
     throw new ReplayError('INVALID_SETTLEMENT','Canonical pinned settlement/deltas do not match');
+  const seat=n=>Number.isInteger(n)&&n>=0&&n<4;
+  if(result.reason==='exhaustive-draw'){
+    if(wins.length||result.winnerSeat!==null||result.tai!==0||
+       result.delta.some(n=>n!==0))
+      throw new ReplayError('INVALID_SETTLEMENT','Invalid historical exhaustive draw');
+  }else if(result.reason==='win'){
+    const win=wins[0],w=result.winnerSeat,s=result.sourceSeat;
+    if(wins.length!==1||win!==state.events.at(-2)||win.visibility!=='public'||
+       win.causedByActionId!==terminal.causedByActionId||
+       !seat(w)||!seat(s)||win.actorSeat!==w||terminal.actorSeat!==w||
+       win.payload?.winnerSeat!==w||win.payload?.sourceSeat!==s||
+       win.payload?.via!==result.via||payload.winnerSeat!==w||
+       !Number.isSafeInteger(result.tai)||result.tai<0||payload.tai!==result.tai||
+       !Array.isArray(result.breakdown)||
+       result.breakdown.some(item=>!item||typeof item.code!=='string'||
+         typeof item.source!=='string'||!Number.isSafeInteger(item.tai)||item.tai<0)||
+       new Set(result.breakdown.map(item=>item.code)).size!==result.breakdown.length||
+       result.breakdown.reduce((n,item)=>n+BigInt(item.tai),0n)!==BigInt(result.tai))
+      throw new ReplayError('INVALID_SETTLEMENT','Historical WIN/SETTLE and breakdown disagree');
+    // Verify responsibility using the ORIGINAL minimal policy only. This is an
+    // accounting invariant, not a second scorer or a substitute result.
+    const payers=result.via==='self-draw'&&w===s?[0,1,2,3].filter(n=>n!==w):
+      result.via==='discard'&&w!==s?[s]:null;
+    if(!payers||result.delta[w]<0||
+       result.delta.some((n,i)=>i!==w&&(payers.includes(i)?n>0:n!==0)))
+      throw new ReplayError('INVALID_SETTLEMENT','Historical payer responsibility mismatch');
+    const cfg=assertProfile(state.ruleRef).extensions.tw16.scoring;
+    for(const payer of payers){
+      const points=cfg.basePoints+(result.tai+
+        (payer===state.round.dealerSeat||w===state.round.dealerSeat?cfg.dealerInteractionTai:0))*cfg.pointsPerTai;
+      if(!Number.isSafeInteger(points)||result.delta[payer]!==-points)
+        throw new ReplayError('INVALID_SETTLEMENT','Historical payer amount mismatch');
+    }
+  }else throw new ReplayError('INVALID_SETTLEMENT','Unknown historical settlement reason');
   if(result.robAddedKong!==undefined) {
     const marker=result.robAddedKong;
     if(!isRobAddedKong(state.ruleRef)||
@@ -261,9 +302,15 @@ export function validateReplayArchive(archive) {
        m.verificationScope!==(r3?'experimental-r3-full-round':'experimental-bounded-draw-discard'))
       throw new Error('manifest version/identity');
     const profile=assertProfile(m.ruleRef);
-    if(m.scoringVersion!==pinnedScoringVersion(profile,m.ruleRef))
+    const pinned=pinnedScoringVersion(profile,m.ruleRef);
+    if(typeof m.scoringVersion!=='string'||!m.scoringVersion)
+      throw new Error('Missing historical scoring version');
+    if(m.scoringVersion!==pinned){
+      if(!['unavailable','tw16-minimal-tai-v1'].includes(m.scoringVersion))
+        throw new ReplayError('UNSUPPORTED_SCORING_PROFILE','Historical scoring policy is unavailable for this RuleProfile');
       throw new Error('Pinned scoring policy mismatch');
-    if(!same(m.ruleProfileSnapshot,profile))throw new Error('RuleProfile snapshot mismatch');
+    }
+    if(!same(m.ruleProfileSnapshot,profile))throw new Error('RuleProfile snapshot mismatch; historical policy cannot be silently upgraded');
     if(r3){
       if(profile.status!=='experimental'||m.ruleProfileVersion!==profile.ruleVersion||
          m.initialSeedRef!=='private:ReplayManifest.initialSeed'||
@@ -281,7 +328,8 @@ export function validateReplayArchive(archive) {
          e.turnEvent?.seq!==i+1)throw new Error('ReplayEvent seq/version');
       return e.turnEvent;
     });
-    if(checksum(archive.events)!==m.integrity?.eventsChecksum||
+    if(m.integrity?.algorithm!=='fnv1a-32-canonical-checksum-not-signature'||
+       checksum(archive.events)!==m.integrity?.eventsChecksum||
        checksum(archive.decisions)!==m.integrity?.decisionChecksum)
       throw new Error('event/decision checksum');
     if(!same(decisionsOf(events,m),archive.decisions))

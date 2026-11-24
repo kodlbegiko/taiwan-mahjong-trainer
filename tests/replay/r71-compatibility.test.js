@@ -97,7 +97,7 @@ test('R7.1 canonical SHA matches Node SHA-256, JSON and key-order invariance',()
   assert.equal(validateReplayArchive(copy),true);
   assert.deepEqual(replayIntegrityHashes(copy.manifest,copy.events,copy.decisions,reverse(state)),archive.manifest.integrity.sha256);
   copy.manifest.scoringVersion='tw16-gametower-comparative@1.0.0-experimental';
-  code(()=>validateReplayArchive(copy),'CORRUPT_REPLAY');
+  code(()=>validateReplayArchive(copy),'UNSUPPORTED_SCORING_PROFILE');
 });
 function legacySettled(){
   const ref={profileId:'tw16-single-winner-interception',ruleVersion:'experimental-v1'};
@@ -241,7 +241,16 @@ test('R7.1 opt-in comparison scoring never replaces historical Rules results, ev
     const definition=cp(scoring.getScoringProfile('tw16-gametower-comparative'));
     definition.settlement.fee={mode:'fixed-per-player',points:7};
     const profile=scoring.createScoringProfile(definition);
-    const comparison=scoring.settleRulesState(profile,state);
+    const capabilities=getRuleCapabilities(state.ruleRef);
+    const publicEventContractVersion=capabilities.publicEventContractVersion;
+    if(state.extensions.tw16.result.robAddedKong){
+      assert.equal(publicEventContractVersion,'tw16-rob-added-kong-public/1.0.0');
+      assert.throws(()=>scoring.settleRulesState(profile,state),
+        {code:'UNSUPPORTED_SCORING_CAPABILITY'});
+      assert.throws(()=>scoring.settleRulesState(profile,state,{publicEventContractVersion:'unknown'}),
+        {code:'UNSUPPORTED_SCORING_CAPABILITY'});
+    }
+    const comparison=scoring.settleRulesState(profile,state,{publicEventContractVersion});
     assert.equal(scoring.assertLedgerConservation(comparison),true);
     assert.equal(comparison.scoringVersion,profile.profileId+'@'+profile.version);
     assert.equal(comparison.playerTransferDeltas.reduce((n,v)=>n+v,0),0);
@@ -260,6 +269,6 @@ test('R7.1 opt-in comparison scoring never replaces historical Rules results, ev
     assert.deepEqual(service.getReplayFrame(meta.replayId,1,{perspective:'postgame'}).postgameDisclosure.outcome.delta,result.delta);
     const forged=cp(archive);
     forged.manifest.scoringVersion=comparison.scoringVersion;
-    code(()=>validateReplayArchive(forged),'CORRUPT_REPLAY');
+    code(()=>validateReplayArchive(forged),'UNSUPPORTED_SCORING_PROFILE');
   }
 });
