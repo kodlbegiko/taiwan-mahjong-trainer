@@ -15,7 +15,9 @@ let replayFrame=null,replayBusy=false,botStatus='',storage=null;
 let dailyBoot='idle';
 let pendingAction=null,restartPending=false;
 const forceSandbox=new URLSearchParams(window.location.search).get('table')==='sandbox';
-const seededQA=new URLSearchParams(window.location.search).get('qa')==='seeded';
+const authorityQA=!forceSandbox&&['127.0.0.1','localhost','[::1]'].includes(window.location.hostname)&&
+  new URLSearchParams(window.location.search).get('qa')==='authority';
+const seededQA=authorityQA||new URLSearchParams(window.location.search).get('qa')==='seeded';
 
 
 function profilesList() {
@@ -27,14 +29,15 @@ function profilesList() {
 function profiles() {
   return profilesList().map(p=>'<option value="'+safe(p.profileId+'@'+p.ruleVersion)+'">'+
     safe(p.profileId==='tw16-single-winner-interception'?'一炮一響／攔胡（實驗性）':
-      p.profileId==='tw16-configurable-table'?'舊實驗桌規（多人胡牌拒絕）':p.profileId)+
+      p.profileId==='tw16-configurable-table'?'舊實驗桌規（多人胡牌拒絕）':
+      p.profileId==='tw16-authoritative-scoring'?'權威計分（本機限定實驗／未認證）':p.profileId)+
       ' ['+safe(p.profileId)+'] · '+safe(p.ruleVersion)+' · '+safe(p.status)+'</option>').join('');
 }
 function renderEmpty() {
   return '<header class="table-heading"><div><span class="table-overline">PHASE 3 · EXPERIMENTAL</span>'+
     '<h1 id="table-heading" tabindex="-1">四人實戰</h1>'+
     '<p>'+(fullMode
-      ? 'R3 規則、三名 Bot 與 Replay 正式接線；台數仍為實驗性簡化政策。'
+      ? (authorityQA?'本機限定權威計分驗收；獨立存檔、非金額、未認證。':'R3 規則、三名 Bot 與 Replay 正式接線；台數仍為實驗性簡化政策。')
       : '目前沒有通過版本驗證的 R3 Bot／Replay 接線，僅提供舊版摸打 Sandbox。')+
     '</p></div></header><section class="table-empty"><h2>建立實驗牌桌</h2>'+
     '<label for="table-profile">明確選擇 RuleProfile</label>'+
@@ -328,9 +331,11 @@ async function init() {
   try{storage=window.localStorage;}catch{storage=null;}
   session=createSandboxSession({storage});
   if(!forceSandbox&&fullRoundCapability()){
-    try{session=await createFullRoundSession({storage});fullMode=true;}
-    catch(error){lastError='R3 功能版本尚未完全整合：'+error.message;}
+    try{session=await createFullRoundSession({storage,enableAuthoritative:authorityQA});fullMode=true;}
+    catch(error){lastError='R3 功能版本尚未完全整合：'+error.message;
+      if(authorityQA){root.textContent='本機權威計分驗收未就緒：'+error.message;root.hidden=false;return;}}
   }
+  if(authorityQA&&!fullMode){root.textContent='本機權威計分驗收未就緒';root.hidden=false;return;}
   try{session.restore();}
   catch(error){lastError='無法驗證歷史對局：'+error.message;}
   // Add the Daily route without touching index.html (AI6 owns shared shell).

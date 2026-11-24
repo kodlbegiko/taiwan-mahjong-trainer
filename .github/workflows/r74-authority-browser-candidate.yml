@@ -1,0 +1,34 @@
+name: R7.4 local-only authority browser acceptance
+on:
+  push:
+    branches: [integration/r74-authority-browser-candidate]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  local-authority:
+    if: github.ref_name == 'integration/r74-authority-browser-candidate'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install playwright==1.56.0
+      - name: Exact local browser authority gate
+        run: |
+          set -euo pipefail
+          mkdir -p r74-authority-browser
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git rev-parse HEAD > r74-authority-browser/tested-sha.txt
+          python tests/browser/r74-authority-local-gate.py --evidence r74-authority-browser
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r74-authority-local-browser
+          path: r74-authority-browser
+          retention-days: 14
