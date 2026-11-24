@@ -31,6 +31,10 @@ def open_game(page):
     selector=page.locator('#table-bot-difficulty')
     require(selector.input_value()=='Beginner','Historical Beginner default changed')
     selector.select_option(difficulty)
+    fixed_seed=os.environ.get('PHASE3_FIXED_SEED')
+    if fixed_seed:
+        page.locator('#table-fixed-seed').fill(fixed_seed)
+        require(page.locator('#table-fixed-seed').input_value()==fixed_seed,'Fixed seed not selected in normal UI')
     page.locator('#full-table-root [data-start-new]').click()
     page.wait_for_selector('.table-hand', timeout=25000)
     require(page.locator('[data-bot-difficulty]').get_attribute('data-bot-difficulty')==difficulty,
@@ -97,17 +101,28 @@ def make_human_decision(page, coverage, folder):
     if cont.count():
         cont.click()
         return 'continue-bots'
+    plan=coverage.get('plan')
+    planned=None
+    if plan is not None:
+        index=coverage.get('plan_index',0)
+        require(index<len(plan),'Real UI requires more actions than the deterministic plan')
+        planned=plan[index]
     options=page.locator('.table-action-buttons [data-submit-action]:enabled')
     if options.count():
         if not coverage['declaration_negative_paths']:
             probe_inline_confirmation(page,folder)
             coverage['declaration_negative_paths']=True
             options=page.locator('.table-action-buttons [data-submit-action]:enabled')
+    if options.count() and (planned is None or planned['kind']!='discard'):
         labels=options.all_text_contents()
         preference=(['胡牌','補花','明槓','暗槓','加槓','碰','吃','摸牌','放棄宣告']
                     if os.environ.get('PHASE3_R71_CLAIMS')=='1' else
                     ['胡牌','補花','摸牌','放棄宣告','明槓','暗槓','加槓','碰','吃'])
-        chosen=next((i for word in preference for i,label in enumerate(labels) if word in label),0)
+        if planned is not None:
+            chosen=next((i for i in range(options.count()) if options.nth(i).get_attribute('data-submit-action')==planned['actionId']),None)
+            require(chosen is not None,'Planned declaration is not actually offered by current LegalActions: '+str(planned))
+        else:
+            chosen=next((i for word in preference for i,label in enumerate(labels) if word in label),0)
         selected=options.nth(chosen)
         label=labels[chosen]
         selected.click()
@@ -126,13 +141,21 @@ def make_human_decision(page, coverage, folder):
             coverage['double_confirm']=True
         else:
             page.locator('[data-confirm-action]').click()
+        if planned is not None: coverage['plan_index']=coverage.get('plan_index',0)+1
         return label
     tile=page.locator('.table-hand button[data-pick-action]:enabled')
     if tile.count():
-        tile.first.click()
+        if planned is not None:
+            require(planned['kind']=='discard','Expected a planned declaration, not discard')
+            index=next((i for i in range(tile.count()) if tile.nth(i).get_attribute('data-pick-action')==planned['actionId']),None)
+            require(index is not None,'Planned discard is not actually offered by current LegalActions: '+str(planned))
+            tile.nth(index).click()
+        else:
+            tile.first.click()
         confirm=page.locator('.table-actions [data-submit-action]:enabled')
         require(confirm.count()==1,'discard selection has no formal confirmation')
         confirm.click()
+        if planned is not None: coverage['plan_index']=coverage.get('plan_index',0)+1
         return 'discard'
     return 'waiting'
 
@@ -174,6 +197,9 @@ def full_round(page, folder):
     page.screenshot(path=str(folder/'table-390-real-r3.png'),full_page=True)
     history=[]
     coverage={'declaration_negative_paths':False}
+    if os.environ.get('PHASE3_ACTION_PLAN'):
+        coverage['plan']=json.loads(os.environ['PHASE3_ACTION_PLAN'])
+        coverage['plan_index']=0
     for step in range(MAX_HUMAN_DECISIONS):
         page.wait_for_timeout(100)
         if page.locator('.table-round-summary').count():
@@ -191,6 +217,8 @@ def full_round(page, folder):
                                  page.locator('[role="alert"]').last.inner_text())
     else:
         raise AssertionError('No real terminal outcome after 320 UI decision steps: '+str(history[-20:]))
+    if 'plan' in coverage:
+        require(coverage['plan_index']==len(coverage['plan']),'Terminal before consuming exact deterministic action plan')
     require(coverage['declaration_negative_paths'],
             'No real flower/claim declaration exercised cancellation, refusal and retry')
     require(coverage.get('double_confirm'),'No genuine duplicate confirmation exercised')

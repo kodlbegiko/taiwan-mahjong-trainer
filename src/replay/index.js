@@ -104,7 +104,24 @@ function frameFrom(archive,seq,settlementRuntime) {
           state.extensions.tw16.result.settlement)))
       throw new ReplayError('VIEW_FORBIDDEN','Authoritative historical projection contains private evidence or an incorrect summary');
   }
-  if(!strategyUnavailableReason(view))readPlayerView(view);
+  // R5 discard-win terminal views carry the Rules-owned claimResolution,
+  // a deliberately unsupported payload in the pre-settlement Strategy parser.
+  // Validate the exact canonical terminal projection instead of dropping data
+  // or weakening Strategy's live decision contract.
+  const r5Terminal=m.ruleRef.profileId==='tw16-single-winner-interception'&&
+    m.ruleRef.ruleVersion==='experimental-v1'&&state.round.phase==='settled'&&
+    state.extensions.tw16.result?.claimResolution!==undefined;
+  if(r5Terminal){
+    const result=state.extensions.tw16.result;
+    const disclosed=view.publicEvents.filter(e=>Object.hasOwn(e.payload,'claimResolution'));
+    const win=disclosed[0],terminal=view.publicEvents.at(-1);
+    if(view.round.phase!=='settled'||view.legalActions.length!==0||
+       disclosed.length!==1||win.type!=='win'||win.actorSeat!==result.winnerSeat||
+       win.payload.seat!==result.winnerSeat||win.payload.sourceSeat!==result.sourceSeat||
+       !same(win.payload.claimResolution,result.claimResolution)||
+       terminal?.type!=='settle'||terminal.seq!==seq)
+      throw new ReplayError('VIEW_FORBIDDEN','R5 terminal claim resolution differs from canonical Rules result');
+  }else if(!strategyUnavailableReason(view))readPlayerView(view);
   return {...V1,frameVersion:FRAME_VERSION,replayId:m.replayId,
     perspective:'player-at-time',asOfEventSeq:seq,
     playerView:clone(view),publicEvent:clone(view.publicEvents.at(-1)),
@@ -289,9 +306,13 @@ export function createReplayService({storage=null,settlementRuntime}={}) {
         viewId:frame.playerView.viewId,asOfEventSeq:d.beforeEventSeq,
         audienceSeat:m.ownerSeat},legalActionIds:frame.playerView.legalActions.map(a=>a.actionId)};
   }
-  function getDecisionAnalysis(replayId,eventSeq,{viewerSeat,actionId}={}) {
-    const archive=readArchive(store,replayId,settlementRuntime);
-    const m=archive.manifest;
+  function getDecisionAnalysis(replayId,eventSeq,options={}) {
+    return analyzeArchiveDecision(readArchive(store,replayId,settlementRuntime),eventSeq,options);
+  }
+  // One verified archive snapshot per public operation: no mixed revisions
+  // if a storage adapter changes between reads. All frame checks remain intact.
+  function analyzeArchiveDecision(archive,eventSeq,{viewerSeat,actionId}={}) {
+    const m=archive.manifest,replayId=m.replayId;
     ownerOnly(m,viewerSeat??m.ownerSeat);
     const decision=archive.decisions.find(d=>d.eventSeq===eventSeq||d.endEventSeq===eventSeq);
     if(!decision) throw new ReplayError('DECISION_NOT_FOUND','No decision at event sequence');
@@ -344,7 +365,7 @@ export function createReplayService({storage=null,settlementRuntime}={}) {
     const best=structural?strategy.recommendations[0]:null;
     const s=exactValue(chosen,'postDiscardShanten'),b=exactValue(best,'postDiscardShanten');
     const u=exactValue(chosen,'oneTurnEffectiveCopies'),v=exactValue(best,'oneTurnEffectiveCopies');
-    const basic={...V1,analysisVersion:ANALYSIS_VERSION,replayId,eventSeq,
+    const basic={...V1,analysisVersion:ANALYSIS_VERSION,replayId,eventSeq:decision.eventSeq,
       decisionVersion:DECISION_VERSION,chosenActionId:decision.actionId,
       endEventSeq:decision.endEventSeq??decision.eventSeq,
       decisionKind:decision.kind,ruleRef:clone(m.ruleRef),engineVersion:m.engineVersion,
@@ -370,16 +391,19 @@ export function createReplayService({storage=null,settlementRuntime}={}) {
     const archive=readArchive(store,replayId,settlementRuntime),owner=archive.manifest.ownerSeat;
     const findings=[];
     for(const d of archive.decisions) if(d.actorSeat===owner && d.kind==='discard')
-      findings.push(...getDecisionAnalysis(replayId,d.eventSeq).findings);
+      findings.push(...analyzeArchiveDecision(archive,d.eventSeq).findings);
     return findings;
   }
   function createReviewQuestion(replayId,eventSeq) {
-    const analysis=getDecisionAnalysis(replayId,eventSeq);
+    const archive=readArchive(store,replayId,settlementRuntime);
+    const analysis=analyzeArchiveDecision(archive,eventSeq);
     if(analysis.decisionKind!=='discard'||analysis.analysisStatus!=='advisory-structural')
       throw new ReplayError('UNSCORABLE_DECISION','Only current supported discard decisions can produce review scenarios');
-    const frame=getReplayFrame(replayId,eventSeq-1);
+    // The action group's start/end aliases identify the same decision.
+    // Use its verified pre-action view, not an arithmetic event offset.
+    const frame=frameFrom(archive,analysis.sourceViewRef.asOfEventSeq,settlementRuntime);
     return createUnscoredScenario({playerView:frame.playerView,decisionAnalysis:analysis,
-      source:{replayId,eventSeq}});
+      source:{replayId,eventSeq:analysis.eventSeq}});
   }
   return Object.freeze({apiVersion:REPLAY_API_VERSION,saveReplay,recoverReplay,
     listReplays,listReplayAvailability,loadReplay,getReplayFrame,listReplayFrameBoundaries,getPlayerDecision,getDecisionAnalysis,

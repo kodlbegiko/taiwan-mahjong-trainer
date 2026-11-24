@@ -188,3 +188,34 @@ test('A14 exposed dragon does not require nonexistent seat wind proof, but expos
   x.evidence.melds=[{kind:'triplet',open:true,tileIds:['t:28:0','t:28:1','t:28:2']}];
   assert.throws(()=>evalWin(x),/wind proofs/);
 });
+
+test('A15 sparse or noncanonical host arrays and signed zero cannot pass authoritative settlement',()=>{
+  const trailing=a=>{const v=[...a];v.length++;return v;};
+  const extra=a=>Object.assign([...a],{ignored:'must not disappear'});
+  const cases=[
+    x=>{x.payerSeats=trailing(x.payerSeats);},
+    x=>{x.payerSeats=extra(x.payerSeats);},
+    x=>{x.payerSeats=[-0];},
+    x=>{x.evidenceEventIds=trailing(x.evidenceEventIds);},
+    x=>{x.evidenceEventIds=extra(x.evidenceEventIds);},
+    x=>{x.evidence.concealed=trailing(x.evidence.concealed);},
+    x=>{x.evidence.melds=trailing(x.evidence.melds);},
+    x=>{x.evidence.melds[0].tileIds=trailing(x.evidence.melds[0].tileIds);},
+    x=>{x.evidence.flowers=trailing([]);},
+    x=>{x.evidence.flowers=extra([]);},
+    x=>{x.evidence.sourceSeat=-0;},
+    x=>{x.evidence.dealerStreak=-0;},
+    x=>{x.evidence.streakEvidence={roundRefs:extra([])};},
+  ];
+  for(const change of cases){
+    const x=structuredClone(fixture());change(x);
+    assert.throws(()=>evalWin(x),RangeError);
+  }
+  const malformedDraw=draw();malformedDraw.payerSeats=trailing([]);
+  assert.throws(()=>evalWin(malformedDraw),/payer seats/);
+  const altered=structuredClone(profile);
+  altered.ruleRefs=trailing(altered.ruleRefs);
+  assert.throws(()=>settlePreSettlement(altered,fixture()),ScoringCapabilityError);
+  assert.deepEqual(evalWin(fixture()).playerDeltas,[-1,1,0,0]);
+  assert.deepEqual(evalWin(draw()).playerDeltas,[0,0,0,0]);
+});
