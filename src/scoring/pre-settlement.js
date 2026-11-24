@@ -5,7 +5,11 @@ import {settleWinningHand,settleExhaustiveDraw,assertLedgerConservation} from '.
 export const PRE_SETTLEMENT_CONTRACT='tw16-pre-settlement/1.0.0';
 export const PUBLIC_EVENT_CONTRACT='tw16-rob-added-kong-public/1.0.0';
 const isObject=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);
-const seat=x=>Number.isInteger(x)&&x>=0&&x<4;
+const seat=x=>Number.isInteger(x)&&x>=0&&x<4&&!Object.is(x,-0);
+// Array#every skips holes. Host evidence must be dense JSON-shaped data,
+// with no extra enumerable properties that serialization could silently drop.
+const dense=x=>Array.isArray(x)&&Object.keys(x).length===x.length&&
+  Array.from({length:x.length},(_,i)=>Object.hasOwn(x,i)).every(Boolean);
 const text=x=>typeof x==='string'&&x.length>0;
 const phys=x=>typeof x==='string'&&/^t:(0|[1-9]|[12][0-9]|3[0-3]):[0-3]$/.test(x);
 const fail=message=>{throw new RangeError('Invalid pre-settlement evidence: '+message);};
@@ -17,6 +21,7 @@ function same(a,b){
   if(Object.is(a,b))return true;
   if(!a||!b||typeof a!=='object'||typeof b!=='object'||
     Array.isArray(a)!==Array.isArray(b)||Object.keys(a).length!==Object.keys(b).length)return false;
+  if(Array.isArray(a)&&(!dense(a)||!dense(b)||a.length!==b.length))return false;
   return Object.keys(a).every(k=>Object.hasOwn(b,k)&&same(a[k],b[k]));
 }
 const immutable=x=>{
@@ -57,7 +62,7 @@ export function settlePreSettlement(profile,envelope){
     settlementId===roundId,'round and settlement identity');
   require(Number.isSafeInteger(sourceRevision)&&sourceRevision>=1,
     'source revision');
-  require(Array.isArray(evidenceEventIds)&&evidenceEventIds.length>0,
+  require(dense(evidenceEventIds)&&evidenceEventIds.length>0,
     'nonempty ordered raw event references');
   let last=0;
   for(const id of evidenceEventIds){
@@ -70,7 +75,7 @@ export function settlePreSettlement(profile,envelope){
     last=seq;
   }
   require(last===sourceRevision,'terminal legal-action prefix reference');
-  require(Array.isArray(payerSeats)&&payerSeats.every(seat)&&
+  require(dense(payerSeats)&&payerSeats.every(seat)&&
     new Set(payerSeats).size===payerSeats.length,'payer seats');
   let ledger;
   if(reason==='exhaustive-draw'){
@@ -89,11 +94,11 @@ export function settlePreSettlement(profile,envelope){
     require([27,28,29,30].includes(evidence.prevailingWindType)&&
       (evidence.seatWindType===undefined||[27,28,29,30].includes(evidence.seatWindType)),
       'wind evidence');
-    require(phys(winningTileId)&&Array.isArray(evidence.concealed)&&
-      evidence.concealed.every(phys)&&Array.isArray(evidence.melds)&&
+    require(phys(winningTileId)&&dense(evidence.concealed)&&
+      evidence.concealed.every(phys)&&dense(evidence.melds)&&
       evidence.melds.every(m=>fields(m,['kind','open','tileIds'])&&
-        Array.isArray(m.tileIds)&&m.tileIds.every(phys)&&
-        (m.open===true||m.kind==='kong'))&&Array.isArray(evidence.flowers),
+        dense(m.tileIds)&&m.tileIds.every(phys)&&
+        (m.open===true||m.kind==='kong'))&&dense(evidence.flowers),
       'physical winning-hand inventory and claimed melds');
     if(evidence.specialWin!==undefined&&evidence.specialWin!=='ordinary')
       capability(evidence.specialWin);
@@ -101,10 +106,10 @@ export function settlePreSettlement(profile,envelope){
       capability('bao-pai-or-special-liability');
     if(evidence.flowers.length===8)capability('flower-only-win');
     require(Number.isSafeInteger(evidence.dealerStreak)&&evidence.dealerStreak>=0&&
-      evidence.dealerStreak<=10,'explicit dealer streak within pinned policy');
+      evidence.dealerStreak<=10&&!Object.is(evidence.dealerStreak,-0),'explicit dealer streak within pinned policy');
     if(evidence.streakEvidence!==undefined){
       require(fields(evidence.streakEvidence,['roundRefs'])&&
-        Array.isArray(evidence.streakEvidence.roundRefs)&&
+        dense(evidence.streakEvidence.roundRefs)&&
         evidence.streakEvidence.roundRefs.length===evidence.dealerStreak&&
         evidence.streakEvidence.roundRefs.every(text)&&
         new Set(evidence.streakEvidence.roundRefs).size===evidence.dealerStreak,
