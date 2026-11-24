@@ -24,3 +24,5 @@ Agent 7: include ./src/replay/index.js, ./src/replay/internal.js, ./src/replay/i
 
 Agent 1: obtain public fixed HTTPS deployment SHA, complete a real legal hand, open Replay from settlement, inspect initial/intermediate/terminal boundaries and score consistency, refresh and reopen, go offline and reload/reopen; report exact SHA, URL, trace/screenshot, status and sanitized diagnostics. Previous R6 native-dialog blocker and old R5 staging are not R7.1 evidence. No GameState injection.
 
+
+Initial isolated ECMAScript source-overlay test on 797b7c88 + Rules 633d20fa: 6/7 PASS, one test fixture stale revision (second WIN must be issued from state after first WIN). Corrected fixture; subsequent test evidence recorded in PR #46. Source overlay uses actual Replay/Rules/Strategy view parser, unused coaching dependency fail-on-call stubs and independent Python hashlib vectors; not Node CLI, GitHub Actions, or physical-browser acceptance.

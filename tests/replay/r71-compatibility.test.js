@@ -178,10 +178,30 @@ test('R7.1 all PASS commits kong atomically and replays exact tail replacement',
   assert.deepEqual(replayStateAt(archive,end.revision),end);
   assert.deepEqual(service.getReplayFrame(meta.replayId,end.revision).playerView,createPlayerView(end,1));
   assert.equal(meta.completionStatus,'incomplete');
+  // Continue the same real hand to a terminal result, without bots or a
+  // synthetic state edit. Always pass reactions to avoid unsupported
+  // multi-winner arbitration; prefer canonical self-win when offered.
+  let terminal=end;
+  for(let i=0;i<1024&&terminal.round.phase!=='settled';i++){
+    const seat=terminal.round.phase==='claim_window'
+      ?listPendingClaimResponders(terminal)[0]:terminal.round.currentSeat;
+    const legal=listLegalActions(terminal,seat);
+    const action=terminal.round.phase==='claim_window'
+      ?legal.find(a=>a.kind==='pass')
+      :['replace_flower','win','draw','discard'].map(k=>legal.find(a=>a.kind===k)).find(Boolean);
+    assert.ok(action,'Rules must provide a legal continuation at '+terminal.revision);
+    terminal=take(terminal,action);
+  }
+  assert.equal(terminal.round.phase,'settled');
+  const saved=openArchive(terminal,1,'settled-public-only');
+  assert.deepEqual(replayStateAt(saved.archive,terminal.revision),terminal);
+  assert.deepEqual(saved.service.getReplayFrame(saved.meta.replayId,1,{perspective:'postgame'}).postgameDisclosure.outcome.delta,
+    terminal.extensions.tw16.result.delta);
 });
 test('R7.1 competing robbers preserve accepted prefix; rejected final PASS is not archived',{skip:dependency},()=>{
   const {open}=prepared(true);
-  const state=take(take(open,choose(open,2,'win')),choose(open,3,'win'));
+  const first=take(open,choose(open,2,'win'));
+  const state=take(first,choose(first,3,'win'));
   const action=choose(state,0,'pass'),submission={actorSeat:0,actionId:action.actionId,expectedRevision:action.expectedRevision};
   assert.throws(()=>applyAction(state,submission),e=>e instanceof RuleCapabilityError&&e.capability==='multiple_winners');
   const archive=createReplayArchive(state,{ownerSeat:0,unsupportedSubmission:submission});
