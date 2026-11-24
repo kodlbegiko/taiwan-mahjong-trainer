@@ -1,0 +1,4 @@
+# R7.4 full shuffled authority host gate
+
+Parent 92e4a08d4e4b8f708e60ddb0259edcda9b15f7f8: blocked-checkpoint regression 25/25 and browser PASS (run 45447793158).
+This candidate adds test-only coverage: 3 declared seeds at each of 3 difficulties, all attempted independently through the real host, four seats, official actions and deterministic shuffle. Human seat uses actual Bot policy with legal mandatory actions. Every case must terminate with verified settlement and Replay, survive checkpoint restore, and preserve exact score DTO. Explicit unsupported cases are recorded with validated stopped checkpoint and fail the full-match gate; unexpected errors also fail. No selection after the fact, fixtures, hidden decks, runtime changes, or deployment. Successful action plans may be reused in a later real browser gate but are not themselves browser proof. Public and physical-device release flags remain NO.

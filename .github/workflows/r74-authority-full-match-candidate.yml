@@ -1,0 +1,35 @@
+name: R7.4 shuffled authority full-match acceptance
+on:
+  push:
+    branches: [integration/r74-authority-full-match-candidate]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  real-host-matrix:
+    if: github.ref_name == 'integration/r74-authority-full-match-candidate'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        difficulty: [Beginner, Intermediate, Advanced]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Real shuffled full rounds (no excluded seeds)
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          node tests/integration/r74-authority-full-match.mjs --difficulty "${{ matrix.difficulty }}" --output "r74-authority-matrix/report.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r74-authority-matrix-${{ matrix.difficulty }}
+          path: r74-authority-matrix
+          retention-days: 14
