@@ -94,8 +94,9 @@ function get(ref){
   if(!ref||typeof ref.questionId!=='string'||typeof ref.questionVersion!=='string')throw new RangeError('未知情境題版本');
   const spec=byQuestion.get(ref.questionId+'@'+ref.questionVersion);
   if(!spec)throw new RangeError('未知情境題版本');
-  if(!registry.has(spec.key))registry.set(spec.key,construct(spec));
-  return registry.get(spec.key);
+  const key=ref.questionId+'@'+ref.questionVersion;
+  if(!registry.has(key))registry.set(key,construct(spec));
+  return registry.get(key);
 }
 for(const spec of ownedBank){
   const k='academy-scenario-'+spec.key+'@1.0.0';
@@ -116,7 +117,7 @@ export function getScenarioPublicQuestion(ref){return clone(get(ref).publicQuest
 export function getScenarioFullQuestion(ref){return clone(get(ref).question);}
 export function validateScenarioQuestion(q,{publicOnly=false}={}){
   const f=get(q);
-  if(!same(q,f.publicQuestion)&&(!(!publicOnly&&same(q,f.question))))
+  if(!same(q,f.publicQuestion)&&(publicOnly||!same(q,f.question)))
     throw new RangeError('Scenario question does not match immutable public snapshot');
   return true;
 }

@@ -277,7 +277,7 @@ export function createAcademyBridge(facade,storage,{now=()=>new Date().toISOStri
       if(!item||!validRef(item))return null;
       if(!fixtureOnly&&item.sourceRecordRefs?.some(r=>r.kind==='academy-v1')){
         const resolved=facade.resolveReviewQuestion(item);
-        if(resolved?.available&&resolved.source==='academy-scenario'&&
+        if(resolved?.available&&resolved.source==='academy-scenario'&&resolved.lesson&&
            this.canStart(resolved.lesson))return {...resolved.questionRef,lessonId:resolved.lesson.lessonId,scenario:true};
         return null;
       }

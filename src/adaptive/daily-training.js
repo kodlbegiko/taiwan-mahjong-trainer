@@ -70,7 +70,7 @@ export function createDailyTrainingController(storage, {
       const authoritative=learning.toPublicQuestion(ref);
       if(!same(q,authoritative)) return false;
       const lesson=learning.getLessonPublic(q.lessonRef.lessonId);
-      if(lesson?.status!=='published')return false;
+      if(lesson?.status!=='published'||lesson.lessonVersion!==q.lessonRef.lessonVersion)return false;
       if(q.taskType==='scenario'){
         if(typeof learning.listScenarioQuestionRefs!=='function'||typeof learning.validateScenarioQuestion!=='function'||
            !learning.listScenarioQuestionRefs({lessonId:lesson.lessonId}).some(r=>id(r)===id(ref))||
