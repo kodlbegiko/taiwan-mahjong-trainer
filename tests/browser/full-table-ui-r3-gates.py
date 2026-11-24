@@ -31,6 +31,10 @@ def open_game(page):
     selector=page.locator('#table-bot-difficulty')
     require(selector.input_value()=='Beginner','Historical Beginner default changed')
     selector.select_option(difficulty)
+    fixed_seed=os.environ.get('PHASE3_FIXED_SEED')
+    if fixed_seed:
+        page.locator('#table-fixed-seed').fill(fixed_seed)
+        require(page.locator('#table-fixed-seed').input_value()==fixed_seed,'Fixed seed not selected in normal UI')
     page.locator('#full-table-root [data-start-new]').click()
     page.wait_for_selector('.table-hand', timeout=25000)
     require(page.locator('[data-bot-difficulty]').get_attribute('data-bot-difficulty')==difficulty,

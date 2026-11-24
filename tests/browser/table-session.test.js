@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createSandboxSession, TABLE_STORAGE_KEY, availableTableProfiles } from '../../src/table-ui/session.js';
-import { TableView, ReplayControls, ActionBar, BotDifficultySelect } from '../../src/table-ui/view.js';
+import { TableView, ReplayControls, ActionBar, BotDifficultySelect, AuthoritativeSettlement } from '../../src/table-ui/view.js';
 import { createFullRoundSession } from '../../src/table-ui/full-round.js';
 import { tileFaceMarkup } from '../../src/tile-visuals.js';
 
@@ -243,4 +243,33 @@ test('R7.1 legacy full-round checkpoint with no difficulty restores Beginner, wi
   assert.equal(restored.restore(),true);
   assert.equal(restored.snapshot().botDifficulty,'Beginner');
   assert.deepEqual(restored.snapshot().view,initial.view);
+});
+
+test('R7.3 explicit fixed seed produces identical real Rules initial views, defaults unchanged',async()=>{
+  const one=await createFullRoundSession({storage:memoryStorage()});
+  const two=await createFullRoundSession({storage:memoryStorage()});
+  const a=one.start({fixedSeed:'r73-case-0',difficulty:'Beginner'});
+  const b=two.start({fixedSeed:'r73-case-0',difficulty:'Beginner'});
+  assert.deepEqual(a.view,b.view);
+  assert.equal(a.profile.profileId,'tw16-single-winner-interception');
+  assert.throws(()=>one.start({fixedSeed:'r73-case-0'}),/已存在/);
+  assert.throws(()=>one.start({fixedSeed:'bad seed'}),/固定種子/);
+  const c=two.start({fixedSeed:'r73-case-1'});
+  assert.notEqual(c.view.gameId,a.view.gameId);
+  assert.equal(c.botDifficulty,'Beginner');
+});
+test('R7.3 authority renderer consumes only exact public DTO, fails closed on unknown version',()=>{
+  // Wire contract fixture only; this is NOT Rules or browser acceptance.
+  const summary={contractVersion:'tw16-pre-settlement/1.0.0',settlementId:'test-round',
+    scoringVersion:'tw16-gametower-authoritative@1.0.0-experimental',status:'experimental-not-rule-certified',
+    unit:'abstract-points',reason:'win',winType:'rob-added-kong',winnerSeat:2,sourceSeat:1,payerSeats:[1],
+    tai:7,breakdown:[{code:'test',name:'測試項目',tai:7,ruleVersion:'test-version',source:'test-source',scope:'hand'}],
+    payments:[{payerSeat:1,payeeSeat:2,points:7,handTai:7,appliedTai:7,dealerItems:[]}],
+    playerTransferDeltas:[0,-7,7,0],playerDeltas:[0,-7,7,0],fees:[],houseDelta:0};
+  const html=AuthoritativeSettlement({...summary,privateEvidence:'NEVER_RENDER_THIS'});
+  assert.match(html,/data-authoritative-settlement/);
+  assert.match(html,/測試項目/);assert.match(html,/7 台/);assert.match(html,/下家 → 對家：7/);
+  assert.ok(!html.includes('NEVER_RENDER_THIS'));
+  assert.match(AuthoritativeSettlement({...summary,scoringVersion:'unknown'}),/data-authority-unavailable/);
+  assert.match(AuthoritativeSettlement({...summary,playerDeltas:[0,1]}),/data-authority-unavailable/);
 });

@@ -15,6 +15,7 @@ let replayFrame=null,replayBusy=false,botStatus='',storage=null;
 let dailyBoot='idle';
 let pendingAction=null,restartPending=false;
 const forceSandbox=new URLSearchParams(window.location.search).get('table')==='sandbox';
+const seededQA=new URLSearchParams(window.location.search).get('qa')==='seeded';
 
 
 function profilesList() {
@@ -39,6 +40,7 @@ function renderEmpty() {
     '<label for="table-profile">明確選擇 RuleProfile</label>'+
     '<select id="table-profile">'+profiles()+'</select>'+
     (fullMode?BotDifficultySelect('Beginner'):'')+
+    (fullMode&&seededQA?'<label for="table-fixed-seed">固定種子（實驗性重現；留空隨機）</label><input id="table-fixed-seed" maxlength="48" pattern="[A-Za-z0-9_\\-]+" autocomplete="off"><p class="table-muted">只使用 Rules 正式洗牌；每個固定種子請使用獨立測試瀏覽器工作階段。</p>':'')+
     '<button type="button" class="primary" data-start-new '+(!profilesList().length?'disabled':'')+'>'+
     (fullMode?'開始 R3 四人對局':'開始摸打 Sandbox')+'</button>'+
     (lastError?'<p role="alert" class="table-warning">'+safe(lastError)+'</p>':'')+
@@ -111,7 +113,8 @@ async function startNew() {
       available[0];
     if(!profile)throw new Error('沒有已註冊且可用的四人 RuleProfile');
     const difficulty=root.querySelector('#table-bot-difficulty')?.value??session.snapshot()?.botDifficulty??'Beginner';
-    session.start({profileId:profile.profileId,ruleVersion:profile.ruleVersion,...(fullMode?{difficulty}:{})});
+    const fixedSeed=seededQA?(root.querySelector('#table-fixed-seed')?.value||null):null;
+    session.start({profileId:profile.profileId,ruleVersion:profile.ruleVersion,...(fullMode?{difficulty,fixedSeed}:{})});
     selection=null;pendingAction=null;restartPending=false;
     lastError='';botStatus='';timeline=null;replayFrame=null;
     activate('play',{focus:false});

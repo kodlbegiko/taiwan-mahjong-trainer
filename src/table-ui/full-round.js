@@ -13,6 +13,15 @@ function checkedDifficulty(value){
   return value;
 }
 const copy = x => JSON.parse(JSON.stringify(x));
+// Explicit reproducibility is opt-in QA/training, not a hidden deck override.
+// Stable gameId also pins the Bot tie-break input. Normal random mode is unchanged.
+function fixedRoundConfig(seed,profileId,difficulty){
+  if(typeof seed!=='string'||!/^[A-Za-z0-9_-]{1,48}$/.test(seed))
+    throw new RangeError('固定種子須為 1–48 個英數字、底線或連字號');
+  let hash=2166136261;
+  for(const c of seed){hash=Math.imul(hash^c.charCodeAt(0),16777619)>>>0;}
+  return {seed,gameId:'r73-fixed-'+profileId+'-'+difficulty+'-'+hash.toString(16)};
+}
 const isR3 = p => p?.status === 'experimental' && (
   (p.profileId === 'tw16-configurable-table' && p.ruleVersion === 'experimental-full-v1') ||
   (p.profileId === 'tw16-single-winner-interception' && p.ruleVersion === 'experimental-v1'));
@@ -129,17 +138,23 @@ export async function createFullRoundSession({storage} = {}) {
       return false;
     }
   }
-  function start({profileId,ruleVersion,difficulty='Beginner'}={}) {
+  function start({profileId,ruleVersion,difficulty='Beginner',fixedSeed=null}={}) {
     checkedDifficulty(difficulty);
     if (blocked) throw new Error(storageWarning);
     const preferred=rules.listRuleProfiles().find(isR5) ?? rules.listRuleProfiles().find(isR3);
     const p=rules.getRuleProfile(profileId??preferred?.profileId,ruleVersion??preferred?.ruleVersion);
     profileId=p.profileId;ruleVersion=p.ruleVersion;
     if (!isR3(p)) throw new Error('目前只支援明確 experimental R3 RuleProfile');
-    const seed='r3-'+(globalThis.crypto?.randomUUID?.() ??
-      String(Date.now())+'-'+Math.floor(Math.random()*1000000));
-    const next=rules.createGame({gameId:seed.replace(/[^A-Za-z0-9_-]/g,'-'),
-      seed,profileId,ruleVersion,dealerSeat:HUMAN});
+    const config=fixedSeed===null?(()=>{
+      const seed='r3-'+(globalThis.crypto?.randomUUID?.() ??
+        String(Date.now())+'-'+Math.floor(Math.random()*1000000));
+      return {seed,gameId:seed.replace(/[^A-Za-z0-9_-]/g,'-')};
+    })():fixedRoundConfig(fixedSeed,profileId,difficulty);
+    // Do not overwrite existing deterministic archives with another playthrough.
+    if(fixedSeed!==null && (state?.gameId===config.gameId ||
+      replays.listReplays().some(m=>m.gameId===config.gameId)))
+      throw new Error('此固定種子對局已存在；使用獨立測試瀏覽器工作階段重現，不覆寫既有 Replay');
+    const next=rules.createGame({...config,profileId,ruleVersion,dealerSeat:HUMAN});
     rules.validateGameState(next);
     persist(next,{paused:false,difficulty});
     botDifficulty=difficulty;

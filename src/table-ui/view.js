@@ -203,10 +203,56 @@ export function TableView(snapshot,{selection=null,busy=false,error='',botStatus
  * Official end-of-round summary only. Unknown or unverified results do not
  * become wins, tai, scores or settlement merely because the UI can display them.
  */
+// R7.3 exact public DTO only. This renderer never reads private scoring evidence,
+// derives a tai value, or fabricates payments. The opt-in host remains disabled
+// until Rules, Scoring, Bot and Replay joint gates have passed.
+const PUBLIC_SETTLEMENT_VERSION='tw16-gametower-authoritative@1.0.0-experimental';
+export function AuthoritativeSettlement(summary){
+  if(!summary)return '';
+  const item=x=>x&&typeof x.code==='string'&&typeof x.name==='string'&&
+    typeof x.ruleVersion==='string'&&typeof x.source==='string'&&
+    ['hand','payment'].includes(x.scope)&&Number.isInteger(x.tai)&&x.tai>=0;
+  const seat=x=>Number.isInteger(x)&&x>=0&&x<4;
+  const delta=x=>Array.isArray(x)&&x.length===4&&x.every(Number.isInteger);
+  if(summary.contractVersion!=='tw16-pre-settlement/1.0.0'||
+    summary.scoringVersion!==PUBLIC_SETTLEMENT_VERSION||
+    summary.status!=='experimental-not-rule-certified'||summary.unit!=='abstract-points'||
+    typeof summary.settlementId!=='string'||!summary.settlementId||
+    !['win','exhaustive-draw'].includes(summary.reason)||
+    !Number.isInteger(summary.tai)||summary.tai<0||
+    !Array.isArray(summary.breakdown)||!summary.breakdown.every(item)||
+    !delta(summary.playerDeltas)||!delta(summary.playerTransferDeltas)||
+    !Array.isArray(summary.payerSeats)||!summary.payerSeats.every(seat)||
+    !Array.isArray(summary.payments)||!summary.payments.every(p=>p&&seat(p.payerSeat)&&
+      seat(p.payeeSeat)&&['points','handTai','appliedTai'].every(k=>Number.isInteger(p[k])&&p[k]>=0)&&
+      Array.isArray(p.dealerItems)&&p.dealerItems.every(item))||
+    !Array.isArray(summary.fees)||summary.fees.length!==0||summary.houseDelta!==0||
+    (summary.reason==='win'?(!seat(summary.winnerSeat)||!['self-draw','discard','rob-added-kong'].includes(summary.winType)):
+      (summary.winnerSeat!==null||summary.winType!==null||summary.payments.length!==0||summary.payerSeats.length!==0)))
+    return '<section role="alert" data-authority-unavailable>權威結算契約不相容，無法顯示計分。</section>';
+  const line=x=>'<li>'+escapeHtml(x.name)+'（'+escapeHtml(x.code)+'）：'+x.tai+
+    ' 台 · '+escapeHtml(x.ruleVersion)+' · '+escapeHtml(x.source)+' · '+escapeHtml(x.scope)+'</li>';
+  return '<section class="table-round-summary" data-authoritative-settlement aria-label="Rules 權威結算">'+
+    '<h2>局後權威結算 · EXPERIMENTAL</h2>'+
+    '<p>結果：'+escapeHtml(summary.reason)+'</p>'+
+    '<p>勝方：'+(seat(summary.winnerSeat)?SEATS[summary.winnerSeat]:'流局／無')+'</p>'+
+    '<p>胡牌方式：'+escapeHtml(summary.winType??'無')+'</p>'+
+    '<p>計分政策：'+escapeHtml(summary.scoringVersion)+'</p>'+
+    '<p>結算識別：'+escapeHtml(summary.settlementId)+'</p>'+
+    '<p>實驗台數：'+summary.tai+'</p><h3>逐項台數（Rules 公開結果）</h3><ul>'+
+    summary.breakdown.map(line).join('')+'</ul><h3>支付明細（abstract-points）</h3><ul>'+
+    summary.payments.map(p=>'<li>'+SEATS[p.payerSeat]+' → '+SEATS[p.payeeSeat]+'：'+p.points+
+      ' 點；手牌 '+p.handTai+' 台；適用 '+p.appliedTai+' 台<ul>'+p.dealerItems.map(line).join('')+'</ul></li>').join('')+
+    '</ul><p>四家分數變化：'+summary.playerDeltas.map((x,i)=>SEATS[i]+' '+x).join(' / ')+'</p>'+
+    '<p>平台變動：'+summary.houseDelta+'；費用：無</p>'+
+    '<p class="table-warning">實驗性計分、非金額、未取得通用台制認證。</p></section>';
+}
 export function RoundSummary(result){
   const summary=result?.source==='rules'&&result?.experimental===true?
     result.publicSummary:result?.verified===true?result.publicSummary:null;
   if(!summary||typeof summary!=='object')return '';
+  if(Object.hasOwn(summary,'settlement')||summary.scoringPolicy===PUBLIC_SETTLEMENT_VERSION)
+    return AuthoritativeSettlement(summary.settlement??{});
   const winners=Array.isArray(summary.winnerSeats)?summary.winnerSeats.filter(x=>
     Number.isInteger(x)&&x>=0&&x<4).map(x=>SEATS[x]):[];
   const score=Array.isArray(summary.scoreDelta)&&summary.scoreDelta.length===4?
@@ -255,6 +301,8 @@ export function ReplayControls(timeline,index,externalFrame=null){
   const options=frame.legalActions??frame.view.legalActions??[];
   const findings=frame.findings??[];
   const analysis=frame.analysis;
+  const authority=frame.view.round?.phase==='settled'?
+    frame.view.publicEvents?.find(e=>e.type==='settle')?.payload?.settlement:null;
   return '<section class="table-replay" aria-label="正式牌局複盤">'+
     '<h2>逐事件歷史複盤</h2><p>歷史 PlayerView · 事件 '+(frame.asOfEventSeq??(index+1))+' / '+(timeline.manifest?.eventCount??length)+
     ' · '+escapeHtml(timeline.manifest?.completionStatus??'來源已驗證')+'</p>'+
@@ -279,5 +327,6 @@ export function ReplayControls(timeline,index,externalFrame=null){
        ' · '+escapeHtml(x.rationale??'證據不完整')+
        ' · '+escapeHtml(x.verificationStatus??'未驗證')+'</p>').join(''):
       '<p>目前無可驗證的 CoachingFinding；不提供虛構錯誤分數。</p>')+
+    (authority?AuthoritativeSettlement(authority):'')+
     '<button type="button" class="secondary" data-return-table>返回牌桌</button></section>';
 }
