@@ -46,6 +46,7 @@ const name={
   smallDragons:'小三元',bigDragons:'大三元',smallWinds:'小四喜',bigWinds:'大四喜',
   concealedTriplets:'暗刻',openKong:'明槓',concealedKong:'暗槓',
   noHonorsNoFlowers:'無字無花',robAddedKong:'搶槓胡',
+  pinghu:'平胡',allExposed:'全求人',
 };
 function validateEvidence(p,e){
   validateScoringProfile(p);
@@ -158,7 +159,28 @@ export function scoreWinningHand(profile,evidence){
       const types=[...whole];
       const suits=new Set(types.filter(t=>t<27).map(t=>Math.floor(t/9)));
       const honors=types.some(t=>t>=27);
-      if(!honors&&flowers.length===0)
+      // Pinghu needs a real, two-sided pre-win shape, not a user-reported
+      // "waitShape" flag. Only an ordinary discard win can qualify here.
+      const twoSided=winningTile!==null&&dec.groups.some(g=>{
+        if(g.kind!=='sequence')return false;
+        const start=g.type,rank=start%9;
+        const alternate=winningTile===start&&rank<6?start+3:
+          winningTile===start+2&&rank>0?start-1:null;
+        if(alternate===null)return false;
+        const originalCounts=Array(34).fill(0);
+        whole.forEach(t=>originalCounts[t]++);
+        originalCounts[winningTile]--;originalCounts[alternate]++;
+        if(originalCounts[alternate]>4)return false;
+        return combinations([...concealed,alternate],5-melds.length)
+          .some(other=>other.pair<27&&other.groups.every(x=>x.kind==='sequence'));
+      });
+      const pinghu=evidence.via==='discard'&&flowers.length===0&&
+        !honors&&dec.pair<27&&all.every(g=>g.kind==='sequence')&&twoSided;
+      if(pinghu)
+        add(items,'pinghu','pinghu',
+          'five sequences; suited pair; no flower/honor; discard; verified two-sided pre-win wait');
+      if(!honors&&flowers.length===0&&
+          !(pinghu&&profile.variants.pinghuSuppressNoHonorsNoFlowers))
         add(items,'no-honors-no-flowers','noHonorsNoFlowers',
           'no honor tile and no flower in the entire winning hand');
       if(suits.size===0)add(items,'all-honors','allHonors','all 17 effective tiles honor types');
@@ -166,6 +188,10 @@ export function scoreWinningHand(profile,evidence){
         if(honors)add(items,'mixed-suit','mixedSuit','one suited family plus honors');
         else add(items,'pure-suit','pureSuit','one suited family without honors');
       }
+      if(melds.length===5&&melds.every(m=>m.open)&&
+        evidence.via==='discard'&&role==='pair')
+        add(items,'all-exposed','allExposed',
+          'five open claimed melds, one concealed tile before discard win; excludes pair wait tai');
       if(all.every(g=>g.kind!=='sequence')&&
         !(suits.size===0&&profile.variants.allHonorsSuppressAllPongs))
         add(items,'all-pongs','allPongs','five triplets/kongs and one pair');
@@ -234,7 +260,7 @@ export function scoreWinningHand(profile,evidence){
     decomposition:best.decomposition,via:evidence.via,
     winnerSeat:evidence.winnerSeat,sourceSeat:evidence.sourceSeat,
     ruleRef:{...evidence.ruleRef},excludedCapabilities:[
-      'special-wins','wait-shape','flat-hand','bao-pai','multi-winner',
+      'special-wins','unverified-wait-shapes-except-pinghu','bao-pai','multi-winner',
       'declared-ready','heaven-earth-wins'],
     sourceRefs:[...profile.sourceRefs]};
 }
