@@ -41,6 +41,14 @@ jobs:
           node --test tests/rules/claim-arbitration.test.js tests/bots/r3-full-round.test.js tests/bots/r3-host-contract.test.js tests/replay/r3-full-round.test.js tests/integration/phase3-source-boundaries.test.js
       - name: Strict Legacy unsupported and R5 Rules / Replay arbitration
         run: node --test tests/rules/r4-seed-87.test.js tests/rules/r5-single-winner.test.js tests/replay/r4-seed87-atomic.test.js tests/replay/r5-single-winner-replay.test.js
+      - name: Strict R7 integrated Rules / Scoring / Bot / Replay contract
+        if: github.head_ref == 'integration/mahjong-r7-release-audit'
+        env:
+          REPLAY_REQUIRE_R7_RULES: '1'
+          REPLAY_REQUIRE_R7_SCORING: '1'
+        run: |
+          node --input-type=module -e "import {getRuleProfile} from './src/rules/index.js'; getRuleProfile('tw16-rob-added-kong','experimental-v1');"
+          node --test tests/rules/r7-rob-added-kong-golden.test.js tests/scoring/golden.test.js tests/bots/r7-rob-kong-contract.test.js tests/replay/r71-compatibility.test.js
       - name: Strict single-winner 100 fixed seeds (all must settle)
         run: node --test tests/bots/r5-single-winner-full-match.test.js
   r3-chromium:

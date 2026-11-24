@@ -1,7 +1,7 @@
 /* Offline-first, atomic shell for GitHub Pages root or /repo/ deployments.
  * IMPORTANT: change CACHE_VERSION whenever any precached file changes.
  * The install event only succeeds if the entire listed release is cached. */
-const CACHE_VERSION = 'tmt-v02-realistic-tiles-master-academy-phase3-r7-mobile-pwa-a11y-20261124-r7.1b';
+const CACHE_VERSION = 'tmt-v02-realistic-tiles-r7.1-integrated-78e6a1815199';
 const SHELL_CACHE = `tmt-shell-${CACHE_VERSION}`;
 const BASE = new URL('./', self.location.href);
 const SHELL = [
@@ -50,14 +50,17 @@ const SHELL = [
   './src/academy-ui/public-facade.js',
   './src/academy-ui/scenario.js',
   './src/academy/catalog.js',
+  './src/academy/content-audit.js',
   './src/academy/index.js',
   './src/academy/lessons.js',
   './src/academy/provenance.js',
   './src/academy/question-internal.js',
   './src/academy/questions.js',
+  './src/academy/r71-assessments.js',
   './src/academy/records.js',
   './src/academy/registry.js',
   './src/academy/scenario-scorers.js',
+  './src/academy/unpublished-guides.js',
   './src/adaptive/ability.js',
   './src/adaptive/core.js',
   './src/adaptive/daily-training.js',
@@ -74,12 +77,14 @@ const SHELL = [
   './src/bots/controller.js',
   './src/bots/decision.js',
   './src/bots/index.js',
+  './src/bots/strategy-r7.js',
   './src/bots/view.js',
   './src/core/efficiency.js',
   './src/integration/master-academy-facade.js',
   './src/integration/phase3-public-facade.js',
   './src/practice.js',
   './src/replay/index.js',
+  './src/replay/integrity.js',
   './src/replay/internal.js',
   './src/rules/complete-engine.js',
   './src/rules/engine.js',
@@ -89,6 +94,11 @@ const SHELL = [
   './src/rules/tile-constants.js',
   './src/rules/tile-identity.js',
   './src/scenario/index.js',
+  './src/scoring/adapter.js',
+  './src/scoring/evaluate.js',
+  './src/scoring/index.js',
+  './src/scoring/profiles.js',
+  './src/scoring/settlement.js',
   './src/shanten.js',
   './src/storage/archive.js',
   './src/storage/local.js',

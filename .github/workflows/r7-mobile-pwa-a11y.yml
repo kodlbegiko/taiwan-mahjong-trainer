@@ -36,12 +36,18 @@ jobs:
           set -euo pipefail
           echo "SOURCE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
           git fetch origin integration/mahjong-full-game
+          owner_head=HEAD
+          if [[ "${{ github.head_ref }}" == 'integration/mahjong-r7-release-audit' ]]; then
+            owner_head=d02eb508a0c302997f5e10a4eaf01c85bf0e6fb7
+            git merge-base --is-ancestor "$owner_head" HEAD
+            echo "PWA_SOURCE_SHA=$owner_head" >> "$GITHUB_STEP_SUMMARY"
+          fi
           while IFS= read -r file; do
             case "$file" in
               index.html|style.css|sw.js|public/manifest.webmanifest|src/table-ui/table.css|src/table-ui/view.js|src/table-ui/a11y.js|tests/browser/mobile-pwa-a11y-gates.py|tests/pwa/mobile-update-gates.py|docs/quality/R7_MOBILE_PWA_A11Y.md|.github/workflows/r7-mobile-pwa-a11y.yml|scripts/runtime-precache.mjs|.github/workflows/r7-runtime-precache.yml) ;;
               *) echo "::error::Out-of-scope file changed: $file"; exit 1 ;;
             esac
-          done < <(git diff --name-only origin/integration/mahjong-full-game...HEAD)
+          done < <(git diff --name-only origin/integration/mahjong-full-game..."$owner_head")
       - name: Fast SVG and Service Worker compatibility contract
         run: node --test tests/tile-assets-integrity.test.js
       - name: Run existing Node and compatibility regressions
