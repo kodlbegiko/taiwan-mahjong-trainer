@@ -12,6 +12,8 @@ import {calculateShanten} from '../core/efficiency.js';
 import {settleWin, scoreWinningHand} from './scoring.js';
 
 export const COMPLETE_ENGINE_VERSION='rules-engine/0.2.0-experimental';
+// R7 public projection contract; raw V1 ledger and legacy action IDs stay pinned.
+const R7_PUBLIC_EVENT_CONTRACT='tw16-rob-added-kong-public/1.0.0';
 
 /** Explicit failure rather than a guessed fallback for an unsupported house rule. */
 export class RuleCapabilityError extends RangeError {
@@ -85,6 +87,10 @@ export function completeGetRuleCapabilities(ruleRef) {
   return {
     ...V1,ruleRef:{profileId:profile.profileId,ruleVersion:profile.ruleVersion},
     status:'experimental',
+    ...(profile.extensions.tw16.robAddedKong?{
+      publicEventContractVersion:R7_PUBLIC_EVENT_CONTRACT,
+      replacementTailExhaustion:{status:'unsupported',capability:'replacement_tail_exhausted'},
+    }:{}),
     claimArbitration:{
       responders:3,
       supportedActions:['pass','chi','pong','kong','win'],
@@ -280,6 +286,9 @@ export function completeListLegalActions(state,seat){
   if(seat!==state.round.currentSeat)return [];
   const player=state.players[seat];
   if(phase==='replacement'){
+    // No policy has been certified for a mandatory replacement with no tile.
+    // R7 must not advertise an action that cannot complete. Legacy stays pinned.
+    if(p.extensions.tw16.robAddedKong&&!state.wall.length)return [];
     const flowers=player.concealed.filter(isFlower);
     if(flowers.length)return flowers.map(id=>
       action(state,seat,'replace_flower',[id],'PUBLIC_FLOWER_REPLACEMENT'));
@@ -427,6 +436,9 @@ export function completeApplyAction(state,submission){
   if(!Number.isInteger(expectedRevision)||expectedRevision!==state.revision)
     throw new RangeError('Stale expectedRevision');
   if(typeof actionId!=='string')throw new TypeError('actionId required');
+  if(policyOf(state).robAddedKong&&state.round.phase==='replacement'&&
+    state.round.currentSeat===actorSeat&&!state.wall.length)
+    throw new RuleCapabilityError('replacement_tail_exhausted');
   const valid=completeListLegalActions(state,actorSeat);
   const action=valid.find(a=>a.actionId===actionId);
   if(!action)throw new RangeError('Unavailable or illegal actionId');
@@ -503,7 +515,7 @@ export function completeApplyAction(state,submission){
   completeValidateGameState(next,{replay:false});
   return {state:next,event:clone(next.events[before]),events:clone(next.events.slice(before))};
 }
-function publicEvent(evt){
+function publicEvent(evt,privateClaimActionIds=null){
   const hiddenClaim=evt.visibility==='seat-private'&&
     (evt.type==='claim'||evt.type==='pass');
   let payload={};
@@ -532,7 +544,9 @@ function publicEvent(evt){
     ruleRef:clone(evt.ruleRef),type:hiddenClaim?'claim':evt.type,visibility:'public',
     ...(hiddenClaim||evt.actorSeat===undefined?{}:{actorSeat:evt.actorSeat}),
     payload,...(evt.previousEventId?{previousEventId:evt.previousEventId}:{}),
-    ...(evt.visibility==='public'&&evt.causedByActionId?{causedByActionId:evt.causedByActionId}:{})};
+    ...(evt.visibility==='public'&&evt.causedByActionId&&
+      !privateClaimActionIds?.has(evt.causedByActionId)
+      ?{causedByActionId:evt.causedByActionId}:{})};
 }
 export function completeCreatePlayerView(state,seat,eventSeq=state.revision){
   assertSeat(seat);
@@ -554,10 +568,17 @@ export function completeCreatePlayerView(state,seat,eventSeq=state.revision){
     for(const d of p.river)if(!d.claimedByEventId)add(d.tileId);
   }
   if(ext(at).window?.kind==='rob-added-kong')add(ext(at).window.tileId);
+  // A derived public event can be triggered by a private final response.
+  // Its raw action ID encodes seat, kind and tile IDs. R7 projections omit
+  // that private provenance even after resolution; the raw ledger retains it.
+  const privateClaimActionIds=profile.extensions.tw16.robAddedKong
+    ?new Set(at.events.filter(e=>e.visibility==='seat-private'&&
+      (e.type==='claim'||e.type==='pass')).map(e=>e.causedByActionId))
+    :null;
   return {...V1,viewId:'view-'+at.gameId+'-'+eventSeq+'-seat'+seat,
     gameId:at.gameId,ruleRef:clone(at.ruleRef),audienceSeat:seat,
     asOfEventSeq:eventSeq,round:clone(at.round),self,opponents,
-    publicEvents:at.events.filter(evt=>evt.seq<=eventSeq).map(publicEvent),
+    publicEvents:at.events.filter(evt=>evt.seq<=eventSeq).map(evt=>publicEvent(evt,privateClaimActionIds)),
     legalActions:completeListLegalActions(at,seat),
     knownUnavailableTypes:[...known.keys()].filter(t=>known[t]===4),
     capabilities:{structuralScore:true,roundActions:false,settlement:false}};
@@ -596,6 +617,71 @@ export function completeReplayGame(config){
     index+=group.length;state=applied.state;
   }
   return state;
+}
+/**
+ * R7-only structural ledger check, including replay:false at the authoritative
+ * applyAction boundary. Full replay still proves action legality and ownership.
+ * No new raw fields and no changes to R3/R5 event sequences.
+ */
+function validateRobberyLedger(state){
+  const events=state.events,e=ext(state),linked=new Set();
+  const fail=()=>{throw new RangeError('Invalid R7 added-kong proposal ledger');};
+  let pending=null;
+  for(let i=0;i<events.length;i++){
+    const proposal=events[i];
+    if(proposal.type!=='kong_proposed')continue;
+    const from=proposal.actorSeat,id=proposal.payload?.tileId,ref=proposal.eventId;
+    if(!seatOK(from)||proposal.visibility!=='public'||typeof id!=='string'||
+      isFlower(id)||!same(proposal.payload,{kind:'ADDED_KONG',tileId:id})||
+      proposal.causedByActionId!==action({...state,revision:proposal.seq-1},
+        from,'kong',[id],'ADDED_KONG').actionId)fail();
+    let j=i+1;
+    const decisions=[];
+    while(j<events.length&&events[j].visibility==='seat-private'&&
+      ['claim','pass'].includes(events[j].type)){
+      const reply=events[j],seat=reply.actorSeat,kind=reply.payload?.kind;
+      const tileIds=kind==='win'?[id]:[];
+      if(decisions.length>=3||!seatOK(seat)||seat===from||
+        decisions.some(d=>d.seat===seat)||!['win','pass'].includes(kind)||
+        reply.type!==(kind==='win'?'claim':'pass')||
+        !same(reply.payload,{kind,claimEventId:ref,...(kind==='win'?{tileIds}:{})})||
+        reply.causedByActionId!==action({...state,revision:reply.seq-1},seat,kind,tileIds,
+          kind==='win'?'ROB_ADDED_KONG_WIN':'CLAIM_WINDOW_PASS',ref).actionId)fail();
+      decisions.push({seat,kind,actionId:reply.causedByActionId,tileIds});
+      j++;
+    }
+    if(decisions.length<3){
+      if(j!==events.length||pending||state.round.phase!=='claim_window'||
+        e.window?.kind!=='rob-added-kong'||e.window.sourceEventId!==ref||
+        e.window.fromSeat!==from||e.window.tileId!==id||
+        !same(e.window.decisions,decisions))fail();
+      pending=ref;
+      continue;
+    }
+    const wins=decisions.filter(d=>d.kind==='win');
+    const trigger=decisions.at(-1).actionId,finish=events[j];
+    if(wins.length>1||!finish||finish.visibility!=='public'||
+      finish.causedByActionId!==trigger)fail();
+    if(!wins.length){
+      if(finish.type!=='kong'||finish.actorSeat!==from||
+        !same(finish.payload,{kind:'ADDED_KONG',tileIds:[id],proposalEventId:ref}))fail();
+      linked.add(finish.eventId);
+    }else{
+      const winner=wins[0].seat,settle=events[j+1],marker={proposalEventId:ref,fromSeat:from,tileId:id};
+      if(finish.type!=='win'||finish.actorSeat!==winner||
+        !same(finish.payload,{via:'discard',sourceSeat:from,winnerSeat:winner,robAddedKong:marker})||
+        !settle||settle!==events.at(-1)||settle.type!=='settle'||settle.visibility!=='public'||
+        settle.actorSeat!==winner||settle.causedByActionId!==trigger||
+        settle.payload?.reason!=='win'||settle.payload.winnerSeat!==winner||
+        !same(settle.payload.robAddedKong,marker)||
+        !same(e.result?.robAddedKong,marker)||e.result.winningTileId!==id||
+        e.result.winnerSeat!==winner||e.result.sourceSeat!==from)fail();
+      linked.add(finish.eventId);linked.add(settle.eventId);
+    }
+  }
+  if((e.window?.kind==='rob-added-kong'&&!pending)||
+    events.some(evt=>(evt.payload?.proposalEventId||evt.payload?.robAddedKong)&&
+      !linked.has(evt.eventId)))fail();
 }
 export function completeValidateGameState(state,{replay=true}={}){
   if(!state||state.schemaVersion!==1||state.contractVersion!==CONTRACT_VERSION||
@@ -785,6 +871,7 @@ export function completeValidateGameState(state,{replay=true}={}){
       new Set(w.decisions.map(d=>d.seat)).size!==w.decisions.length)
       throw new RangeError('Invalid declaration window');
   }else if(e.window!==null)throw new RangeError('Unexpected declaration window');
+  if(profile.extensions.tw16.robAddedKong)validateRobberyLedger(state);
   if(replay&&!same(completeReplayGame(state),state))
     throw new RangeError('Deterministic complete replay mismatch');
   return true;
