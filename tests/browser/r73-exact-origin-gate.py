@@ -100,9 +100,12 @@ def run(args):
     if public:
         require(urlsplit(args.url).scheme=='https','Real HTTPS required')
         require(args.deployment_sha,'Exact deployment SHA required')
-        require(not args.seeds,'R7.2 deployed UI has no seed field; do not pretend it does')
+        if args.seeds:
+            require(args.deployment_sha!='793bbb1caeef79b94e0bb29bf2ea66b3f7c43f4d',
+                    'R7.2 deployed UI has no seed field; select a new approved SHA')
     report={'gate':'r73-exact-origin','release':False,'mode':'public-https' if public else 'local-seeded',
       'testedSourceSHA':subprocess.check_output(['git','-C',str(root),'rev-parse','HEAD'],text=True).strip(),
+      'harnessSourceSHA':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),
       'deploymentSourceSHA':args.deployment_sha if public else None,'matches':[],'assetSHA256':{},
       'physicalDevice':'NOT_RUN','errors':[]}
     levels=['Beginner','Intermediate','Advanced']
@@ -118,7 +121,7 @@ def run(args):
     save()
     cm=nullcontext((args.url,None)) if public else shared['served_site']()
     with cm as (base,_):
-        url=base if public else base+'?qa=seeded'
+        url=base+('?' if '?' not in base else '&')+'qa=seeded' if seeds else base
         report['origin']=url
         with sync_playwright() as pw:
             browser=pw.chromium.launch(channel='chrome',headless=True,args=['--no-sandbox'])
@@ -163,7 +166,7 @@ def run(args):
             browser.close()
     save()
     print('R73_ACCEPTANCE '+json.dumps(report,ensure_ascii=False),flush=True)
-    if public: require(set(report['difficulties'])==set(levels),'Not all difficulties finished')
+    if public and not seeds: require(set(report['difficulties'])==set(levels),'Not all difficulties finished')
     require(len(report['matches'])>=1 and not report['errors'],'Incomplete real games')
 
 if __name__=='__main__':

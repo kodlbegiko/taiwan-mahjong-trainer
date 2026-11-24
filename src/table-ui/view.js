@@ -131,13 +131,30 @@ function lastEvent(events) {
   const prefix = e.actorSeat === undefined ? '牌局' : SEATS[e.actorSeat];
   return prefix + ' · ' + (e.type === 'deal' ? '配牌' : (ACTIONS[e.type] ?? e.type)) + ' · 事件 ' + e.seq;
 }
+// No speculative kong or supplementary draw: render only the public proposal and
+// linked Rules-issued WIN/PASS; a malformed public contract fails closed.
+export function RobberyNotice(view,window){
+  if(!window)return {html:'',valid:true};
+  const proposal=view.publicEvents?.find(e=>e.type==='kong_proposed'&&e.eventId===window.sourceEventId);
+  const valid=view.round?.phase==='claim_window'&&window.sourceKind==='rob-added-kong'&&
+    window.status==='open'&&window.expectedRevision===view.asOfEventSeq&&
+    proposal?.actorSeat===window.fromSeat&&proposal?.payload?.kind==='ADDED_KONG'&&
+    typeof proposal?.payload?.tileId==='string'&&Number.isInteger(window.fromSeat)&&
+    window.fromSeat>=0&&window.fromSeat<4&&
+    view.legalActions.every(a=>['win','pass'].includes(a.kind)&&a.claimEventId===window.sourceEventId);
+  return valid?{valid,html:'<p role="status" aria-live="polite" data-robbery-window>搶加槓宣告中：'+
+    SEATS[window.fromSeat]+' · '+escapeHtml(actionName({kind:'add_kong',tileIds:[proposal.payload.tileId]}))+
+    '；等待 Rules 裁定，尚未完成加槓或替代摸牌。</p>'}:
+    {valid:false,html:'<p role="alert" data-robbery-invalid>搶加槓公開契約不相容，已停止本次操作。</p>'};
+}
 export function TableView(snapshot,{selection=null,busy=false,error='',botStatus='',
   confirmation=null,restartPending=false}={}) {
   if(!snapshot)return '';
   const {view,profile,wallRemaining,botConnected,replayConnected,storageWarning,replayWarning}=snapshot;
   const opponents=new Map(view.opponents.map(p=>[p.seat,p]));
-  const actions=view.legalActions.filter(a=>a.actorSeat===view.audienceSeat &&
-    a.expectedRevision===view.asOfEventSeq&&typeof a.actionId==='string');
+  const robbery=RobberyNotice(view,snapshot.robbery);
+  const actions=robbery.valid?view.legalActions.filter(a=>a.actorSeat===view.audienceSeat &&
+    a.expectedRevision===view.asOfEventSeq&&typeof a.actionId==='string'):[];
   const humanCanAct=actions.length>0;
   const ended=view.round.phase==='settled';
   const claim=view.round.phase==='claim_window';
@@ -176,8 +193,8 @@ export function TableView(snapshot,{selection=null,busy=false,error='',botStatus
     '</strong><span>'+escapeHtml(botStatus||lastEvent(view.publicEvents))+
     '</span><small>僅顯示當下的公開牌面與本人手牌</small></div>'+
     OpponentSeat(opponents.get(1),view.round.currentSeat,view.round.dealerSeat)+'</div>'+
-    PlayerHand(view.self,actions,selection)+
-    (ended?'<section class="table-actions"><h3>正式 Rules 已結算本局</h3></section>':
+    robbery.html+PlayerHand(view.self,actions,selection)+
+    (!robbery.valid?'<section class="table-actions" aria-label="契約不相容">操作已停止</section>':ended?'<section class="table-actions"><h3>正式 Rules 已結算本局</h3></section>':
       humanCanAct?ActionBar(actions,selection,busy||snapshot.paused,confirmation):
         '<section class="table-actions" aria-label="等待其他玩家"><h3>'+
         (botConnected?'三名 Bot 自動執行中':'Bot API 尚未連接')+'</h3><p>'+
@@ -189,6 +206,7 @@ export function TableView(snapshot,{selection=null,busy=false,error='',botStatus
     '<p class="table-muted">'+
       (profile.scoringPolicy?.configRef==='tw16-minimal-tai-v1'?
         '計分為 tw16-minimal-tai-v1 實驗性簡化台數，不代表台灣通用台制。':
+        profile.profileId==='tw16-authoritative-scoring'?'權威計分由 Rules settlement 提供，UI 不計分；實驗性、未認證。':
         '此 Sandbox 不具正式胡牌計分能力。')+
     (replayConnected?' 已建立官方 Replay 歷史封存。':' 尚無完成的 Replay。')+'</p>'+
     RoundSummary(snapshot.result)+

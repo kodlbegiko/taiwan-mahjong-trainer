@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createSandboxSession, TABLE_STORAGE_KEY, availableTableProfiles } from '../../src/table-ui/session.js';
-import { TableView, ReplayControls, ActionBar, BotDifficultySelect, AuthoritativeSettlement } from '../../src/table-ui/view.js';
+import { TableView, ReplayControls, ActionBar, BotDifficultySelect, AuthoritativeSettlement, RobberyNotice } from '../../src/table-ui/view.js';
 import { createFullRoundSession } from '../../src/table-ui/full-round.js';
 import { tileFaceMarkup } from '../../src/tile-visuals.js';
 
@@ -272,4 +272,18 @@ test('R7.3 authority renderer consumes only exact public DTO, fails closed on un
   assert.ok(!html.includes('NEVER_RENDER_THIS'));
   assert.match(AuthoritativeSettlement({...summary,scoringVersion:'unknown'}),/data-authority-unavailable/);
   assert.match(AuthoritativeSettlement({...summary,playerDeltas:[0,1]}),/data-authority-unavailable/);
+});
+
+test('R7.3 public robbery proposal is pending, exact linked WIN/PASS only',()=>{
+  // Public DTO fixture only, never injected into a game.
+  const proposal={type:'kong_proposed',eventId:'public-proposal',actorSeat:1,payload:{kind:'ADDED_KONG',tileId:'t:5:2'}};
+  const win={kind:'win',claimEventId:proposal.eventId},pass={kind:'pass',claimEventId:proposal.eventId};
+  const v={asOfEventSeq:9,round:{phase:'claim_window'},publicEvents:[proposal],legalActions:[win,pass]};
+  const w={sourceKind:'rob-added-kong',sourceEventId:proposal.eventId,fromSeat:1,expectedRevision:9,status:'open'};
+  assert.equal(RobberyNotice(v,w).valid,true);
+  assert.match(RobberyNotice(v,w).html,/尚未完成加槓或替代摸牌/);
+  assert.equal(RobberyNotice({...v,legalActions:[win,{...pass,claimEventId:'wrong'}]},w).valid,false);
+  assert.equal(RobberyNotice({...v,legalActions:[win,{kind:'draw'}]},w).valid,false);
+  assert.equal(RobberyNotice(v,{...w,expectedRevision:8}).valid,false);
+  assert.equal(RobberyNotice(v,null).html,'');
 });

@@ -170,7 +170,7 @@ export async function createFullRoundSession({storage} = {}) {
       throw new Error('Rules PlayerView exposes opponent concealed');
     const r=state.round.phase==='settled' ? state.extensions?.tw16?.result : null;
     const delta=Array.isArray(r?.delta)&&r.delta.length===4 ? r.delta : null;
-    const result=r&&delta ? {
+    const legacyResult=r&&delta ? {
       source:'rules',experimental:true,
       publicSummary:{
         outcome:r.reason, winnerSeats:Number.isInteger(r.winnerSeat)?[r.winnerSeat]:[],
@@ -180,8 +180,22 @@ export async function createFullRoundSession({storage} = {}) {
         eventCount:state.events.length
       }
     }:null;
+    // The new policy may never fall back to legacy tai. Consume only the
+    // Rules-projected public settlement, never the private authority ledger.
+    const authority=state.ruleRef.profileId==='tw16-authoritative-scoring';
+    const publicSettle=view.publicEvents.find(e=>e.type==='settle')?.payload?.settlement;
+    const result=authority&&state.round.phase==='settled'?{
+      source:'rules',experimental:true,publicSummary:{
+        scoringPolicy:'tw16-gametower-authoritative@1.0.0-experimental',
+        settlement:publicSettle??null,eventCount:view.asOfEventSeq
+      }}:legacyResult;
+    const window=state.round.phase==='claim_window'?rules.getClaimWindowPublic(state):null;
+    const robbery=window?.sourceKind==='rob-added-kong'?{
+      sourceKind:window.sourceKind,sourceEventId:window.sourceEventId,
+      fromSeat:window.fromSeat,expectedRevision:window.expectedRevision,status:window.status
+    }:null;
     return copy({
-      view,profile:rules.getRuleProfile(state.ruleRef.profileId,state.ruleRef.ruleVersion),
+      view,robbery,profile:rules.getRuleProfile(state.ruleRef.profileId,state.ruleRef.ruleVersion),
       wallRemaining:state.wall.length, botConnected:true,botDifficulty,
       replayConnected:!!replayId,storageWarning,
       replayWarning,phase:'experimental-full',result,
