@@ -390,3 +390,96 @@ test('R7-001 ledger rejects forged signed-zero amounts rather than hiding them i
   ledger.fees[0].points=-0;
   assert.throws(()=>assertLedgerConservation(ledger),/Invalid fee/);
 });
+
+
+const ROB_REF={profileId:'tw16-rob-added-kong',ruleVersion:'experimental-v1'};
+function robAddedKongEvidence(){
+  return fixture({ruleRef:ROB_REF,winningTile:'t:27:3',
+    robAddedKong:{proposalEventId:'evt:r7-rob:5',fromSeat:0,tileId:'t:27:3'}});
+}
+function robAddedKongSettledSnapshot(){
+  const marker={proposalEventId:'evt:r7-rob:5',fromSeat:0,tileId:'t:27:3'};
+  const events=[
+    {eventId:marker.proposalEventId,seq:5,type:'kong_proposed',
+      visibility:'public',actorSeat:0,payload:{kind:'ADDED_KONG',tileId:marker.tileId}},
+    {eventId:'evt:r7-rob:6',seq:6,type:'claim',visibility:'seat-private',
+      actorSeat:1,payload:{kind:'win',claimEventId:marker.proposalEventId}},
+    {eventId:'evt:r7-rob:7',seq:7,type:'win',visibility:'public',
+      payload:{winnerSeat:1,sourceSeat:0,via:'discard',robAddedKong:structuredClone(marker)}},
+    {eventId:'evt:r7-rob:8',seq:8,type:'settle',visibility:'public',
+      payload:{reason:'win',winnerSeat:1,delta:[-120,120,0,0],
+        robAddedKong:structuredClone(marker)}},
+  ];
+  return {ruleRef:ROB_REF,round:{phase:'settled',prevailingWind:'east',
+      dealerSeat:3,handIndex:0,scores:[-120,120,0,0]},
+    extensions:{tw16:{result:{reason:'win',winnerSeat:1,sourceSeat:0,via:'discard',
+      winningTileId:marker.tileId,robAddedKong:structuredClone(marker),delta:[-120,120,0,0]}}},
+    players:[
+      {concealed:[],flowers:[],river:[{tileId:marker.tileId,seq:5}],
+       melds:[{kind:'triplet',open:true,
+         tileIds:['t:27:0','t:27:1','t:27:2']}]},
+      {concealed:[3,4,5,9,10,11,12,13,14,18,19,20,27],
+       flowers:[],melds:[{kind:'sequence',open:true,tileIds:[0,1,2]}]},
+      {concealed:[],flowers:[],river:[],melds:[]},
+      {concealed:[],flowers:[],river:[],melds:[]},
+    ],events};
+}
+test('R7.1 rob-added-kong 1 tai: exclusively the kong declarer pays, not self-draw',()=>{
+  const e=robAddedKongEvidence();
+  const result=scoreWinningHand(p,e);
+  assert.equal(result.tai,1);
+  assert.deepEqual(result.breakdown.map(x=>x.code),['rob-added-kong']);
+  assert.ok(result.breakdown[0].evidence.includes('evt:r7-rob:5'));
+  for(const profile of [p,see]){
+    const ledger=settleWinningHand(profile,e);
+    assert.equal(ledger.payments.length,1);
+    assert.deepEqual(ledger.playerTransferDeltas,[-1,1,0,0]);
+    assert.equal(ledger.score.via,'discard');
+    assert.equal(ledger.score.breakdown.find(x=>x.code==='rob-added-kong')?.tai,1);
+    assert.equal(assertLedgerConservation(ledger),true);
+    assert.deepEqual(JSON.parse(JSON.stringify(ledger)),ledger);
+  }
+});
+test('R7.1 robbery is opt-in: forged/unsupported markers cannot alter R5 settlement',()=>{
+  const e=robAddedKongEvidence();
+  assert.throws(()=>scoreWinningHand(p,{...e,ruleRef:ref}),/rob-added-kong profile pin/);
+  assert.throws(()=>scoreWinningHand(p,{...e,via:'self-draw',sourceSeat:1}),/rob-added-kong/);
+  assert.throws(()=>scoreWinningHand(p,{...e,robAddedKong:{...e.robAddedKong,fromSeat:2}}),/provenance/);
+  assert.throws(()=>scoreWinningHand(p,{...e,robAddedKong:{...e.robAddedKong,tileId:'t:27:2'}}),/provenance/);
+  assert.throws(()=>scoreWinningHand(p,{...e,specialWin:'rob-kong'}),ScoringCapabilityError);
+});
+test('R7.1 real Rules Agent marker contract: ordered public proposal and single private winner',()=>{
+  const snapshot=robAddedKongSettledSnapshot(),before=JSON.stringify(snapshot);
+  const evidence=evidenceFromSettledRulesState(snapshot);
+  assert.deepEqual(evidence.robAddedKong,{proposalEventId:'evt:r7-rob:5',
+    fromSeat:0,tileId:'t:27:3'});
+  assert.equal(evidence.winningTile,'t:27:3');
+  assert.equal(evidence.via,'discard');
+  const ledger=settleRulesState(p,snapshot);
+  assert.deepEqual(ledger.playerTransferDeltas,[-1,1,0,0]);
+  assert.equal(assertLedgerConservation(ledger),true);
+  assert.equal(JSON.stringify(snapshot),before,'read-only adapter must not change Rules state');
+});
+test('R7.1 robbery adapter rejects missing/tampered proposal, claim, marker, tile or payer',()=>{
+  const attacks=[
+    s=>{s.events[0].type='discard';},
+    s=>{s.events[0].actorSeat=2;},
+    s=>{s.events[0].payload.tileId='t:27:2';},
+    s=>{s.events[1].visibility='public';},
+    s=>{s.events[1].actorSeat=2;},
+    s=>{s.events[1].payload.claimEventId='evt:other:3';},
+    s=>{s.events[2].payload.robAddedKong.tileId='t:27:2';},
+    s=>{s.events[3].payload.robAddedKong.fromSeat=2;},
+    s=>{s.extensions.tw16.result.robAddedKong.tileId='t:27:2';},
+    s=>{s.players[0].river=[];},
+    s=>{s.players[0].melds[0].open=false;},
+    s=>{s.players[0].concealed=['t:27:3'];},
+    s=>{s.events.push({type:'kong',payload:{proposalEventId:'evt:r7-rob:5'}});},
+    s=>{s.ruleRef=ref;},
+  ];
+  for(const attack of attacks){
+    const snapshot=robAddedKongSettledSnapshot();attack(snapshot);
+    assert.throws(()=>evidenceFromSettledRulesState(snapshot),
+      /provenance|linkage|payer|terminal/i);
+  }
+});
