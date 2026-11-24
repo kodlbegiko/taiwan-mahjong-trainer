@@ -6,7 +6,17 @@ import { parse } from 'acorn';
 const read = path => readFileSync(path, 'utf8');
 const list = dir => readdirSync(dir, { withFileTypes: true }).flatMap(e =>
   e.isDirectory() ? list(join(dir, e.name)) : [join(dir, e.name)]);
-const inventory = list('src').filter(p => /\.m?js$/.test(p)).sort();
+// Explicit reviewed exceptions: these are unpublished teaching / QA modules,
+ // not shipped browser entrypoints. A runtime import of any exception fails
+ // requireAsset(), and new src modules are cached by default.
+const qaOnly = new Set([
+  'src/academy/content-audit.js',
+  'src/academy/r71-assessments.js',
+  'src/academy/unpublished-guides.js',
+]);
+const allSource = list('src').filter(p => /\.m?js$/.test(p)).sort();
+for (const p of qaOnly) if (!allSource.includes(p)) throw Error('Stale QA-only exception: '+p);
+const inventory = allSource.filter(p => !qaOnly.has(p));
 const marker = /  \/\/ BEGIN GENERATED RUNTIME JS[^\n]*\n[\s\S]*?  \/\/ END GENERATED RUNTIME JS/;
 let sw = read('sw.js');
 if (!marker.test(sw)) throw Error('Generated SW inventory markers missing');
@@ -18,6 +28,7 @@ if (sw.match(marker)[0] !== block) throw Error('Runtime JS inventory differs. Ru
 const shell = sw.slice(sw.indexOf('const SHELL = ['), sw.indexOf('].map(path'));
 const cached = [...shell.matchAll(/'\.\/([^']*)'/g)].map(m => m[1]);
 if (new Set(cached).size !== cached.length) throw Error('Duplicate shell entry');
+for (const p of qaOnly) if (cached.includes(p)) throw Error('QA-only module in runtime shell: '+p);
 const set = new Set(cached);
 for (const p of cached) if (p && (!existsSync(p) || !statSync(p).isFile())) throw Error('Missing shell file: ' + p);
 const edges = [], seen = new Set();
@@ -69,7 +80,7 @@ const html = read('index.html');
 const entries = [...html.matchAll(/<script\b[^>]*\btype="module"[^>]*\bsrc="\.\/([^"]+)"/g)].map(m=>m[1]);
 if (!entries.length) throw Error('No HTML module roots');
 entries.forEach(visit);
-// Audit all source modules in the conservative cache inventory. A new source
+// Audit all shipped source modules in the conservative cache inventory. A new source
 // file must be cached even if its public entry-point is wired in a later PR.
 inventory.forEach(visit);
 for (const m of html.matchAll(/<(?:link|script)\b[^>]*\b(?:href|src)="\.\/([^"]+)"/g)) requireAsset(m[1],'index.html');
@@ -81,6 +92,6 @@ if (writing) {
   sw = sw.replace(/const CACHE_VERSION = '[^']+'/, "const CACHE_VERSION = 'tmt-v02-realistic-tiles-r7-"+hash.digest('hex').slice(0,16)+"'");
   writeFileSync('sw.js',sw);
 }
-const report = {entries,sourceModules:inventory.length,visitedModules:seen.size,shellAssets:cached.length,edges,
-  note:'Static and literal dynamic ESM edges plus module-relative asset URLs; every src JS cached. Non-module fetch/CSS URL additions need explicit shell audit.'};
+const report = {entries,sourceModules:inventory.length,qaOnlyModules:[...qaOnly],allSourceModules:allSource.length,visitedModules:seen.size,shellAssets:cached.length,edges,
+  note:'Static and literal dynamic ESM edges plus module-relative asset URLs; every src JS cached except explicit QA-only modules; a runtime dependency on an exception fails closed. Non-module fetch/CSS URL additions need explicit shell audit.'};
 console.log(JSON.stringify(report,null,2));

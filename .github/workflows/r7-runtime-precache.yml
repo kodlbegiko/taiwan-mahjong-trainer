@@ -44,6 +44,19 @@ jobs:
           fi
           grep -q 'Runtime JS inventory differs' r7-graph/negative-probe.txt
           echo "PASS: uncached runtime module rejected" >> r7-graph/negative-probe.txt
+      - name: Prove a runtime import of an excluded QA module fails the gate
+        if: github.head_ref == 'integration/mahjong-r7-release-audit'
+        run: |
+          set -euo pipefail
+          entry=src/app.js
+          cp "$entry" "$RUNNER_TEMP/r7-app-original.js"
+          trap 'cp "$RUNNER_TEMP/r7-app-original.js" "$entry"' EXIT
+          printf '\nimport "./academy/content-audit.js";\n' >> "$entry"
+          if node scripts/runtime-precache.mjs > r7-graph/qa-import-negative-probe.txt 2>&1; then
+            echo "Runtime QA-only import incorrectly passed" >&2
+            exit 1
+          fi
+          grep -q 'needs uncached/missing src/academy/content-audit.js' r7-graph/qa-import-negative-probe.txt
       - uses: actions/upload-artifact@v4
         if: always()
         with:

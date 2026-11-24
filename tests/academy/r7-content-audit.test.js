@@ -210,7 +210,7 @@ test('R7 wrong-answer review: real canonical score leads to available review, no
 test('R7 offline graph: Academy release entrypoint does not import QA-only modules missing from SW precache',()=>{
   const publicEntry=readFileSync(new URL('../../src/academy/index.js',import.meta.url),'utf8');
   const sw=readFileSync(new URL('../../sw.js',import.meta.url),'utf8');
-  for(const moduleName of ['content-audit.js','unpublished-guides.js']){
+  for(const moduleName of ['content-audit.js','unpublished-guides.js','r71-assessments.js']){
     assert.ok(!publicEntry.includes(moduleName),moduleName+' is not a runtime dependency');
     assert.ok(!sw.includes("'./src/academy/"+moduleName+"'"),
       moduleName+' should remain a standalone QA-only module');

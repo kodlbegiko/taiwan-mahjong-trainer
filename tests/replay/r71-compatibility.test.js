@@ -241,7 +241,16 @@ test('R7.1 opt-in comparison scoring never replaces historical Rules results, ev
     const definition=cp(scoring.getScoringProfile('tw16-gametower-comparative'));
     definition.settlement.fee={mode:'fixed-per-player',points:7};
     const profile=scoring.createScoringProfile(definition);
-    const comparison=scoring.settleRulesState(profile,state);
+    const capabilities=getRuleCapabilities(state.ruleRef);
+    const publicEventContractVersion=capabilities.publicEventContractVersion;
+    if(state.extensions.tw16.result.robAddedKong){
+      assert.equal(publicEventContractVersion,'tw16-rob-added-kong-public/1.0.0');
+      assert.throws(()=>scoring.settleRulesState(profile,state),
+        {code:'UNSUPPORTED_SCORING_CAPABILITY'});
+      assert.throws(()=>scoring.settleRulesState(profile,state,{publicEventContractVersion:'unknown'}),
+        {code:'UNSUPPORTED_SCORING_CAPABILITY'});
+    }
+    const comparison=scoring.settleRulesState(profile,state,{publicEventContractVersion});
     assert.equal(scoring.assertLedgerConservation(comparison),true);
     assert.equal(comparison.scoringVersion,profile.profileId+'@'+profile.version);
     assert.equal(comparison.playerTransferDeltas.reduce((n,v)=>n+v,0),0);

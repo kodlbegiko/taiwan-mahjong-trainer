@@ -1,7 +1,7 @@
 /* Offline-first, atomic shell for GitHub Pages root or /repo/ deployments.
  * IMPORTANT: change CACHE_VERSION whenever any precached file changes.
  * The install event only succeeds if the entire listed release is cached. */
-const CACHE_VERSION = 'tmt-v02-realistic-tiles-r7.1-integrated-78e6a1815199';
+const CACHE_VERSION = 'tmt-v02-realistic-tiles-r7.2-qa-boundary-9d32149f';
 const SHELL_CACHE = `tmt-shell-${CACHE_VERSION}`;
 const BASE = new URL('./', self.location.href);
 const SHELL = [
@@ -50,17 +50,14 @@ const SHELL = [
   './src/academy-ui/public-facade.js',
   './src/academy-ui/scenario.js',
   './src/academy/catalog.js',
-  './src/academy/content-audit.js',
   './src/academy/index.js',
   './src/academy/lessons.js',
   './src/academy/provenance.js',
   './src/academy/question-internal.js',
   './src/academy/questions.js',
-  './src/academy/r71-assessments.js',
   './src/academy/records.js',
   './src/academy/registry.js',
   './src/academy/scenario-scorers.js',
-  './src/academy/unpublished-guides.js',
   './src/adaptive/ability.js',
   './src/adaptive/core.js',
   './src/adaptive/daily-training.js',
