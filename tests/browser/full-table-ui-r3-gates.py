@@ -76,6 +76,20 @@ def make_human_decision(page, coverage, folder):
     # Only click currently issued UI LegalAction controls. Never fabricate IDs.
     if page.locator('.table-round-summary').count():
         return 'settled'
+    if coverage.get('consumed_id') and not coverage.get('expired_dom'):
+        # Re-submit the actual prior Rules-issued token through a DOM control.
+        # Never change GameState, storage, or the Rules/Bot authority.
+        stale=page.locator('.table-action-buttons [data-submit-action]:enabled')
+        if stale.count():
+            revision=page.locator('.table-version').inner_text()
+            stale.first.evaluate('(el,id)=>el.dataset.submitAction=id',coverage['consumed_id'])
+            stale.first.click()
+            require('過期' in page.locator('[role="alert"]').last.inner_text(),
+                    'Previously consumed LegalAction was not explicitly rejected')
+            require(page.locator('.table-version').inner_text()==revision,
+                    'Expired action changed Rules revision')
+            require(page.locator('[data-action-confirmation]').count()==0,'Expired action was staged')
+            coverage['expired_dom']=True
     cont=page.locator('[data-continue-bots]:enabled')
     if cont.count():
         cont.click()
@@ -99,8 +113,10 @@ def make_human_decision(page, coverage, folder):
         if not coverage.get('double_confirm'):
             # Two real click events on the same rendered button, no Rules injection.
             before=page.locator('.table-version').inner_text()
+            coverage['consumed_id']=page.locator('[data-confirm-action]').get_attribute('data-confirm-action')
             page.locator('[data-confirm-action]').evaluate('(el)=>{el.click();el.click()}')
-            page.locator('[data-table-busy="false"]').wait_for(timeout=25000)
+            page.wait_for_function('''before=>document.querySelector('[data-table-busy="false"]') &&
+                document.querySelector('.table-version')?.innerText!==before''',arg=before,timeout=25000)
             require(page.locator('.table-version').inner_text()!=before,'Confirmed action did not advance')
             require(page.locator('[data-action-confirmation]').count()==0,'Duplicate left stale confirmation')
             require(page.locator('[role="alert"]').count()==0,'Duplicate confirmation caused error')
@@ -175,6 +191,7 @@ def full_round(page, folder):
     require(coverage['declaration_negative_paths'],
             'No real flower/claim declaration exercised cancellation, refusal and retry')
     require(coverage.get('double_confirm'),'No genuine duplicate confirmation exercised')
+    require(coverage.get('expired_dom'),'No real consumed LegalAction retry exercised')
     require(not native_dialogs,
             'Native browser dialog appeared in full-match table UI: '+str(native_dialogs))
     result=page.locator('.table-round-summary').inner_text()
@@ -191,6 +208,7 @@ def full_round(page, folder):
     require(page.locator('.table-round-summary').inner_text()==result,'Reload altered authoritative settlement')
     require(page.locator('[data-bot-difficulty]').get_attribute('data-bot-difficulty')==os.environ.get('PHASE3_BOT_DIFFICULTY','Beginner'),
             'Reload altered selected Bot difficulty')
+    page.screenshot(path=str(folder/'table-390-real-settled-reloaded.png'),full_page=True)
     page.locator('[data-table-nav="replay"]').click()
     page.wait_for_selector('.table-replay',timeout=20000)
     require('當時你的手牌' in page.locator('.table-replay').inner_text(),
@@ -204,6 +222,12 @@ def full_round(page, folder):
     require('事件 1 /' in page.locator('.table-replay').inner_text(),
             'Replay jump to historical event failed')
     page.screenshot(path=str(folder/'table-390-real-replay.png'),full_page=True)
+    (folder/'r7-confirmation-coverage.json').write_text(json.dumps({
+        'declaration_cancel_reject_retry':coverage['declaration_negative_paths'],
+        'duplicate_click':coverage['double_confirm'],'expired_actual_token':coverage['expired_dom'],
+        'native_dialogs':native_dialogs,'difficulty':os.environ.get('PHASE3_BOT_DIFFICULTY','Beginner'),
+        'restored_settlement_and_difficulty':True,'humanActionHistogram':{h:history.count(h) for h in set(history)}
+    },ensure_ascii=False,indent=2),encoding='utf-8')
     return history
 
 def daily_roundtrip(page,folder):

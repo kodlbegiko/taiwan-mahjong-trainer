@@ -108,13 +108,13 @@ jobs:
       - name: Record exact test SHA and public deployment source
         run: |
           echo "TESTED_SOURCE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
-          echo "PUBLIC_DEPLOYMENT_SOURCE_SHA=ad32cbc6d44b48670de5af819cd29d203222e266" >> "$GITHUB_STEP_SUMMARY"
-          echo "PUBLIC_DEPLOYMENT_URL=https://taiwan-mahjong-phase3-r5-experimental-56c7mdzfc-sign2.vercel.app/" >> "$GITHUB_STEP_SUMMARY"
+          echo "PUBLIC_DEPLOYMENT_SOURCE_SHA=ee2eda1a3223ac85433f3ae5e31604258e1b4e7c" >> "$GITHUB_STEP_SUMMARY"
+          echo "PUBLIC_DEPLOYMENT_URL=https://taiwan-mahjong-phase3-r5-experimental-ib7ewqch0-sign2.vercel.app/" >> "$GITHUB_STEP_SUMMARY"
           google-chrome --version
       - name: Public Vercel HTTPS — real human plus three Bots
         env:
-          DEPLOYMENT_SOURCE_SHA: ad32cbc6d44b48670de5af819cd29d203222e266
-          R7_PUBLIC_URL: https://taiwan-mahjong-phase3-r5-experimental-56c7mdzfc-sign2.vercel.app/
+          DEPLOYMENT_SOURCE_SHA: ee2eda1a3223ac85433f3ae5e31604258e1b4e7c
+          R7_PUBLIC_URL: https://taiwan-mahjong-phase3-r5-experimental-ib7ewqch0-sign2.vercel.app/
         run: |
           python tests/browser/r7-public-https-gates.py \
             --url "$R7_PUBLIC_URL" --screenshots r7-public-https-evidence \

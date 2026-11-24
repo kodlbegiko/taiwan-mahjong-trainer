@@ -5,13 +5,14 @@ Vercel deployment, checks settlement and Replay, and saves traces/screenshots.
 This is separate from the exact-checkout localhost/browser acceptance.
 """
 import argparse
+import hashlib
 import json
 import os
 import re
 import runpy
 from datetime import datetime, timezone
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import urljoin, urlsplit
 from playwright.sync_api import sync_playwright
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -51,6 +52,7 @@ def run(url, folder, max_matches, source_sha, deployment_sha):
     os.environ['PHASE3_REQUIRE_SINGLE_WINNER']='1'
     outcomes=set()
     attempts=[]
+    runtime_hashes={}
     os.environ['PHASE3_R71_CLAIMS']='1'
     with sync_playwright() as pw:
         browser=pw.chromium.launch(channel='chrome',headless=True,args=['--no-sandbox'])
@@ -70,8 +72,18 @@ def run(url, folder, max_matches, source_sha, deployment_sha):
                 response=page.goto(url,wait_until='networkidle',timeout=45000)
                 require(response and response.status==200,
                         'Live public origin did not return HTTP 200')
-                require(page.url.startswith('https://'),
-                        'Public navigation downgraded to non-HTTPS')
+                require(urlsplit(page.url).scheme=='https' and urlsplit(page.url).netloc==parts.netloc,
+                        'Public navigation changed HTTPS origin')
+                if idx==0:
+                    # Verify exact runtime source bytes, independently of Vercel's source SHA metadata.
+                    root=SCRIPT_DIR.parents[1]
+                    for path in ('src/table-ui/main.js','src/table-ui/view.js','src/table-ui/full-round.js'):
+                        remote=ctx.request.get(urljoin(url,path),timeout=30000)
+                        require(remote.status==200,'Runtime file inaccessible: '+path)
+                        actual=hashlib.sha256(remote.body()).hexdigest()
+                        expected=hashlib.sha256((root/path).read_bytes()).hexdigest()
+                        require(actual==expected,'Public runtime SHA256 mismatch: '+path)
+                        runtime_hashes[path]=actual
                 history=full_round(page,dest)
                 page.locator('[data-table-nav="play"]').click()
                 summary=page.locator('.table-round-summary').inner_text()
@@ -95,7 +107,8 @@ def run(url, folder, max_matches, source_sha, deployment_sha):
     report={
       'gate':'r7-public-https-real-ui','release':False,
       'testedSourceSHA':source_sha,'deploymentSourceSHA':deployment_sha,
-      'publicOrigin':url,'testedAtUTC':datetime.now(timezone.utc).isoformat(),
+      'publicOrigin':url,'runtimeSourceSHA256':runtime_hashes,
+      'testedAtUTC':datetime.now(timezone.utc).isoformat(),
       'browser':'GitHub Actions Ubuntu / Google Chrome via Playwright Python',
       'execution':'actual DOM clicks only; no injected GameState or private Bot state',
       'matches':attempts,'winObserved':'WIN' in outcomes,
