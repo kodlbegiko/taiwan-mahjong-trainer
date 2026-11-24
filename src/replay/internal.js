@@ -393,7 +393,7 @@ function verifiedUnsupportedSubmission(state,submitted,settlementRuntime) {
     throw new ReplayError('INVALID_INTERRUPTION','Cannot validate the rejected Rules action',error);
   }
   if(!legal)throw new ReplayError('INVALID_INTERRUPTION','Rejected submission is not a current legal Rules action');
-  const priorChecksum=checksum(state);
+  const priorCanonical=canonical(state);
   let capabilityError=null;
   try {
     // Authority is Rules. Do not invent an alternative arbitration/reducer.
@@ -406,7 +406,7 @@ function verifiedUnsupportedSubmission(state,submitted,settlementRuntime) {
       throw new ReplayError('INVALID_INTERRUPTION','Rules did not produce an unsupported capability',error);
     capabilityError=error;
   }
-  if(!capabilityError || checksum(state)!==priorChecksum)
+  if(!capabilityError || canonical(state)!==priorCanonical)
     throw new ReplayError('INVALID_INTERRUPTION','Rejected Rules action must fail atomically and leave state unchanged');
   return {kind:'unsupported-rule-capability',code:capabilityError.code,
     capability:capabilityError.capability,

@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {createGame,listLegalActions,listPendingClaimResponders,applyAction,listRuleProfiles,getRuleCapabilities} from '../../src/rules/index.js';
+import * as Rules from '../../src/rules/index.js';
+const {createGame,listLegalActions,listPendingClaimResponders,applyAction,listRuleProfiles,getRuleCapabilities}=Rules;
 import {createReplayArchive,validateReplayArchive,replayStateAt,replayIntegrityHashes,checksum,ReplayError} from '../../src/replay/internal.js';
 import {createReplayService} from '../../src/replay/index.js';
 
@@ -112,4 +113,31 @@ test('R7.3 authoritative scoring integration dependency gate (no SKIP)',()=>{
     assert.equal(getRuleCapabilities({profileId:p.profileId,ruleVersion:p.ruleVersion}).scoring.evidenceContractVersion,'tw16-pre-settlement/1.0.0');
   }
   assert.equal(getRuleCapabilities(ref).scoring.policy,'tw16-minimal-tai-v1');
+});
+
+test('R7.3 legacy FNV and SHA readback never invokes the new scorer even when runtime is supplied',async t=>{
+  if(typeof Rules.createSettlementRuntime!=='function'){
+    if(process.env.REPLAY_REQUIRE_R73_AUTHORITATIVE==='1')assert.fail('BLOCKED: Rules settlement runtime missing');
+    t.diagnostic('Standalone old-runtime regression only; cross-source runtime absent');return;
+  }
+  let scoring;
+  try{scoring=await import('../../src/scoring/index.js')}catch(error){
+    if(error.code!=='ERR_MODULE_NOT_FOUND'||process.env.REPLAY_REQUIRE_R73_AUTHORITATIVE==='1')throw error;
+    t.diagnostic('BLOCKED: Scoring module missing');return;
+  }
+  let calls=0;
+  const settlementRuntime=Rules.createSettlementRuntime({...scoring,settlePreSettlement(){
+    calls++;throw Error('Historical minimal-tai replay must never enter authoritative scorer');
+  }});
+  for(const a of [fixture.legacyArchive,fixture.shaArchive]){
+    const id=a.manifest.replayId,raw=JSON.stringify(a),storage=new Map([[key(id),raw]]);
+    const svc=createReplayService({storage,settlementRuntime});
+    assert.equal(svc.recoverReplay(id).scoringVersion,'tw16-minimal-tai-v1');
+    const state=replayStateAt(a,a.events.length,{settlementRuntime});
+    assert.deepEqual(state.extensions.tw16.result,fixture.expectedResult);
+    assert.deepEqual(svc.getReplayFrame(id,1,{perspective:'postgame'}).postgameDisclosure.outcome.delta,fixture.expectedScores);
+    svc.saveReplay(state,{disclosurePolicy:'settled-public-only'});
+    assert.equal(storage.get(key(id)),raw);
+  }
+  assert.equal(calls,0);
 });

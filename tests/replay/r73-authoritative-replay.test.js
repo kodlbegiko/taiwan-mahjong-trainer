@@ -119,6 +119,10 @@ function verifyArchive(state,type,payers){
   if(type!==null)errorCode(()=>svc.getReplayFrame(id,state.revision-1),'NON_ATOMIC_EVENT_SEQ');
   errorCode(()=>validateReplayArchive(a),'SCORING_RUNTIME_REQUIRED');
   errorCode(()=>createReplayService({storage}).loadReplay(id),'SCORING_RUNTIME_REQUIRED');
+  errorCode(()=>validateReplayArchive(a,{settlementRuntime:{contractVersion:AUTHORITATIVE_PRE_SETTLEMENT,
+    scoringVersion:AUTHORITATIVE_SCORING_VERSION}}),'SCORING_RUNTIME_REQUIRED');
+  const unknown=cp(a);unknown.manifest.scoringVersion='retired-or-unknown@99';
+  errorCode(()=>validateReplayArchive(unknown,opts()),'UNSUPPORTED_SCORING_PROFILE');
   storage.delete(INDEX);
   const reopened=createReplayService({storage,...opts()});
   assert.equal(reopened.recoverReplay(id).replayId,id);
@@ -171,6 +175,11 @@ test('R7.3 authoritative Rules + Scoring + Replay mandatory integration: actual 
   assertPrivate(frame);
   errorCode(()=>svc.getReplayFrame(incomplete.replayId,1,{perspective:'postgame'}),'POSTGAME_UNAVAILABLE');
   const original=store.get(key(incomplete.replayId));
+  store.delete(INDEX);
+  errorCode(()=>createReplayService({storage:store}).recoverReplay(incomplete.replayId),'SCORING_RUNTIME_REQUIRED');
+  assert.equal(store.has(INDEX),false);
+  assert.equal(createReplayService({storage:store,...opts()}).recoverReplay(incomplete.replayId).replayId,incomplete.replayId);
+  assert.equal(store.get(key(incomplete.replayId)),original);
   const failRuntime=Rules.createSettlementRuntime({...scoring,settlePreSettlement(){throw Error('injected test scorer failure')}});
   assert.throws(()=>applyAction(s,actionInput(last),{settlementRuntime:failRuntime}),/injected test scorer failure/);
   assert.deepEqual(s,prefix);assert.equal(s.extensions.tw16.result,null);
@@ -178,6 +187,21 @@ test('R7.3 authoritative Rules + Scoring + Replay mandatory integration: actual 
   const robbed=take(s,last);
   assert.deepEqual(verifyArchive(robbed,'rob-added-kong',[1]).playerDeltas,[0,-7,7,0]);
   assert.throws(()=>applyAction(robbed,actionInput(last),opts()));
+  // Real scoring failure: no opening/dice seat-wind proof for flower tai.
+  const flower='f:season-spring:0',hand=robber(9,27);hand[15]=flower;
+  let blocked=createGame({gameId:'r73-replay-no-seatwind',seed:'r73',
+    fixtureDeck:fixtureDeck({0:['t:5:3'],2:hand},firstOrbitLive,{tail:['t:27:1']}),...R7},opts());
+  blocked=take(blocked,choose(blocked,2,'replace_flower',flower));
+  blocked=advanceOrbit(blocked,'t:5:3');
+  blocked=take(blocked,choose(blocked,1,'pass'));blocked=take(blocked,choose(blocked,2,'win'));
+  const blockedBefore=cp(blocked),blockedAction=choose(blocked,3,'pass');
+  assert.throws(()=>applyAction(blocked,actionInput(blockedAction),opts()),/seat wind|wind proof/i);
+  assert.deepEqual(blocked,blockedBefore);assert.equal(blocked.extensions.tw16.result,null);
+  const blockedStorage=new Map(),blockedService=createReplayService({storage:blockedStorage,...opts()});
+  const blockedMeta=blockedService.saveReplay(blocked);
+  assert.equal(blockedMeta.completionStatus,'incomplete');
+  assert.deepEqual(replayStateAt(JSON.parse(blockedStorage.get(key(blockedMeta.replayId))),blocked.revision,opts()),blocked);
+  errorCode(()=>blockedService.getReplayFrame(blockedMeta.replayId,1,{perspective:'postgame'}),'POSTGAME_UNAVAILABLE');
   let ron=createGame({gameId:'r73-replay-discard',seed:'r73',fixtureDeck:fixtureDeck({0:['t:5:3'],2:robber(9,27)},firstOrbitLive),...R7},opts());
   ron=respond(advanceOrbit(ron,'t:5:3'),{2:'win'});
   verifyArchive(ron,'discard',[0]);
