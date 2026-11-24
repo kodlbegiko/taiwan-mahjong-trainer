@@ -1,0 +1,844 @@
+{
+  "schema": "r73-report/1.0",
+  "sourceSHA": "03f23344d0316dbbbf9e0bb1b61320397180a312",
+  "phase": "validation",
+  "seedCount": 100,
+  "seeds": [
+    2000,
+    2001,
+    2002,
+    2003,
+    2004,
+    2005,
+    2006,
+    2007,
+    2008,
+    2009,
+    2010,
+    2011,
+    2012,
+    2013,
+    2014,
+    2015,
+    2016,
+    2017,
+    2018,
+    2019,
+    2020,
+    2021,
+    2022,
+    2023,
+    2024,
+    2025,
+    2026,
+    2027,
+    2028,
+    2029,
+    2030,
+    2031,
+    2032,
+    2033,
+    2034,
+    2035,
+    2036,
+    2037,
+    2038,
+    2039,
+    2040,
+    2041,
+    2042,
+    2043,
+    2044,
+    2045,
+    2046,
+    2047,
+    2048,
+    2049,
+    2050,
+    2051,
+    2052,
+    2053,
+    2054,
+    2055,
+    2056,
+    2057,
+    2058,
+    2059,
+    2060,
+    2061,
+    2062,
+    2063,
+    2064,
+    2065,
+    2066,
+    2067,
+    2068,
+    2069,
+    2070,
+    2071,
+    2072,
+    2073,
+    2074,
+    2075,
+    2076,
+    2077,
+    2078,
+    2079,
+    2080,
+    2081,
+    2082,
+    2083,
+    2084,
+    2085,
+    2086,
+    2087,
+    2088,
+    2089,
+    2090,
+    2091,
+    2092,
+    2093,
+    2094,
+    2095,
+    2096,
+    2097,
+    2098,
+    2099
+  ],
+  "profile": {
+    "profileId": "tw16-single-winner-interception",
+    "ruleVersion": "experimental-v1"
+  },
+  "scoring": "tw16-minimal-tai-v1",
+  "actualGames": 2100,
+  "pairedObservationsPerPolicy": 400,
+  "baseline": {
+    "hands": 400,
+    "wins": 100,
+    "winRate": 0.25,
+    "dealInRate": 0.195,
+    "drawRate": 0,
+    "meanScore": 0,
+    "meanPostDiscardShanten": 1.9135459109818627,
+    "shantenHands": 400,
+    "meanDecisionMs": 5.418060152893381,
+    "p95DecisionMs": 27.939211999997497,
+    "p99DecisionMs": 60.33765400000266,
+    "maxDecisionMs": 499.2586379999998,
+    "fractionOver50ms": 0.016594930655188904,
+    "decisionCount": 20910,
+    "claimWindows": 1166,
+    "claims": 1143,
+    "claimPasses": 3,
+    "ownKongOffers": 46,
+    "ownKongs": 13
+  },
+  "comparisons": {
+    "Beginner": {
+      "metrics": {
+        "hands": 400,
+        "wins": 62,
+        "winRate": 0.155,
+        "dealInRate": 0.205,
+        "drawRate": 0.0325,
+        "meanScore": -6.15,
+        "meanPostDiscardShanten": 2.1777621174942197,
+        "shantenHands": 400,
+        "meanDecisionMs": 7.330141953492804,
+        "p95DecisionMs": 38.811599000007845,
+        "p99DecisionMs": 78.94487599999411,
+        "maxDecisionMs": 295.7376300000178,
+        "fractionOver50ms": 0.03165735567970205,
+        "decisionCount": 20943,
+        "claimWindows": 1465,
+        "claims": 354,
+        "claimPasses": 1091,
+        "ownKongOffers": 32,
+        "ownKongs": 11
+      },
+      "vsLegacy": {
+        "won": {
+          "estimate": -0.095,
+          "ci95": [
+            -0.13,
+            -0.0575
+          ],
+          "n": 100
+        },
+        "dealIn": {
+          "estimate": 0.01,
+          "ci95": [
+            -0.03,
+            0.05
+          ],
+          "n": 100
+        },
+        "draw": {
+          "estimate": 0.0325,
+          "ci95": [
+            0.0175,
+            0.0525
+          ],
+          "n": 100
+        },
+        "score": {
+          "estimate": -6.15,
+          "ci95": [
+            -18.6,
+            6.35
+          ],
+          "n": 100
+        },
+        "meanShanten": {
+          "estimate": 0.26421620651235594,
+          "ci95": [
+            0.17498812815366602,
+            0.34993818776897334
+          ],
+          "n": 100
+        }
+      },
+      "vsOldAdvanced": {
+        "won": {
+          "estimate": -0.0475,
+          "ci95": [
+            -0.095,
+            0.0025
+          ],
+          "n": 100
+        },
+        "dealIn": {
+          "estimate": 0.055,
+          "ci95": [
+            0.005,
+            0.105
+          ],
+          "n": 100
+        },
+        "draw": {
+          "estimate": 0,
+          "ci95": [
+            -0.0225,
+            0.025
+          ],
+          "n": 100
+        },
+        "score": {
+          "estimate": -8.9,
+          "ci95": [
+            -25.7,
+            7.8
+          ],
+          "n": 100
+        },
+        "meanShanten": {
+          "estimate": 0.21085695799298748,
+          "ci95": [
+            0.1346196606863208,
+            0.2881654499503764
+          ],
+          "n": 100
+        }
+      }
+    },
+    "Intermediate": {
+      "metrics": {
+        "hands": 400,
+        "wins": 127,
+        "winRate": 0.3175,
+        "dealInRate": 0.19,
+        "drawRate": 0.0075,
+        "meanScore": 23,
+        "meanPostDiscardShanten": 1.883366254660373,
+        "shantenHands": 400,
+        "meanDecisionMs": 6.372256165243862,
+        "p95DecisionMs": 33.76119800000015,
+        "p99DecisionMs": 68.98579299999983,
+        "maxDecisionMs": 504.52674399999887,
+        "fractionOver50ms": 0.02308662333883015,
+        "decisionCount": 20618,
+        "claimWindows": 1332,
+        "claims": 725,
+        "claimPasses": 578,
+        "ownKongOffers": 62,
+        "ownKongs": 0
+      },
+      "vsLegacy": {
+        "won": {
+          "estimate": 0.0675,
+          "ci95": [
+            0.03,
+            0.105
+          ],
+          "n": 100
+        },
+        "dealIn": {
+          "estimate": -0.005,
+          "ci95": [
+            -0.05,
+            0.04
+          ],
+          "n": 100
+        },
+        "draw": {
+          "estimate": 0.0075,
+          "ci95": [
+            0,
+            0.0175
+          ],
+          "n": 100
+        },
+        "score": {
+          "estimate": 23,
+          "ci95": [
+            9.05,
+            37.4
+          ],
+          "n": 100
+        },
+        "meanShanten": {
+          "estimate": -0.030179656321490684,
+          "ci95": [
+            -0.07906661311469748,
+            0.019176296549168054
+          ],
+          "n": 100
+        }
+      },
+      "vsOldAdvanced": {
+        "won": {
+          "estimate": 0.115,
+          "ci95": [
+            0.0725,
+            0.16
+          ],
+          "n": 100
+        },
+        "dealIn": {
+          "estimate": 0.04,
+          "ci95": [
+            -0.005,
+            0.085
+          ],
+          "n": 100
+        },
+        "draw": {
+          "estimate": -0.025,
+          "ci95": [
+            -0.045,
+            -0.0075
+          ],
+          "n": 100
+        },
+        "score": {
+          "estimate": 20.25,
+          "ci95": [
+            5.75,
+            34.7
+          ],
+          "n": 100
+        },
+        "meanShanten": {
+          "estimate": -0.0835389048408592,
+          "ci95": [
+            -0.11589349644593455,
+            -0.0488003552819729
+          ],
+          "n": 100
+        }
+      }
+    },
+    "Advanced": {
+      "metrics": {
+        "hands": 400,
+        "wins": 81,
+        "winRate": 0.2025,
+        "dealInRate": 0.15,
+        "drawRate": 0.0325,
+        "meanScore": 2.75,
+        "meanPostDiscardShanten": 1.966905159501232,
+        "shantenHands": 400,
+        "meanDecisionMs": 6.902462739923817,
+        "p95DecisionMs": 35.92744499997934,
+        "p99DecisionMs": 73.15886199999659,
+        "maxDecisionMs": 503.0483800000002,
+        "fractionOver50ms": 0.02631940941813013,
+        "decisionCount": 21809,
+        "claimWindows": 1478,
+        "claims": 463,
+        "claimPasses": 995,
+        "ownKongOffers": 86,
+        "ownKongs": 0
+      },
+      "vsLegacy": {
+        "won": {
+          "estimate": -0.0475,
+          "ci95": [
+            -0.0825,
+            -0.0125
+          ],
+          "n": 100
+        },
+        "dealIn": {
+          "estimate": -0.045,
+          "ci95": [
+            -0.085,
+            -0.0025
+          ],
+          "n": 100
+        },
+        "draw": {
+          "estimate": 0.0325,
+          "ci95": [
+            0.0175,
+            0.05
+          ],
+          "n": 100
+        },
+        "score": {
+          "estimate": 2.75,
+          "ci95": [
+            -9.55,
+            15.75
+          ],
+          "n": 100
+        },
+        "meanShanten": {
+          "estimate": 0.053359248519368484,
+          "ci95": [
+            -0.005119520357523448,
+            0.10925118134144839
+          ],
+          "n": 100
+        }
+      },
+      "vsOldAdvanced": {
+        "won": {
+          "estimate": 0,
+          "ci95": [
+            0,
+            0
+          ],
+          "n": 100
+        },
+        "dealIn": {
+          "estimate": 0,
+          "ci95": [
+            0,
+            0
+          ],
+          "n": 100
+        },
+        "draw": {
+          "estimate": 0,
+          "ci95": [
+            0,
+            0
+          ],
+          "n": 100
+        },
+        "score": {
+          "estimate": 0,
+          "ci95": [
+            0,
+            0
+          ],
+          "n": 100
+        },
+        "meanShanten": {
+          "estimate": 0,
+          "ci95": [
+            0,
+            0
+          ],
+          "n": 100
+        }
+      }
+    },
+    "combined": {
+      "metrics": {
+        "hands": 400,
+        "wins": 132,
+        "winRate": 0.33,
+        "dealInRate": 0.1825,
+        "drawRate": 0.0075,
+        "meanScore": 25.7,
+        "meanPostDiscardShanten": 1.8636133107088995,
+        "shantenHands": 400,
+        "meanDecisionMs": 6.316446483824258,
+        "p95DecisionMs": 33.32875900002546,
+        "p99DecisionMs": 67.79536499999813,
+        "maxDecisionMs": 500.83766099999775,
+        "fractionOver50ms": 0.02277103793568265,
+        "decisionCount": 20772,
+        "claimWindows": 1351,
+        "claims": 733,
+        "claimPasses": 586,
+        "ownKongOffers": 70,
+        "ownKongs": 0
+      },
+      "vsLegacy": {
+        "won": {
+          "estimate": 0.08,
+          "ci95": [
+            0.0425,
+            0.1175
+          ],
+          "n": 100
+        },
+        "dealIn": {
+          "estimate": -0.0125,
+          "ci95": [
+            -0.05,
+            0.0275
+          ],
+          "n": 100
+        },
+        "draw": {
+          "estimate": 0.0075,
+          "ci95": [
+            0,
+            0.0175
+          ],
+          "n": 100
+        },
+        "score": {
+          "estimate": 25.7,
+          "ci95": [
+            12.25,
+            39.4
+          ],
+          "n": 100
+        },
+        "meanShanten": {
+          "estimate": -0.04993260027296409,
+          "ci95": [
+            -0.10120598354818561,
+            0.0010571734444605773
+          ],
+          "n": 100
+        }
+      },
+      "vsOldAdvanced": {
+        "won": {
+          "estimate": 0.1275,
+          "ci95": [
+            0.085,
+            0.1725
+          ],
+          "n": 100
+        },
+        "dealIn": {
+          "estimate": 0.0325,
+          "ci95": [
+            -0.0125,
+            0.0775
+          ],
+          "n": 100
+        },
+        "draw": {
+          "estimate": -0.025,
+          "ci95": [
+            -0.0425,
+            -0.0075
+          ],
+          "n": 100
+        },
+        "score": {
+          "estimate": 22.95,
+          "ci95": [
+            8.5,
+            37.45
+          ],
+          "n": 100
+        },
+        "meanShanten": {
+          "estimate": -0.10329184879233261,
+          "ci95": [
+            -0.13872567521058238,
+            -0.06609183017919479
+          ],
+          "n": 100
+        }
+      }
+    }
+  },
+  "selection": null,
+  "selectedVariant": "combined",
+  "direct": {
+    "Beginner": {
+      "metrics": {
+        "hands": 400,
+        "wins": 64,
+        "winRate": 0.16,
+        "dealInRate": 0.2225,
+        "drawRate": 0.0325,
+        "meanScore": -19.95,
+        "meanPostDiscardShanten": 2.1926384912065067,
+        "shantenHands": 400,
+        "meanDecisionMs": 7.596543459655697,
+        "p95DecisionMs": 39.91602199999761,
+        "p99DecisionMs": 78.48459900001762,
+        "maxDecisionMs": 374.44949099997757,
+        "fractionOver50ms": 0.03295792501584516,
+        "decisionCount": 20511,
+        "claimWindows": 1444,
+        "claims": 342,
+        "claimPasses": 1083,
+        "ownKongOffers": 28,
+        "ownKongs": 12
+      },
+      "vsIntermediate": {
+        "won": {
+          "estimate": -0.13,
+          "ci95": [
+            -0.1925,
+            -0.07
+          ],
+          "n": 100
+        },
+        "dealIn": {
+          "estimate": 0.04,
+          "ci95": [
+            -0.0175,
+            0.1
+          ],
+          "n": 100
+        },
+        "draw": {
+          "estimate": 0,
+          "ci95": [
+            0,
+            0
+          ],
+          "n": 100
+        },
+        "score": {
+          "estimate": -34,
+          "ci95": [
+            -50.7,
+            -17.65
+          ],
+          "n": 100
+        },
+        "meanShanten": {
+          "estimate": 0.26698055355592115,
+          "ci95": [
+            0.2065443116932087,
+            0.3272045652468447
+          ],
+          "n": 100
+        }
+      }
+    },
+    "Intermediate": {
+      "metrics": {
+        "hands": 400,
+        "wins": 116,
+        "winRate": 0.29,
+        "dealInRate": 0.1825,
+        "drawRate": 0.0325,
+        "meanScore": 14.05,
+        "meanPostDiscardShanten": 1.9256579376505842,
+        "shantenHands": 400,
+        "meanDecisionMs": 6.4643411898512255,
+        "p95DecisionMs": 34.88730500001111,
+        "p99DecisionMs": 69.3251080000191,
+        "maxDecisionMs": 328.48614200000884,
+        "fractionOver50ms": 0.023805973858158143,
+        "decisionCount": 20121,
+        "claimWindows": 1263,
+        "claims": 671,
+        "claimPasses": 554,
+        "ownKongOffers": 58,
+        "ownKongs": 0
+      },
+      "vsIntermediate": {
+        "won": {
+          "estimate": 0,
+          "ci95": [
+            0,
+            0
+          ],
+          "n": 100
+        },
+        "dealIn": {
+          "estimate": 0,
+          "ci95": [
+            0,
+            0
+          ],
+          "n": 100
+        },
+        "draw": {
+          "estimate": 0,
+          "ci95": [
+            0,
+            0
+          ],
+          "n": 100
+        },
+        "score": {
+          "estimate": 0,
+          "ci95": [
+            0,
+            0
+          ],
+          "n": 100
+        },
+        "meanShanten": {
+          "estimate": 0,
+          "ci95": [
+            0,
+            0
+          ],
+          "n": 100
+        }
+      }
+    },
+    "combined": {
+      "metrics": {
+        "hands": 400,
+        "wins": 116,
+        "winRate": 0.29,
+        "dealInRate": 0.1775,
+        "drawRate": 0.0325,
+        "meanScore": 10.45,
+        "meanPostDiscardShanten": 1.9247228223273094,
+        "shantenHands": 400,
+        "meanDecisionMs": 6.268521635627392,
+        "p95DecisionMs": 33.255638000002364,
+        "p99DecisionMs": 65.73013199999696,
+        "maxDecisionMs": 273.4001419999986,
+        "fractionOver50ms": 0.02236024844720497,
+        "decisionCount": 20125,
+        "claimWindows": 1258,
+        "claims": 707,
+        "claimPasses": 509,
+        "ownKongOffers": 45,
+        "ownKongs": 0
+      },
+      "vsIntermediate": {
+        "won": {
+          "estimate": 0,
+          "ci95": [
+            -0.07,
+            0.07
+          ],
+          "n": 100
+        },
+        "dealIn": {
+          "estimate": -0.005,
+          "ci95": [
+            -0.0675,
+            0.055
+          ],
+          "n": 100
+        },
+        "draw": {
+          "estimate": 0,
+          "ci95": [
+            0,
+            0
+          ],
+          "n": 100
+        },
+        "score": {
+          "estimate": -3.6,
+          "ci95": [
+            -24.2,
+            17.85
+          ],
+          "n": 100
+        },
+        "meanShanten": {
+          "estimate": -0.0009351153232732101,
+          "ci95": [
+            -0.06166730431591108,
+            0.060420169559972224
+          ],
+          "n": 100
+        }
+      }
+    },
+    "legacy": {
+      "metrics": {
+        "hands": 400,
+        "wins": 91,
+        "winRate": 0.2275,
+        "dealInRate": 0.1725,
+        "drawRate": 0.0325,
+        "meanScore": -4.55,
+        "meanPostDiscardShanten": 1.913503435494243,
+        "shantenHands": 400,
+        "meanDecisionMs": 5.398983039935775,
+        "p95DecisionMs": 28.709089000010863,
+        "p99DecisionMs": 60.57920599999488,
+        "maxDecisionMs": 289.28918400002294,
+        "fractionOver50ms": 0.01657708343798664,
+        "decisionCount": 19907,
+        "claimWindows": 1124,
+        "claims": 1097,
+        "claimPasses": 4,
+        "ownKongOffers": 40,
+        "ownKongs": 10
+      },
+      "vsIntermediate": {
+        "won": {
+          "estimate": -0.0625,
+          "ci95": [
+            -0.1325,
+            0.0075
+          ],
+          "n": 100
+        },
+        "dealIn": {
+          "estimate": -0.01,
+          "ci95": [
+            -0.07,
+            0.0525
+          ],
+          "n": 100
+        },
+        "draw": {
+          "estimate": 0,
+          "ci95": [
+            0,
+            0
+          ],
+          "n": 100
+        },
+        "score": {
+          "estimate": -18.6,
+          "ci95": [
+            -36.7,
+            0.1
+          ],
+          "n": 100
+        },
+        "meanShanten": {
+          "estimate": -0.012154502156340403,
+          "ci95": [
+            -0.06911941224625053,
+            0.049377258974685444
+          ],
+          "n": 100
+        }
+      }
+    }
+  },
+  "invalidActions": 0,
+  "replayMatches": 2100,
+  "perfBudget": {
+    "scope": "Node runner, not phone",
+    "p95Ms": 50,
+    "p99Ms": 100,
+    "passByPolicy": {
+      "Beginner": true,
+      "Intermediate": true,
+      "Advanced": true,
+      "combined": true
+    }
+  },
+  "note": "No promotion: calibration is exploratory; independent validation score CI, deal-in risk, latency and integrated/mobile gates must be reviewed. No calibrated risk probabilities."
+}
