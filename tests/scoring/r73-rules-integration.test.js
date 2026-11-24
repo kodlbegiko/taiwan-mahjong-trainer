@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as Rules from '../../src/rules/index.js';
-import {assertLedgerConservation,AUTHORITATIVE_RULE_REF,AUTHORITATIVE_SCORING_REF} from '../../src/scoring/index.js';
+import * as Scoring from '../../src/scoring/index.js';
+const {assertLedgerConservation,AUTHORITATIVE_RULE_REF,AUTHORITATIVE_SCORING_REF}=Scoring;
 
 // This source-owned gate becomes mandatory once the Rules-owned implementation
 // is present. On a standalone Scoring branch do not imply a joint pass.
@@ -11,6 +12,8 @@ try{available=!!Rules.getRuleProfile(ref.profileId,ref.ruleVersion)}catch{}
 const mandatory=process.env.SCORING_REQUIRE_R73_RULES==='1';
 const opts={skip:!available&&!mandatory?'Rules #51 authoritative dependency not present in standalone checkout':false};
 const requireRules=()=>assert.ok(available,'Required authoritative Rules dependency unavailable');
+const runtime=available?Rules.createSettlementRuntime(Scoring):null;
+const runtimeOpts=()=>({settlementRuntime:runtime});
 const choose=(s,seat,kind,id,reason)=>{
   const a=Rules.listLegalActions(s,seat).find(a=>a.kind===kind&&
     (id===undefined||a.tileIds.includes(id))&&
@@ -18,7 +21,7 @@ const choose=(s,seat,kind,id,reason)=>{
   assert.ok(a,'Missing legal '+kind+' '+id+' seat '+seat);
   return a;
 };
-const take=(s,a)=>Rules.applyAction(s,{actorSeat:a.actorSeat,actionId:a.actionId,expectedRevision:a.expectedRevision}).state;
+const take=(s,a)=>Rules.applyAction(s,{actorSeat:a.actorSeat,actionId:a.actionId,expectedRevision:a.expectedRevision},runtimeOpts()).state;
 function respond(s,choices={}){
   for(const seat of Rules.listPendingClaimResponders(s))
     s=take(s,choose(s,seat,choices[seat]||'pass'));
@@ -42,25 +45,38 @@ function deck(assigned,live){
 }
 function start(gameId,assigned,live){
   requireRules();
-  return Rules.createGame({gameId,seed:gameId,fixtureDeck:deck(assigned,live),...ref});
+  return Rules.createGame({gameId,seed:gameId,fixtureDeck:deck(assigned,live),...ref},runtimeOpts());
 }
 function verify(s,expectedKind,expectedPayers){
   assert.equal(s.round.phase,'settled');
-  assert.equal(Rules.validateGameState(s),true);
+  assert.equal(Rules.validateGameState(s,runtimeOpts()),true);
   const r=s.extensions.tw16.result,settle=s.events.at(-1);
   assert.equal(settle.type,'settle');
-  const ledger=r.scoringLedger;
-  assert.ok(ledger,'Rules must persist complete authoritative scoringLedger');
+  const commitment=r.authoritativeSettlement;
+  assert.ok(commitment,'Rules must persist the private authoritative settlement commitment');
+  const ledger=commitment.ledger;
+  assert.ok(ledger,'Rules must persist the complete private ledger');
   assert.equal(ledger.scoringVersion,AUTHORITATIVE_SCORING_REF.profileId+'@'+AUTHORITATIVE_SCORING_REF.version);
   assert.equal(ledger.winType,expectedKind);
   assert.deepEqual(ledger.payments.map(p=>p.payerSeat),expectedPayers);
   assert.deepEqual(ledger.playerDeltas,s.round.scores);
-  assert.deepEqual(settle.payload.scoringLedger,ledger);
+  assert.deepEqual(settle.payload.settlement,r.settlement);
+  assert.deepEqual(r.settlement.playerDeltas,ledger.playerDeltas);
+  assert.equal(r.settlement.scoringVersion,ledger.scoringVersion);
+  assert.equal(r.settlement.tai,ledger.score?.tai??0);
+  assert.deepEqual(r.settlement.payerSeats,expectedPayers);
+  assert.deepEqual(Scoring.settlePreSettlement(commitment.scoringProfile,commitment.evidence),ledger);
+  for(const seat of [0,1,2,3]){
+    const view=Rules.createPlayerView(s,seat,s.revision,runtimeOpts());
+    assert.deepEqual(view.publicEvents.at(-1).payload.settlement,r.settlement);
+    const raw=JSON.stringify(view.publicEvents);
+    assert.ok(!raw.includes('"authoritativeSettlement"')&&!raw.includes('"scoringLedger"')&&!raw.includes('"decomposition"')&&!raw.includes('"evidenceEventIds"'));
+  }
   assert.equal(assertLedgerConservation(ledger),true);
   assert.deepEqual(JSON.parse(JSON.stringify(ledger)),ledger);
   assert.equal(ledger.settlementId,s.round.roundId);
   assert.ok(ledger.sourceRevision<settle.seq);
-  assert.deepEqual(Rules.replayGame(s),s);
+  assert.deepEqual(Rules.replayGame(s,runtimeOpts()),s);
   return ledger;
 }
 const waiting=[0,1,2,3,4,5,9,10,11,12,13,14,18,19,20,24].map(t=>'t:'+t+':0');
