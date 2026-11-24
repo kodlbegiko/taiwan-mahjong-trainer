@@ -110,7 +110,7 @@ function numeric(f,v,target,alternatives,reason,observations={}){
 }
 function actionTask(f,view,targetKind,reason){
   const options=view.legalActions.map(a=>option(a.actionId,
-    a.kind+' '+a.tileIds.map(id=>tileLabel(Number(id.split(':')[1]))).join(' ')));
+    a.kind+' '+a.tileIds.map(id=>tileLabel(Number(id.split(':')[1]))+' ('+id+')').join(' ')));
   const accepted=view.legalActions.filter(a=>a.kind===targetKind).map(a=>a.actionId);
   if(!accepted.length||accepted.length===options.length)throw new RangeError('No meaningful legal alternatives');
   return {f,view,options,accepted,reason,observations:{requiredActionKind:targetKind},
@@ -176,7 +176,9 @@ const cases=[
  ['l5-01','tradeoff','strategy.synthesis','conditional','本題明定只優化結構牌效、不估放槍及台數：選擇合法最優捨牌。'],
  ['l5-01','constrained-tradeoff','strategy.synthesis','conditional','指定練習：先最低向聽，再偏好 0 號座曾捨的牌種（若有），最後最多進張；不是實戰最優。'],
  ['l5-02','speed','efficiency.near-tie','conditional','限時做完相同題目更快，何者是可支持的解讀？'],
+ ['l5-02','near-tie-metric','efficiency.near-tie','exact','在這個合法捨牌局面中，選擇最低向聽且最多有效進張的選項；不考慮答題速度。'],
  ['l5-03','evidence','efficiency.shanten','conditional','哪一項理由能以當前視角與版本重播核對？'],
+ ['l5-03','evidence-shanten','efficiency.shanten','exact','計算這個聽牌情境的精確向聽數，作為可重播理由的第一項證據。'],
  ['l5-04','synthesis','strategy.synthesis','conditional','選擇符合當前資訊界線的綜合判斷。']
 ];
 const specs=cases.map(([lesson,key,skillTagId,basis,promptZhTW])=>Object.freeze({
@@ -220,6 +222,7 @@ function construct(f){
       p=knownWait(f,f.key);
       return textTask(f,p.view,[option('yes','可完成結構'),option('no','不能完成結構')],
         [calculateShanten([...p.hand,5])===-1?'yes':'no'],'五組面子加上六萬作將眼，結構完整；不宣稱所有桌規均允許和牌。');
+    case 'evidence-shanten':
     case 'shanten':
       p=knownWait(f,f.key);n=calculateShanten(p.hand);
       return numeric(f,p.view,n,[-1,0,1,2],'向聽 0 表示再加入一張可完成標準和牌結構。');
@@ -248,6 +251,7 @@ function construct(f){
     case 'constrained-tradeoff':return riverPolicy(f,true);
     case 'tai':return choice3(f,scenario('pong-open'),'不能，須先定義計台版本與效用模型','有效進張最多必然台數最高','門清必然比任何副露有利','本題固定實驗桌規；不使用未驗證台數或勝率來唯一排序。');
     case 'tradeoff':return efficiency(f,'pong-open','題目只要求結構牌效；相同指標全部滿分。未比較真實攻守得失。');
+    case 'near-tie-metric':return efficiency(f,'concealed-kong','比較所有合法捨牌的向聽及有效進張；同分全接受，不以耗時或未知風險決勝。');
     case 'speed':return choice3(f,scenario('winning'),'可能更熟悉題型或記住答案，需獨立測驗才可推論能力','必然達大師級','作答時間可替代正確率','計時並非經真人校準的能力量尺。');
     case 'evidence':return choice3(f,scenario('pong-open'),'原題版本、PlayerView 及合法捨牌的向聽／進張','對手完整暗牌及未來摸牌','只憑速度與結果推斷實力','可重播的公開資料及明示結構計算能被核查；未知資訊不可當作證據。');
     case 'synthesis':return choice3(f,scenario('kong'),'先核對合法行動，分開列出結構牌效、未知風險與未認證台數','槓牌一定能提高期望收益','用未知對手牌型直接決定唯一最佳行動','僅合法性及明確結構指標可被核查，未校準因素僅供討論。');
@@ -274,7 +278,7 @@ export function getR71Question(ref){
     lessonRef:{lessonId:f.lessonId,lessonVersion:'1.0.0'},
     assessmentVersion:R71_ASSESSMENT_VERSION,scorerId:R71_SCORER_ID,
     scope:f.basis==='exact'?'exact-objective':'explicit-conditional-goal',
-    assessmentSkillTagId:f.skillTagId,taskType:x.kind,promptZhTW:f.promptZhTW,
+    targetSkillTagId:f.skillTagId,taskType:x.kind,promptZhTW:f.promptZhTW,
     playerView:v,ruleRef:clone(v.ruleRef),engineVersion:COMPLETE_ENGINE_VERSION,
     options:clone(x.options),publicationStatus:'instructor-review',officialCredit:false};
 }
@@ -307,7 +311,8 @@ export function getR71Coverage(){
       supplementalQuestionCount:refs.length,
       exactObjectiveCount:refs.filter(r=>specFor(r).basis==='exact').length,
       conditionalCount:refs.filter(r=>specFor(r).basis==='conditional').length,
-      assessedTargetSkillTagIds:[...new Set(refs.map(r=>specFor(r).skillTagId))],
+      targetedSkillTagIds:[...new Set(refs.map(r=>specFor(r).skillTagId))],
+      exactObjectiveSkillTagIds:[...new Set(refs.filter(r=>specFor(r).basis==='exact').map(r=>specFor(r).skillTagId))],
       formalCredit:false,publicationBlocker:lesson.status==='published'?
         'independent-review-and-record-contract':'independent-review-scorer-contract-and-release-gates'};
   });
