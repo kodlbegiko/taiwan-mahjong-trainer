@@ -52,6 +52,35 @@ def ready(page, url):
     page.reload(wait_until='load')
     page.wait_for_function('navigator.serviceWorker.controller !== null', timeout=20000)
 
+def quiesce_registration(page):
+    # Complete any unchanged-script update before replacing served bytes.
+    page.evaluate("""async () => {
+      const r=await navigator.serviceWorker.getRegistration();
+      if(!r)throw Error('Missing registration');
+      await r.update();
+    }""")
+    page.wait_for_function("""async () => {
+      const r=await navigator.serviceWorker.getRegistration();
+      return r && !r.installing && !r.waiting &&
+        r.active===navigator.serviceWorker.controller &&
+        r.active?.state==='activated';
+    }""", timeout=30000)
+
+def install_control_document(page, url, tree):
+    # An initially uncontrolled same-origin HTML document without the app's
+    # automatic update or reload handlers. The actual production SW claims it.
+    # Retain this document during activation; do not change storage or SW code.
+    (tree / 'replay-upgrade-control.html').write_text(
+        '<!doctype html><meta charset="utf-8"><title>Replay upgrade control</title>',
+        encoding='utf-8')
+    page.goto(url + 'replay-upgrade-control.html', wait_until='load')
+    page.evaluate("""async base => {
+      await navigator.serviceWorker.register(new URL('sw.js',base),{scope:base});
+      await navigator.serviceWorker.ready;
+    }""", url)
+    page.wait_for_function('navigator.serviceWorker.controller?.state==="activated"',timeout=30000)
+    quiesce_registration(page)
+
 def check_cache(page, generation, expected):
     # A cache name is not proof of which worker actually handles this client.
     status = page.evaluate("""async () => {
@@ -210,7 +239,8 @@ def run(engine, previous_tree=None):
         browser = getattr(pw, engine).launch(headless=True)
         try:
             for label, fixture, authority, scores in cases:
-                with served_site(fresh_sw=True) as (url, tree):
+                http_events = []
+                with served_site(fresh_sw=True, update_http=http_events) as (url, tree):
                     context = browser.new_context(service_workers='allow')
                     try:
                         page = context.new_page()
@@ -224,7 +254,7 @@ def run(engine, previous_tree=None):
                             previous_generation = cache_name(previous_tree)
                             require(previous_generation != generation, 'Upgrade must change actual cache generation')
                             copy_release(previous_tree, tree)
-                            ready(page, url)
+                            install_control_document(page, url, tree)
                             key, raw = seed_archive(page, fixture)
                             # Verify old runtime can read this exact old record,
                             # without requiring new authority/Scoring modules.
@@ -241,11 +271,13 @@ def run(engine, previous_tree=None):
                             }""")
                             copy_release(ROOT, tree)
                             update_worker(page, url, previous_generation, generation)
-                            print(label, 'activated new generation; opening new controlled document', flush=True)
+                            print(label, 'activated new generation in neutral control document', flush=True)
+                            check_cache(page, generation, expected)
                             page.close()
                             page = context.new_page()
                             observe(page)
                             ready(page, url)
+                            quiesce_registration(page)
                             require(page.evaluate('key=>localStorage.getItem(key)', key) == raw,
                                     'Upgrade changed archive bytes before new-document read')
                         else:
@@ -275,6 +307,7 @@ def run(engine, previous_tree=None):
                                         'delta':online['delta'],'hash':online['hash'],
                                         'bytesPreserved':online['bytesPreserved']})
                     finally:
+                        print(label, 'SW_HTTP', json.dumps(http_events), flush=True)
                         context.close()
         finally:
             browser.close()
