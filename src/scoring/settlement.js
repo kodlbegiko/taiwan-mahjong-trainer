@@ -3,7 +3,7 @@ import {SCORING_CONTRACT,validateScoringProfile} from './profiles.js';
 // Canonicalize signed zero at the accounting boundary, never in expected test values.
 const canonical=x=>x===0?0:x;
 const valid=x=>Number.isSafeInteger(x)&&!Object.is(x,-0);
-const addSafe=(a,b)=>{const n=a+b;if(!valid(n))throw new RangeError('Settlement integer overflow');return canonical(n);};
+const addSafe=(a,b)=>{const n=canonical(a+b);if(!valid(n))throw new RangeError('Settlement integer overflow');return n;};
 export function assertLedgerConservation(ledger){
   if(!ledger||!Array.isArray(ledger.playerTransferDeltas)||
     ledger.playerTransferDeltas.length!==4||!ledger.playerTransferDeltas.every(valid)||
