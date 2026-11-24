@@ -11,6 +11,7 @@ import json
 import re
 import shutil
 import sys
+from time import monotonic
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 
@@ -46,9 +47,43 @@ def copy_release(source, target):
     shutil.copytree(source, target, ignore=shutil.ignore_patterns(
         '.git', 'node_modules', '__pycache__', '.pytest_cache', '*.png.b64.txt'))
 
+def wait_resolved_true(page, predicate, *, arg=None, timeout=30000, label):
+    """Poll the *resolved* JS boolean, not a truthy Promise/JSHandle.
+
+    Playwright's page.evaluate awaits returned Promises. Its wait_for_function
+    predicate is not used for asynchronous ServiceWorker/CacheStorage checks.
+    Do not accept null, a nonempty object, or any other truthy value as PASS.
+    """
+    deadline = monotonic() + timeout / 1000
+    attempts = 0
+    last = None
+    while monotonic() < deadline:
+        attempts += 1
+        last = page.evaluate(predicate, arg)
+        if last is True:
+            print('WAIT_RESOLVED', label, attempts, flush=True)
+            return
+        page.wait_for_timeout(100)
+    raise AssertionError(f'{label}: timeout after {attempts} polls; last resolved value={last!r}')
+
+
+def verify_wait_primitive(page):
+    # Regression: asynchronous false and null must not finish the gate;
+    # the third invocation resolves to true. No arbitrary sleep as evidence.
+    page.evaluate('() => { window.__replayWaitProbe=0; }')
+    wait_resolved_true(page, """async () => {
+      await Promise.resolve();
+      const n=++window.__replayWaitProbe;
+      return n===1 ? false : n===2 ? null : true;
+    }""", timeout=5000, label='async-predicate-regression')
+    require(page.evaluate('window.__replayWaitProbe') == 3,
+            'Async predicate accepted a non-true result')
+    page.evaluate('delete window.__replayWaitProbe')
+
+
 def ready(page, url):
     page.goto(url, wait_until='load')
-    page.wait_for_function("async () => !!(await navigator.serviceWorker.getRegistration())?.active", timeout=30000)
+    wait_resolved_true(page, "async () => (await navigator.serviceWorker.getRegistration())?.active?.state==='activated'", label='active-worker-ready')
     page.reload(wait_until='load')
     page.wait_for_function('navigator.serviceWorker.controller !== null', timeout=20000)
 
@@ -59,12 +94,12 @@ def quiesce_registration(page):
       if(!r)throw Error('Missing registration');
       await r.update();
     }""")
-    page.wait_for_function("""async () => {
+    wait_resolved_true(page, """async () => {
       const r=await navigator.serviceWorker.getRegistration();
-      return r && !r.installing && !r.waiting &&
+      return !!r && !r.installing && !r.waiting &&
         r.active===navigator.serviceWorker.controller &&
         r.active?.state==='activated';
-    }""", timeout=30000)
+    }""", label='registration-quiescent')
 
 def install_control_document(page, url, tree):
     # An initially uncontrolled same-origin HTML document without the app's
@@ -80,6 +115,7 @@ def install_control_document(page, url, tree):
     }""", url)
     page.wait_for_function('navigator.serviceWorker.controller?.state==="activated"',timeout=30000)
     quiesce_registration(page)
+    verify_wait_primitive(page)
 
 def check_cache(page, generation, expected):
     # A cache name is not proof of which worker actually handles this client.
@@ -206,7 +242,7 @@ def update_worker(page, url, old_generation, new_generation):
       window.__replayAcknowledged=null;
       await registration.update();
     }""")
-    page.wait_for_function("""async () => {
+    wait_resolved_true(page, """async () => {
       const r=await navigator.serviceWorker.getRegistration();
       if(!r) throw Error('Registration lost during upgrade');
       const waiting=r.waiting;
@@ -216,12 +252,13 @@ def update_worker(page, url, old_generation, new_generation):
       }
       const controller=navigator.serviceWorker.controller;
       return !!controller && controller!==window.__replayOldController &&
-        controller.state==='activated' && r.active===controller;
-    }""", timeout=30000)
-    page.wait_for_function("""async ({oldName,newName}) => {
+        controller.state==='activated' && r.active===controller && !r.waiting && !r.installing;
+    }""", label='new-controller-activated')
+    wait_resolved_true(page, """async ({oldName,newName}) => {
       const names=await caches.keys();
       return names.includes(newName)&&!names.includes(oldName);
-    }""", arg={'oldName': old_generation, 'newName': new_generation}, timeout=30000)
+    }""", arg={'oldName': old_generation, 'newName': new_generation},
+        label='retired-cache-removed')
     # Do not import new modules in the pre-upgrade page. The application
     # performs its own controllerchange reload, which can race a test reload.
     # The caller opens a new document in the SAME browser context/storage.
