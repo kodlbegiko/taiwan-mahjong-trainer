@@ -51,9 +51,12 @@ def run(url, folder, max_matches, source_sha, deployment_sha):
     os.environ['PHASE3_REQUIRE_SINGLE_WINNER']='1'
     outcomes=set()
     attempts=[]
+    os.environ['PHASE3_R71_CLAIMS']='1'
     with sync_playwright() as pw:
         browser=pw.chromium.launch(channel='chrome',headless=True,args=['--no-sandbox'])
         for idx in range(max_matches):
+            difficulty=['Beginner','Intermediate','Advanced'][idx%3]
+            os.environ['PHASE3_BOT_DIFFICULTY']=difficulty
             dest=folder / ('match-%02d' % (idx + 1))
             dest.mkdir(parents=True,exist_ok=True)
             ctx=browser.new_context(viewport={'width':390,'height':844},
@@ -74,7 +77,7 @@ def run(url, folder, max_matches, source_sha, deployment_sha):
                 summary=page.locator('.table-round-summary').inner_text()
                 result=parse_summary(summary)
                 require(not errors,'JavaScript page errors: '+repr(errors))
-                result.update({'uiActions':len(history),
+                result.update({'difficulty':difficulty,'uiActions':len(history),
                                'humanActionHistogram':{h:history.count(h) for h in set(history)},
                                'pageErrors':errors,'http':response.status})
                 attempts.append(result)
@@ -84,7 +87,7 @@ def run(url, folder, max_matches, source_sha, deployment_sha):
                 ctx.close()
             # Seek both naturally occurring terminal types with real UI;
             # never manipulate app RNG, GameState, rules, or Bot decisions.
-            if len(outcomes)==2:
+            if len(outcomes)==2 and idx>=2:
                 break
         browser.close()
     require(attempts and all(x['outcome'] in ('WIN','DRAW') for x in attempts),
@@ -96,6 +99,8 @@ def run(url, folder, max_matches, source_sha, deployment_sha):
       'browser':'GitHub Actions Ubuntu / Google Chrome via Playwright Python',
       'execution':'actual DOM clicks only; no injected GameState or private Bot state',
       'matches':attempts,'winObserved':'WIN' in outcomes,
+      'observedHumanDeclarations':sorted({h.split(' · ')[0] for a in attempts for h in a['humanActionHistogram']}),
+      'r7BotStrategy':'BLOCKED until Agent 4 PR #48 is integrated; tested existing contract',
       'drawObserved':'DRAW' in outcomes,
       'missingOutcomeStatus':{kind:'PASS' if kind in outcomes else 'NOT_OBSERVED'
                               for kind in ('WIN','DRAW')},

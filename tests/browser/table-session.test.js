@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createSandboxSession, TABLE_STORAGE_KEY, availableTableProfiles } from '../../src/table-ui/session.js';
-import { TableView, ReplayControls } from '../../src/table-ui/view.js';
+import { TableView, ReplayControls, ActionBar, BotDifficultySelect } from '../../src/table-ui/view.js';
+import { createFullRoundSession } from '../../src/table-ui/full-round.js';
 import { tileFaceMarkup } from '../../src/tile-visuals.js';
 
 function memoryStorage() {
@@ -163,4 +164,78 @@ test('all 34 traditional tile assets remain in the canonical face lookup', () =>
   for (let t = 0; t < 34; t++) {
     assert.ok(tileFaceMarkup(t).includes('/tiles/' + t + '.svg'));
   }
+});
+
+test('R7.1 declaration renderer contract: all supported kinds, exact token, busy and ARIA',()=>{
+  // Pure public renderer input, NOT real game/Rules/E2E evidence.
+  for(const kind of ['replace_flower','pass','chi','pong','kong','win','draw']){
+    const a={kind,actionId:'render-contract-'+kind,actorSeat:0,expectedRevision:9,tileIds:[]};
+    const html=ActionBar([a],null,false,a);
+    assert.ok(html.includes('data-confirm-action="'+a.actionId+'"'));
+    assert.ok(html.includes('data-cancel-action'));
+    assert.ok(html.includes('aria-live="polite"'));
+    for(const wrong of [{...a,expectedRevision:8},{...a,actorSeat:1},{...a,kind:'discard'},{...a,actionId:'stale'}]){
+      assert.ok(!ActionBar([a],null,false,wrong).includes('data-confirm-action='));
+    }
+    const disabled=ActionBar([a],null,true,a);
+    assert.ok(disabled.includes('aria-busy="true"'));
+    assert.match(disabled,/data-confirm-action="[^"]+" disabled/);
+    assert.match(disabled,/data-cancel-action disabled/);
+  }
+});
+test('R7.1 full-round Bot difficulties preserve existing public host and checkpoint contract',async()=>{
+  for(const difficulty of ['Beginner','Intermediate','Advanced']){
+    const storage=memoryStorage();
+    const session=await createFullRoundSession({storage});
+    const initial=session.start({difficulty});
+    assert.equal(initial.botDifficulty,difficulty);
+    assert.match(TableView(initial),new RegExp('data-bot-difficulty="'+difficulty+'"'));
+    assert.ok(BotDifficultySelect(difficulty).includes('value="'+difficulty+'" selected'));
+    const a=initial.view.legalActions[0];
+    assert.ok(a,'Rules must supply a legal first action');
+    const submission={actionId:a.actionId,actorSeat:a.actorSeat,expectedRevision:a.expectedRevision};
+    const before=initial.view.asOfEventSeq;
+    await assert.rejects(session.submit({...submission,expectedRevision:before+1}),/過期|不合法/);
+    assert.equal(session.snapshot().view.asOfEventSeq,before);
+    const both=await Promise.allSettled([session.submit(submission),session.submit(submission)]);
+    assert.equal(both.filter(x=>x.status==='fulfilled').length,1,'duplicate action committed twice');
+    assert.equal(both.filter(x=>x.status==='rejected').length,1);
+    assert.ok(session.snapshot().view.asOfEventSeq>before);
+    const after=session.snapshot().view.asOfEventSeq;
+    await assert.rejects(session.submit(submission),/過期|不合法/);
+    assert.equal(session.snapshot().view.asOfEventSeq,after);
+    // Use actual Rules legal actions until the host hands off to Bots.
+    for(let i=0;i<20;i++){
+      const v=session.snapshot().view;
+      if(v.round.phase==='settled')break;
+      if(!v.legalActions.length||v.round.phase==='claim_window')break;
+      const action=v.legalActions.find(x=>x.kind==='discard')??v.legalActions[0];
+      await session.submit({actionId:action.actionId,actorSeat:action.actorSeat,expectedRevision:action.expectedRevision});
+      if(action.kind==='discard')break;
+    }
+    const progressed=await session.advanceBots({maxActions:128});
+    assert.ok(['human-turn','settled'].includes(progressed.status));
+    assert.ok(progressed.actions>0,'difficulty must drive real Bot actions');
+    const persisted=session.snapshot();
+    const restored=await createFullRoundSession({storage});
+    assert.equal(restored.restore(),true);
+    assert.deepEqual(restored.snapshot().view,persisted.view);
+    assert.equal(restored.snapshot().botDifficulty,difficulty);
+    assert.throws(()=>restored.start({difficulty:'invalid'}),/難度/);
+    assert.equal(restored.snapshot().view.asOfEventSeq,persisted.view.asOfEventSeq);
+  }
+});
+test('R7.1 legacy full-round checkpoint with no difficulty restores Beginner, without altering GameState',async()=>{
+  const storage=memoryStorage();
+  const session=await createFullRoundSession({storage});
+  const initial=session.start();
+  assert.equal(initial.botDifficulty,'Beginner');
+  const key='tw-mahjong-master-academy:full-table:r3:v1';
+  const legacy=JSON.parse(storage.getItem(key));
+  delete legacy.botDifficulty; // metadata migration only; retain actual Rules state untouched
+  storage.setItem(key,JSON.stringify(legacy));
+  const restored=await createFullRoundSession({storage});
+  assert.equal(restored.restore(),true);
+  assert.equal(restored.snapshot().botDifficulty,'Beginner');
+  assert.deepEqual(restored.snapshot().view,initial.view);
 });

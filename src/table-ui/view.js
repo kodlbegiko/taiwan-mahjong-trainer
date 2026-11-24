@@ -3,7 +3,7 @@ import { tileAccessibleName, tileFaceMarkup } from '../tile-visuals.js';
 
 const SEATS = Object.freeze(['你', '下家', '對家', '上家']);
 const ACTIONS = Object.freeze({
-  draw: '摸牌', discard: '捨牌', chi: '吃', chow: '吃',
+  draw: '摸牌', discard: '捨牌', chi: '吃', chow: '吃', kong_proposed: '加槓提案（等待規則裁定）',
   pong: '碰', pung: '碰', kong: '槓', exposed_kong: '明槓',
   concealed_kong: '暗槓', add_kong: '加槓', win: '胡牌',
   ron: '榮和', tsumo: '自摸', pass: '放棄宣告', replace_flower: '補花',
@@ -11,6 +11,13 @@ const ACTIONS = Object.freeze({
 const escapeHtml = input => String(input ?? '').replace(/[&<>"']/g, c =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
+export function BotDifficultySelect(selected='Beginner') {
+  const labels={Beginner:'Beginner（初級／歷史預設）',Intermediate:'Intermediate（中級）',Advanced:'Advanced（進階）'};
+  return '<label for="table-bot-difficulty">三位 Bot 難度（新局生效）</label>'+
+    '<select id="table-bot-difficulty" data-bot-difficulty-select>'+
+    Object.entries(labels).map(([level,label])=>'<option value="'+level+'" '+
+      (level===selected?'selected':'')+'>'+escapeHtml(label)+'</option>').join('')+'</select>';
+}
 function typeFromTile(tile) {
   if (Number.isInteger(tile?.tileType) && tile.tileType >= 0 && tile.tileType <= 33) return tile.tileType;
   const match = /^t:(0|[1-9]|[12][0-9]|3[0-3]):[0-3]$/.exec(tile?.id ?? tile?.tileId ?? tile);
@@ -34,14 +41,14 @@ function tileButton(tile, action, selected) {
 }
 
 function meldSection(melds) {
-  return '<div class="table-melds" aria-label="公開副露">' +
+  return '<div class="table-melds" role="group" aria-label="公開副露">' +
     (melds.length ? melds.map(m =>
-      '<div class="table-meld" aria-label="' + escapeHtml(m.kind ?? '副露') + '">' +
+      '<div class="table-meld" role="group" aria-label="' + escapeHtml(m.kind ?? '副露') + '">' +
       (m.tileIds ?? []).map(tile => tileSpan(tile)).join('') + '</div>').join('')
       : '<span class="table-quiet">副露 0</span>') + '</div>';
 }
 function flowersSection(flowers) {
-  return '<div class="table-flowers" aria-label="公開花牌">' +
+  return '<div class="table-flowers" role="group" aria-label="公開花牌">' +
     (flowers.length ? flowers.map(f => '<span class="table-flower">' +
       escapeHtml(f.flowerCode ?? '花') + '</span>').join('') :
       '<span class="table-quiet">花牌 0</span>') + '</div>';
@@ -86,7 +93,7 @@ function actionName(action) {
   const reason=action.legalityBasis?.reasonCodes?.[0];
   const kind=action.kind==='kong'?
     (reason==='CONCEALED_KONG'?'暗槓':reason==='ADDED_KONG'?'加槓':'明槓'):
-    action.kind==='win'?(reason==='SELF_DRAW_WIN'?'自摸胡牌':'胡牌'):
+    action.kind==='win'?(reason==='SELF_DRAW_WIN'?'自摸胡牌':reason==='ROB_ADDED_KONG_WIN'?'搶加槓胡牌':'胡牌'):
     (ACTIONS[action.kind]??action.kind);
   // Distinguish multiple physically different combinations without fabricating IDs.
   const physical=action.kind==='chi'&&ids.length?' ['+ids.join(', ')+']':'';
@@ -96,20 +103,21 @@ export function ActionBar(legalActions, selectedId, busy, confirmation=null) {
   const chosen = legalActions.find(a => a.kind === 'discard' && a.actionId === selectedId);
   const declarationActions = legalActions.filter(a => a.kind !== 'discard');
   const pending = declarationActions.find(a => a.actionId===confirmation?.actionId &&
-    a.actorSeat===confirmation?.actorSeat && a.expectedRevision===confirmation?.expectedRevision);
-  return '<section class="table-actions" aria-label="合法動作"><div class="table-actions-heading">' +
+    a.actorSeat===confirmation?.actorSeat && a.expectedRevision===confirmation?.expectedRevision &&
+    a.kind===confirmation?.kind);
+  return '<section class="table-actions" aria-label="合法動作" aria-busy="'+(busy?'true':'false')+'"><div class="table-actions-heading">' +
     '<h3>可操作動作</h3><span>僅顯示 Rules Engine 回傳的 LegalAction</span></div>' +
-    (chosen ? '<div class="table-selected"><span>已選：' + escapeHtml(actionName(chosen)) +
+    (chosen ? '<div class="table-selected"><span role="status" aria-live="polite">已選：' + escapeHtml(actionName(chosen)) +
       '</span><button type="button" data-submit-action="' + escapeHtml(chosen.actionId) +
       '" class="primary" ' + (busy ? 'disabled' : '') + '>確認捨牌</button>' +
-      '<button type="button" data-clear-selection class="secondary">取消</button></div>'
+      '<button type="button" data-clear-selection class="secondary" '+(busy?'disabled':'')+'>取消</button></div>'
       : '<p class="table-quiet">請點選一張手牌；捨牌不會立即送出。</p>') +
     '<div class="table-action-buttons">' + declarationActions.map(a =>
       '<button type="button" class="secondary" data-submit-action="' +
       escapeHtml(a.actionId) + '" ' + (busy ? 'disabled' : '') +
       '>' + escapeHtml(actionName(a)) + '</button>').join('') + '</div>' +
     (pending?'<div class="table-selected table-confirmation" data-action-confirmation role="group" '+
-      'aria-label="正式動作確認"><p>確定執行合法動作：'+escapeHtml(actionName(pending))+
+      'aria-label="正式動作確認"><p role="status" aria-live="polite">確定執行合法動作：'+escapeHtml(actionName(pending))+
       '？宣告後無法撤銷。</p><button type="button" class="primary" data-confirm-action="'+
       escapeHtml(pending.actionId)+'" '+(busy?'disabled':'')+'>確認宣告</button>'+
       '<button type="button" class="secondary" data-cancel-action '+(busy?'disabled':'')+
@@ -143,10 +151,12 @@ export function TableView(snapshot,{selection=null,busy=false,error='',botStatus
     (busy?'disabled':'')+'>重新開局</button></div></header>'+
     (restartPending?'<div class="table-selected table-confirmation" data-restart-confirmation '+
       'role="group" aria-label="重新開局確認"><p>確定重新開局？目前對局會被取代。</p>'+
+      (botConnected?BotDifficultySelect(snapshot.botDifficulty):'')+
       '<button type="button" class="primary" data-confirm-new>確定重新開局</button>'+
       '<button type="button" class="secondary" data-cancel-new>取消</button></div>':'')+
     '<div class="table-facts" data-table-busy="'+(busy?'true':'false')+'"><span>規則：'+escapeHtml(profile.profileId)+
-    '</span><span>階段：'+escapeHtml(view.round.phase)+
+    '</span>'+(botConnected?'<span data-bot-difficulty="'+escapeHtml(snapshot.botDifficulty)+'">Bot 難度：'+escapeHtml(snapshot.botDifficulty)+'</span>':'')+
+    '<span>階段：'+escapeHtml(view.round.phase)+
     '</span><span>莊家：'+SEATS[view.round.dealerSeat]+
     '</span><span>行動席：'+(ended?'結束':SEATS[view.round.currentSeat])+
     '</span><span>牌山剩餘：'+wallRemaining+' 張</span>'+
@@ -159,7 +169,7 @@ export function TableView(snapshot,{selection=null,busy=false,error='',botStatus
     (storageWarning?'<p role="status" class="table-warning">'+escapeHtml(storageWarning)+'</p>':'')+
     (replayWarning?'<p role="status" class="table-warning">'+escapeHtml(replayWarning)+'</p>':'')+
     (error?'<p role="alert" class="table-warning">'+escapeHtml(error)+'</p>':'')+
-    '<div class="table-grid" aria-label="四人牌桌公開資訊">'+
+    '<div class="table-grid" role="group" aria-label="四人牌桌公開資訊">'+
     OpponentSeat(opponents.get(2),view.round.currentSeat,view.round.dealerSeat)+
     OpponentSeat(opponents.get(3),view.round.currentSeat,view.round.dealerSeat)+
     '<div class="table-felt" aria-live="polite"><strong>'+phaseLabel+

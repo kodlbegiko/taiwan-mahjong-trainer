@@ -1,7 +1,7 @@
 import { createSandboxSession, availableTableProfiles } from './session.js';
 import { createFullRoundSession, fullRoundCapability } from './full-round.js';
 import { createDailyPanel } from './daily.js';
-import { TableView, ReplayControls } from './view.js';
+import { TableView, ReplayControls, BotDifficultySelect } from './view.js';
 import { installTileFaceFallback } from '../tile-visuals.js';
 
 const root=document.querySelector('#full-table-root');
@@ -38,6 +38,7 @@ function renderEmpty() {
     '</p></div></header><section class="table-empty"><h2>建立實驗牌桌</h2>'+
     '<label for="table-profile">明確選擇 RuleProfile</label>'+
     '<select id="table-profile">'+profiles()+'</select>'+
+    (fullMode?BotDifficultySelect('Beginner'):'')+
     '<button type="button" class="primary" data-start-new '+(!profilesList().length?'disabled':'')+'>'+
     (fullMode?'開始 R3 四人對局':'開始摸打 Sandbox')+'</button>'+
     (lastError?'<p role="alert" class="table-warning">'+safe(lastError)+'</p>':'')+
@@ -45,6 +46,7 @@ function renderEmpty() {
     '<button type="button" class="secondary" data-return-academy>返回課程</button></section>';
 }
 function activate(page,{focus=true}={}) {
+  if(page!==activePage){pendingAction=null;selection=null;restartPending=false;}
   activePage=page;
   document.body.dataset.tableView=page==='academy'?'none':page;
   if(root)root.hidden=page==='academy';
@@ -108,7 +110,8 @@ async function startNew() {
       available.find(p=>p.profileId===current?.profileId&&p.ruleVersion===current?.ruleVersion)??
       available[0];
     if(!profile)throw new Error('沒有已註冊且可用的四人 RuleProfile');
-    session.start({profileId:profile.profileId,ruleVersion:profile.ruleVersion});
+    const difficulty=root.querySelector('#table-bot-difficulty')?.value??session.snapshot()?.botDifficulty??'Beginner';
+    session.start({profileId:profile.profileId,ruleVersion:profile.ruleVersion,...(fullMode?{difficulty}:{})});
     selection=null;pendingAction=null;restartPending=false;
     lastError='';botStatus='';timeline=null;replayFrame=null;
     activate('play',{focus:false});
@@ -126,6 +129,7 @@ function stageAction(actionId) {
     lastError='原始動作已過期或不合法，請重新選擇。';draw();return;
   }
   if(action.kind==='discard'){
+    if(selection!==actionId){lastError='請先選取要捨出的合法手牌。';draw();return;}
     pendingAction=null;
     void submit(actionId);
     return;
@@ -144,7 +148,7 @@ async function submit(actionId) {
   const action=previous?.view?.legalActions?.find(a=>a.actionId===actionId);
   const valid=action&&action.actorSeat===previous.view.audienceSeat&&
     action.expectedRevision===previous.view.asOfEventSeq;
-  const confirmed=action?.kind==='discard'||(pendingAction?.actionId===actionId&&
+  const confirmed=(action?.kind==='discard'&&selection===actionId)||(pendingAction?.actionId===actionId&&
     pendingAction?.actorSeat===action?.actorSeat&&
     pendingAction?.expectedRevision===action?.expectedRevision&&
     pendingAction?.kind===action?.kind);
@@ -162,7 +166,9 @@ async function submit(actionId) {
   } catch(error) {
     selection=null;
     lastError='規則／Bot 動作未完成：'+error.message;
-  } finally {busy=false;botStatus='';draw();}
+  } finally {busy=false;botStatus='';draw();
+    if(activePage==='play')root.querySelector('.table-actions button:not(:disabled), .table-hand button:not(:disabled), #table-heading')?.focus({preventScroll:true});
+  }
 }
 async function loadReplayFrame(index) {
   if(!timeline?.verified||replayBusy)return;
@@ -238,6 +244,7 @@ function onClick(event) {
   const button=event.target.closest('button');
   if(!button)return;
   if(button.hasAttribute('data-pause-bots')){
+    pendingAction=null;selection=null;restartPending=false;
     session?.pause?.();botStatus='對局已暫停';draw();return;
   }
   if(button.hasAttribute('data-resume-bots')){
@@ -255,10 +262,13 @@ function onClick(event) {
     return;
   }
   if(button.hasAttribute('data-cancel-new')){
-    restartPending=false;draw();return;
+    restartPending=false;draw();root.querySelector('[data-start-new]')?.focus({preventScroll:true});return;
   }
   if(button.hasAttribute('data-cancel-action')){
-    pendingAction=null;lastError='';draw();return;
+    const id=pendingAction?.actionId;
+    pendingAction=null;lastError='';draw();
+    const prior=Array.from(root.querySelectorAll('[data-submit-action]:not(:disabled)')).find(el=>el.dataset.submitAction===id);
+    (prior??root.querySelector('#table-heading'))?.focus({preventScroll:true});return;
   }
   if(button.hasAttribute('data-confirm-action')){
     const actionId=button.dataset.confirmAction;
@@ -297,7 +307,10 @@ function onClick(event) {
     if(selection)root.querySelector('[data-submit-action]')?.focus({preventScroll:true});
     return;
   }
-  if(button.hasAttribute('data-clear-selection')){selection=null;draw();return;}
+  if(button.hasAttribute('data-clear-selection')){
+    const id=selection;selection=null;draw();
+    Array.from(root.querySelectorAll('[data-pick-action]:not(:disabled)')).find(el=>el.dataset.pickAction===id)?.focus({preventScroll:true});return;
+  }
   if(button.hasAttribute('data-submit-action'))return stageAction(button.dataset.submitAction);
   if(button.hasAttribute('data-replay-first'))return void loadReplayFrame(0);
   if(button.hasAttribute('data-replay-prev'))return void loadReplayFrame(Math.max(0,replayIndex-1));

@@ -7,6 +7,11 @@ import * as rules from '../rules/index.js';
 
 const KEY = 'tw-mahjong-master-academy:full-table:r3:v1';
 const HUMAN = 0;
+const DIFFICULTIES=Object.freeze(['Beginner','Intermediate','Advanced']);
+function checkedDifficulty(value){
+  if(!DIFFICULTIES.includes(value))throw new RangeError('不支援的 Bot 難度');
+  return value;
+}
 const copy = x => JSON.parse(JSON.stringify(x));
 const isR3 = p => p?.status === 'experimental' && (
   (p.profileId === 'tw16-configurable-table' && p.ruleVersion === 'experimental-full-v1') ||
@@ -37,14 +42,15 @@ export async function createFullRoundSession({storage} = {}) {
       typeof storage.setItem !== 'function')
     throw new Error('正式 R3 對局需要可靠的本機儲存');
 
-  let state = null, controller = null, blocked = false;
+  let state = null, controller = null, blocked = false, submitting=false;
+  let botDifficulty='Beginner';
   let storageWarning = '', replayWarning = '', replayId = null;
   const replays = replayApi.createReplayService({storage});
 
-  function persist(next,{paused=controller?.isPaused()??false}={}) {
+  function persist(next,{paused=controller?.isPaused()??false,difficulty=botDifficulty}={}) {
     if (blocked) throw new Error('舊紀錄損壞，禁止覆蓋');
     try {
-      storage.setItem(KEY, JSON.stringify({version:1, gameState:next, botCheckpoint:{paused}}));
+      storage.setItem(KEY, JSON.stringify({version:1, gameState:next, botCheckpoint:{paused}, botDifficulty:checkedDifficulty(difficulty)}));
       storageWarning = '';
     } catch (e) {
       storageWarning = 'R3 對局儲存失敗，重新整理可能遺失進度：' + e.message;
@@ -90,7 +96,7 @@ export async function createFullRoundSession({storage} = {}) {
   function setupController(checkpoint=null) {
     controller = botApi.createBotController({
       bots:[1,2,3].map(seat=>botApi.createBot({
-        seat,difficulty:'Beginner',seed:'table-bot-seat-'+seat
+        seat,difficulty:botDifficulty,seed:'table-bot-seat-'+seat
       })),
       humanSeat:HUMAN, maxRevision:100000,checkpoint,
       getActingSeat:()=>state.round.phase==='settled'
@@ -112,6 +118,7 @@ export async function createFullRoundSession({storage} = {}) {
         obj.gameState.ruleRef?.profileId,obj.gameState.ruleRef?.ruleVersion
       ))) throw new Error('Invalid R3 checkpoint');
       rules.validateGameState(obj.gameState);
+      botDifficulty=checkedDifficulty(Object.hasOwn(obj,'botDifficulty')?obj.botDifficulty:'Beginner');
       state=obj.gameState;
       setupController(obj.botCheckpoint??null);
       if (state.round.phase==='settled') archive();
@@ -122,7 +129,8 @@ export async function createFullRoundSession({storage} = {}) {
       return false;
     }
   }
-  function start({profileId,ruleVersion}={}) {
+  function start({profileId,ruleVersion,difficulty='Beginner'}={}) {
+    checkedDifficulty(difficulty);
     if (blocked) throw new Error(storageWarning);
     const preferred=rules.listRuleProfiles().find(isR5) ?? rules.listRuleProfiles().find(isR3);
     const p=rules.getRuleProfile(profileId??preferred?.profileId,ruleVersion??preferred?.ruleVersion);
@@ -133,7 +141,8 @@ export async function createFullRoundSession({storage} = {}) {
     const next=rules.createGame({gameId:seed.replace(/[^A-Za-z0-9_-]/g,'-'),
       seed,profileId,ruleVersion,dealerSeat:HUMAN});
     rules.validateGameState(next);
-    persist(next,{paused:false});
+    persist(next,{paused:false,difficulty});
+    botDifficulty=difficulty;
     state=next;
     replayId=null;replayWarning='';
     setupController();
@@ -158,7 +167,7 @@ export async function createFullRoundSession({storage} = {}) {
     }:null;
     return copy({
       view,profile:rules.getRuleProfile(state.ruleRef.profileId,state.ruleRef.ruleVersion),
-      wallRemaining:state.wall.length, botConnected:true,
+      wallRemaining:state.wall.length, botConnected:true,botDifficulty,
       replayConnected:!!replayId,storageWarning,
       replayWarning,phase:'experimental-full',result,
       paused:controller?.isPaused()??false
@@ -168,10 +177,14 @@ export async function createFullRoundSession({storage} = {}) {
     if (!state || !controller) throw new Error('尚未開始 R3 對局');
     if (!legal({actionId,actorSeat,expectedRevision},HUMAN))
       throw new Error('過期或不合法的玩家 Action');
-    const r=await controller.submitHumanAction({actionId,expectedRevision});
-    if (r.status!=='acted')
-      throw new Error('Bot Controller 拒絕：'+r.status+(r.reason?' / '+r.reason:''));
-    return snapshot();
+    if(submitting)throw new Error('玩家 Action 已在提交中');
+    submitting=true;
+    try{
+      const r=await controller.submitHumanAction({actionId,expectedRevision});
+      if (r.status!=='acted')
+        throw new Error('Bot Controller 拒絕：'+r.status+(r.reason?' / '+r.reason:''));
+      return snapshot();
+    }finally{submitting=false;}
   }
   async function advanceBots({maxActions=1024,onProgress=()=>{}}={}) {
     if (!state || !controller) return {status:'not-started',snapshot:snapshot()};
