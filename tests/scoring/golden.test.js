@@ -483,3 +483,34 @@ test('R7.1 robbery adapter rejects missing/tampered proposal, claim, marker, til
       /provenance|linkage|payer|terminal/i);
   }
 });
+
+
+test('R7.1 strict 平胡 requires five sequences, suited eye, no flowers/honor, discard and provable two-sided wait',()=>{
+  const pre=[0,1,2,3,4,5,9,10,11,12,13,14,21,22,25,25];
+  const e=fixture({concealed:pre,winningTile:23,melds:[]});
+  const s=scoreWinningHand(p,e);
+  assert.equal(s.breakdown.find(x=>x.code==='pinghu')?.tai,2);
+  assert.ok(s.breakdown.some(x=>x.code==='concealed'));
+  const alt=scoreWinningHand(see,e);
+  assert.equal(alt.breakdown.find(x=>x.code==='pinghu')?.tai,2);
+  assert.ok(!alt.breakdown.some(x=>x.code==='no-honors-no-flowers'));
+  assert.ok(!scoreWinningHand(p,{...e,flowers:[f('season-spring')],seatWindType:27})
+    .breakdown.some(x=>x.code==='pinghu'));
+  const edge=fixture({concealed:[0,1,2,3,4,5,9,10,11,12,13,14,18,19,25,25],
+    winningTile:20,melds:[]});
+  assert.ok(!scoreWinningHand(p,edge).breakdown.some(x=>x.code==='pinghu'),
+    '1-2 awaiting 3 is an edge wait, not two-sided');
+  assert.ok(!scoreWinningHand(p,{...e,via:'self-draw',sourceSeat:1,
+    winningTile:undefined,concealed:[...pre,23]}).breakdown.some(x=>x.code==='pinghu'));
+});
+test('R7.1 全求人 five open melds adds 2 tai without duplicating pair-wait tai',()=>{
+  const melds=[[0,1,2],[3,4,5],[9,10,11],[12,13,14],[21,22,23]]
+    .map(tileIds=>({kind:'sequence',open:true,tileIds}));
+  const e=fixture({concealed:[25],winningTile:25,melds});
+  const s=scoreWinningHand(p,e);
+  assert.equal(s.breakdown.find(x=>x.code==='all-exposed')?.tai,2);
+  assert.ok(!s.breakdown.some(x=>x.code==='pinghu'));
+  const l=settleWinningHand(p,e);
+  assert.equal(l.payments.length,1);
+  assert.equal(l.playerTransferDeltas.reduce((n,x)=>n+x,0),0);
+});
