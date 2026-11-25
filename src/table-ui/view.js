@@ -298,7 +298,7 @@ export function landscapeHint(){
   return '<p class="table-rotate-hint"><span aria-hidden="true">↔</span> 建議將手機轉為橫向，使用完整四家牌桌。直向仍可操作。</p>';
 }
 export function TableView(snapshot,{selection=null,busy=false,error='',botStatus='',
-  confirmation=null,restartPending=false,drawCue=null,soundEnabled=false,soundAvailable=true,theme='jade-room',camera='flat'}={}) {
+  confirmation=null,restartPending=false,drawCue=null,soundEnabled=false,soundAvailable=true,theme='jade-room',camera='flat',focused=false}={}) {
   if(!snapshot)return '';
   theme=normalizeTableTheme(theme);
   camera=normalizeTableCamera(camera);
@@ -327,7 +327,9 @@ export function TableView(snapshot,{selection=null,busy=false,error='',botStatus
     (soundEnabled?'true':'false')+'" '+(soundAvailable?'':'disabled')+'>'+
     (soundAvailable?(soundEnabled?'音效：開啟':'音效：關閉'):'音效：不支援')+'</button>'+
     '<button type="button" class="secondary" data-start-new '+
-    (busy?'disabled':'')+'>重新開局</button></div></header>'+landscapeHint()+
+    (busy?'disabled':'')+'>重新開局</button>'+
+    '<button type="button" class="secondary table-focus-toggle" data-table-focus-toggle aria-pressed="'+
+    (focused?'true':'false')+'">'+(focused?'退出專注':'專注牌桌')+'</button></div></header>'+landscapeHint()+
     (restartPending?'<div class="table-selected table-confirmation" data-restart-confirmation '+
       'role="group" aria-label="重新開局確認"><p>確定重新開局？目前對局會被取代。</p>'+
       (botConnected?BotDifficultySelect(snapshot.botDifficulty):'')+

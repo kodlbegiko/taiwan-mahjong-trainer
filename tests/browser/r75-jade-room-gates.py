@@ -251,14 +251,37 @@ def main():
                     assert rows==(1 if report['available']>=780 else 2),report
                     report['rows']=rows
                     page.locator('[data-table-theme="jade-room"]').screenshot(path=str(out/f'phone-landscape-{landscape[0]}x{landscape[1]}.png'))
+                    # Focus mode is explicitly opt-in. Compare real document
+                    # geometry and preserve both selection and authority.
                     hand.first.tap()
+                    selected=page.locator('.table-hand button[aria-pressed="true"]').get_attribute('data-pick-action')
+                    before_height=page.locator('#full-table-root').evaluate('(el)=>el.getBoundingClientRect().bottom+scrollY')
+                    page.locator('[data-table-focus-toggle]').tap()
+                    assert page.locator('[data-table-focus-toggle]').get_attribute('aria-pressed')=='true'
+                    assert not page.locator('#full-table-navigation').is_visible()
+                    assert page.locator('.table-version').inner_text()==revision
+                    assert hand.evaluate_all('(els)=>els.map(e=>e.dataset.pickAction)')==ids
+                    assert page.locator('.table-hand button[aria-pressed="true"]').get_attribute('data-pick-action')==selected
+                    after_height=page.locator('#full-table-root').evaluate('(el)=>el.getBoundingClientRect().bottom+scrollY')
+                    assert before_height-after_height>=60, (before_height,after_height)
+                    assert page.locator('[data-submit-action]').bounding_box()['height']>=44
+                    assert page.evaluate('document.documentElement.scrollWidth<=innerWidth+1')
+                    page.screenshot(path=str(out/f'phone-focus-{landscape[0]}x{landscape[1]}.png'),full_page=True)
+                    page.locator('[data-table-focus-toggle]').tap()
+                    assert page.locator('#full-table-navigation').is_visible()
+                    assert page.locator('.table-version').inner_text()==revision
+                    assert page.locator('.table-hand button[aria-pressed="true"]').get_attribute('data-pick-action')==selected
+                    page.locator('[data-table-focus-toggle]').tap()
+                    report['focusHeightSaved']=round(before_height-after_height,1)
                     page.locator('[data-submit-action]').tap()
                     page.wait_for_function("(rev)=>document.querySelector('.table-version').innerText!==rev",arg=revision)
                     after=page.locator('.table-version').inner_text()
                     page.set_viewport_size({'width':portrait[0],'height':portrait[1]})
                     assert page.locator('.table-rotate-hint').is_visible()
+                    assert page.locator('#full-table-navigation').is_visible()
                     assert page.locator('.table-version').inner_text()==after
                     page.locator('[data-table-nav="academy"]').click()
+                    assert page.locator('body').get_attribute('data-table-focus') is None
                     assert not page.locator('.table-rotate-hint').is_visible()
                     report['rotation']='PASS: selection preserved, real touch discard, no reset, academy unaffected'
                     evidence.append(report)

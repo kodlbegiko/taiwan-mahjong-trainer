@@ -984,3 +984,33 @@ body[data-table-view="replay"] #full-table-navigation {
     body[data-table-view="play"] #full-table-root .table-game-surface .table-hand {grid-template-columns:repeat(17,minmax(44px,1fr));}
   }
 }
+
+/* Optional landscape focus: remove site chrome only by explicit choice.
+   No fullscreen API, no orientation lock, no game-state or storage writes.
+   All Rules warnings and confirmations remain accessible; exit is visible. */
+#full-table-root .table-focus-toggle {display:none;}
+@media (orientation:landscape) and (max-height:520px) and (max-width:1024px) {
+  body[data-table-view="play"] #full-table-root .table-focus-toggle {display:inline-flex;align-items:center;justify-content:center;min-width:88px;}
+  body[data-table-view="play"][data-table-focus="true"] :is(.topbar,#full-table-navigation,.pwa-bar,.pwa-install-help) {display:none;}
+  body[data-table-view="play"][data-table-focus="true"] #full-table-root {padding-top:0;padding-bottom:max(6px,env(safe-area-inset-bottom));}
+  body[data-table-view="play"][data-table-focus="true"] #full-table-root .table-heading {display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:4px;margin-bottom:3px;}
+  body[data-table-view="play"][data-table-focus="true"] #full-table-root .table-heading h1 {font-size:15px;line-height:1.3;}
+  body[data-table-view="play"][data-table-focus="true"] #full-table-root .table-heading p {font-size:10px;line-height:1.3;}
+  body[data-table-view="play"][data-table-focus="true"] #full-table-root .table-overline {font-size:9px;letter-spacing:0;}
+  body[data-table-view="play"][data-table-focus="true"] #full-table-root .table-header-tools {width:auto;flex-wrap:nowrap;gap:4px;}
+  body[data-table-view="play"][data-table-focus="true"] #full-table-root .table-header-tools > :not(.table-version,.table-focus-toggle) {display:none;}
+  body[data-table-view="play"][data-table-focus="true"] #full-table-root .table-version {font-size:10px;padding:3px 6px;}
+  body[data-table-view="play"][data-table-focus="true"] #full-table-root .table-facts {margin:2px 0 3px;gap:2px;}
+  body[data-table-view="play"][data-table-focus="true"] #full-table-root .table-facts span {padding:1px 4px;font-size:9px;}
+  body[data-table-view="play"][data-table-focus="true"] #full-table-root .table-game-surface .table-grid {gap:2px;padding:3px;}
+  body[data-table-view="play"][data-table-focus="true"] #full-table-root .table-game-surface .table-opponent {padding:2px;}
+  body[data-table-view="play"][data-table-focus="true"] #full-table-root .table-game-surface .table-concealed {margin:1px 0;gap:1px;}
+  body[data-table-view="play"][data-table-focus="true"] #full-table-root .table-seat-extras .table-quiet {display:none;}
+  body[data-table-view="play"][data-table-focus="true"] #full-table-root .table-seat-extras:not(:has(.table-meld,.table-flower)) {display:none;}
+  body[data-table-view="play"][data-table-focus="true"] #full-table-root .table-own-river:has([data-river-history-count="0"]) {display:none;}
+  body[data-table-view="play"][data-table-focus="true"] #full-table-root .table-self {gap:2px;}
+  body[data-table-view="play"][data-table-focus="true"] #full-table-root .table-actions {margin-top:3px;padding:4px 6px;}
+  body[data-table-view="play"][data-table-focus="true"] #full-table-root .table-actions-heading {gap:4px;}
+  body[data-table-view="play"][data-table-focus="true"] #full-table-root .table-selected {padding:2px 0;}
+  body[data-table-view="play"][data-table-focus="true"] #full-table-root .table-footer-controls {padding:4px 0;}
+}

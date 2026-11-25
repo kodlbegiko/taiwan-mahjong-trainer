@@ -16,7 +16,7 @@ let dailyBoot='idle';
 let pendingAction=null,restartPending=false;
 let lastPaintedGame=null,lastPaintedRevision=-1;
 let previousOwnView=null,drawCue=null;
-let tableTheme='jade-room',tableCamera='flat';
+let tableTheme='jade-room',tableCamera='flat',tableFocused=false;
 // Sound is strictly opt-in per page session. No assets, autoplay, network,
 // private tile data, storage writes, or influence on Rules/Replay timing.
 let audioContext=null,audioMaster=null,audioEnabled=false,audioPending=false,audioFailed=false;
@@ -116,6 +116,7 @@ function renderEmpty() {
 }
 function activate(page,{focus=true}={}) {
   if(page!==activePage){pendingAction=null;selection=null;restartPending=false;previousOwnView=null;drawCue=null;lastPaintedGame=null;lastPaintedRevision=-1;}
+  if(page!=='play'){tableFocused=false;delete document.body.dataset.tableFocus;}
   activePage=page;
   document.body.dataset.tableView=page==='academy'?'none':page;
   if(root)root.hidden=page==='academy';
@@ -158,7 +159,7 @@ function draw() {
       concealed:nextView.self.concealed.map(t=>({id:t.id}))}}:null;
   root.innerHTML=snapshot?TableView(snapshot,{selection,busy,error:lastError,
     botStatus,confirmation:pendingAction,restartPending,drawCue,
-    soundEnabled:audioEnabled,soundAvailable:Boolean(AudioCtor)&&!audioFailed,theme:tableTheme,camera:tableCamera}):renderEmpty();
+    soundEnabled:audioEnabled,soundAvailable:Boolean(AudioCtor)&&!audioFailed,theme:tableTheme,camera:tableCamera,focused:tableFocused}):renderEmpty();
   // Animate only a genuinely new, already committed public discard. Selection,
   // confirmation, rerender, initial restore and replay never replay the effect.
   const view=snapshot?.view, latest=latestPublicDiscard(view);
@@ -352,6 +353,16 @@ async function dailyAction(kind) {
 function onClick(event) {
   const button=event.target.closest('button');
   if(!button)return;
+  if(button.hasAttribute('data-table-focus-toggle')){
+    if(activePage!=='play')return;
+    tableFocused=!tableFocused;
+    if(tableFocused)document.body.dataset.tableFocus='true';
+    else delete document.body.dataset.tableFocus;
+    button.setAttribute('aria-pressed',String(tableFocused));
+    button.textContent=tableFocused?'退出專注':'專注牌桌';
+    window.scrollTo(0,0);
+    return;
+  }
   if(button.hasAttribute('data-table-sound')){
     if(!button.disabled)void toggleTableSound();
     return;
