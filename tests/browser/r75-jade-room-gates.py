@@ -104,6 +104,13 @@ def main():
                         surface=page.locator('[data-table-camera="perspective"]')
                         assert surface.count()==1
                         assert surface.locator('.table-back-stack').first.evaluate('(el)=>getComputedStyle(el).transform')!='none'
+                        mesh=surface.locator('.table-back-tile .table-tile-extrusion')
+                        assert mesh.count()==48
+                        assert surface.locator('.table-back-tile img').count()==0
+                        assert mesh.first.evaluate('(el)=>getComputedStyle(el).display')=='block'
+                        faces=mesh.first.locator('.table-mesh-face').evaluate_all('(els)=>els.map(e=>getComputedStyle(e).transform)')
+                        assert len(faces)==5 and len(set(faces))==5 and all(x!='none' for x in faces),faces
+                        assert surface.locator('.table-hand .table-tile-extrusion').count()==0
                         if width==1440:
                             assert surface.locator('.table-grid').evaluate('(el)=>getComputedStyle(el).transform')!='none'
                         assert page.locator('.table-version').inner_text()==revision
@@ -116,6 +123,8 @@ def main():
                         surface.screenshot(path=str(out/f'perspective-{width}x{height}.png'))
                         camera.select_option('flat')
                         assert page.locator('[data-table-camera="flat"]').count()==1
+                        assert page.locator('.table-back-tile .table-tile-extrusion').first.evaluate('(el)=>getComputedStyle(el).display')=='none'
+                        report['extrusion']='PASS: five transformed side/rear planes per concealed back; flat mode hidden; no private face'
                         report['camera']='PASS: public perspective; unchanged hand targets, selection, revision and action IDs'
                     page.locator('[data-clear-selection]').click()
                     assert page.locator('.table-hand button[aria-pressed="true"]').count()==0
@@ -144,6 +153,11 @@ def main():
                         page.locator('[data-submit-action]').click()
                         page.wait_for_function('window.__tmtSoundStarts===1')
                         assert page.locator('.table-last-discard').count()==1
+                        page.locator('[data-table-camera-select]').select_option('perspective')
+                        assert page.locator('.table-last-discard .table-mesh-face').count()==5
+                        assert page.locator('.table-last-discard .table-face-image').count()==1
+                        page.locator('[data-table-camera="perspective"]').screenshot(path=str(out/'perspective-public-discard.png'))
+                        page.locator('[data-table-camera-select]').select_option('flat')
                         sound.click()
                         assert sound.get_attribute('aria-pressed')=='false'
                         assert page.evaluate('window.__tmtSoundStarts')==1

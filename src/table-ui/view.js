@@ -23,11 +23,16 @@ function typeFromTile(tile) {
   const match = /^t:(0|[1-9]|[12][0-9]|3[0-3]):[0-3]$/.exec(tile?.id ?? tile?.tileId ?? tile);
   return match ? Number(match[1]) : null;
 }
+// Front artwork stays on the existing semantic tile. Five additional planes
+// form its extrusion only in perspective mode. Concealed backs use identical
+// unmarked geometry; they never receive any hidden tile identity.
+const extrudedSides='<span class="table-tile-extrusion" aria-hidden="true">'+
+  ['top','bottom','left','right','rear'].map(side=>'<i class="table-mesh-face table-mesh-'+side+'"></i>').join('')+'</span>';
 function tileSpan(tile, className = '') {
   const t = typeFromTile(tile);
   if (t === null) return '<span class="table-flower" aria-label="花牌（無可用 SVG）">花</span>';
   return '<span class="table-tile tile ' + className + '" role="img" aria-label="' +
-    escapeHtml(tileAccessibleName(t)) + '">' + tileFaceMarkup(t) + '</span>';
+    escapeHtml(tileAccessibleName(t)) + '">' + tileFaceMarkup(t) + extrudedSides + '</span>';
 }
 function tileButton(tile, action, selected, drawn=false) {
   const t = typeFromTile(tile);
@@ -92,7 +97,7 @@ export function OpponentSeat(person, currentSeat, dealerSeat, latest=null) {
     '<div class="table-concealed" aria-label="暗牌僅顯示張數">' +
     '<span class="table-back-stack" aria-hidden="true">' +
     (Number.isSafeInteger(person.concealedCount)&&person.concealedCount>=0&&person.concealedCount<=18?
-      '<i class="table-back-tile"></i>'.repeat(person.concealedCount):'') + '</span>' +
+      ('<i class="table-back-tile">'+extrudedSides+'</i>').repeat(person.concealedCount):'') + '</span>' +
     '<span class="table-back-count">' + escapeHtml(person.concealedCount) + ' 張暗牌</span></div>' +
     '<div class="table-seat-extras">' + meldSection(person.melds ?? []) + flowersSection(person.flowers ?? []) + '</div>' +
     riverSection(person.river ?? [],latest,person.seat) + '</section>';

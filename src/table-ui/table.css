@@ -728,3 +728,58 @@ body[data-table-view="replay"] #full-table-navigation {
   #full-table-root [data-table-camera="perspective"] .table-back-tile {border-bottom-width:4px;}
   #full-table-root [data-table-camera="perspective"] .table-river .table-tile:not(.table-last-discard) {border-bottom-width:3px;}
 }
+
+/* Physical extrusion: five orthogonal planes behind the existing front face.
+   Flat/replay layouts remain unchanged; no duplicate artwork or hit targets. */
+#full-table-root .table-tile-extrusion {display:none;}
+@supports (transform-style:preserve-3d) {
+  #full-table-root [data-table-camera="perspective"] :is(.table-river .table-tile,.table-meld .table-tile,.table-back-tile) {
+    --tile-depth:6px;
+    position:relative;
+    transform-style:preserve-3d;
+    overflow:visible;
+    isolation:auto;
+  }
+  #full-table-root [data-table-camera="perspective"] .table-back-stack {transform-style:preserve-3d;}
+  #full-table-root [data-table-camera="perspective"] .table-tile-extrusion {
+    display:block;position:absolute;inset:0;pointer-events:none;transform-style:preserve-3d;
+  }
+  #full-table-root [data-table-camera="perspective"] .table-mesh-face {
+    display:block;position:absolute;box-sizing:border-box;
+    border:1px solid #162f254d;pointer-events:none;
+    backface-visibility:hidden;
+    background:linear-gradient(90deg,#e7e3d1 0 62%,#37785a 62% 100%);
+  }
+  #full-table-root [data-table-camera="perspective"] .table-mesh-top {
+    top:0;left:0;width:100%;height:var(--tile-depth);
+    transform-origin:50% 0;transform:rotateX(90deg) translateY(calc(-1 * var(--tile-depth)));
+    background:linear-gradient(180deg,#d5d1be 0 62%,#509171 62% 100%);
+  }
+  #full-table-root [data-table-camera="perspective"] .table-mesh-bottom {
+    bottom:0;left:0;width:100%;height:var(--tile-depth);
+    transform-origin:50% 100%;transform:rotateX(-90deg) translateY(var(--tile-depth));
+    background:linear-gradient(180deg,#24513c 0 38%,#b6b3a3 38% 100%);
+  }
+  #full-table-root [data-table-camera="perspective"] .table-mesh-left {
+    left:0;top:0;width:var(--tile-depth);height:100%;
+    transform-origin:0 50%;transform:rotateY(-90deg) translateX(calc(-1 * var(--tile-depth)));
+    background:linear-gradient(90deg,#407d5e 0 38%,#e2ddca 38% 100%);
+  }
+  #full-table-root [data-table-camera="perspective"] .table-mesh-right {
+    right:0;top:0;width:var(--tile-depth);height:100%;
+    transform-origin:100% 50%;transform:rotateY(90deg) translateX(var(--tile-depth));
+    background:linear-gradient(90deg,#c8c4b0 0 62%,#25573f 62% 100%);
+  }
+  #full-table-root [data-table-camera="perspective"] .table-mesh-rear {
+    inset:0;transform:translateZ(calc(-1 * var(--tile-depth))) rotateY(180deg);
+    border-radius:3px;background:linear-gradient(145deg,#589576,#245940);
+  }
+  /* An exposed public tile has an ivory front. The opponent rack instead
+     presents the resin back to the player; its reverse is deliberately blank. */
+  #full-table-root [data-table-camera="perspective"] .table-back-tile .table-mesh-rear {
+    background:linear-gradient(145deg,#eee9d9,#d6d1bb);
+  }
+  @media(max-width:560px) {
+    #full-table-root [data-table-camera="perspective"] :is(.table-river .table-tile,.table-meld .table-tile,.table-back-tile) {--tile-depth:3px;}
+  }
+}

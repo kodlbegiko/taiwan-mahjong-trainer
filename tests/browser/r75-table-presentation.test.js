@@ -183,3 +183,18 @@ test('R7.5 camera is allowlisted and presentation-only',()=>{
   assert.ok(perspective.includes('data-submit-action="'+id+'"'));
   assert.equal(JSON.stringify(snap),bytes);
 });
+
+test('R7.5 extrusion adds anonymous planes to public tiles only and preserves action IDs',()=>{
+  const p=availableTableProfiles().find(x=>x.profileId==='tw16-four-player-sandbox');
+  const s=createSandboxSession(),snap=s.start({profileId:p.profileId,ruleVersion:p.ruleVersion});
+  const html=TableView(snap,{camera:'perspective'});
+  assert.equal((html.match(/class="table-tile-extrusion"/g)??[]).length,48);
+  assert.equal((html.match(/class="table-mesh-face table-mesh-/g)??[]).length,48*5);
+  assert.equal((html.match(/data-pick-action=/g)??[]).length,17);
+  const a=snap.view.legalActions[0];
+  const after=s.submit({actionId:a.actionId,actorSeat:a.actorSeat,expectedRevision:a.expectedRevision});
+  const next=TableView(after,{camera:'perspective'});
+  assert.equal((next.match(/class="table-tile-extrusion"/g)??[]).length,49);
+  assert.equal((next.match(/table-last-discard/g)??[]).length,1);
+  assert.ok(after.view.opponents.every(p=>!Object.hasOwn(p,'concealed')));
+});
