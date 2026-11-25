@@ -22,14 +22,14 @@ def main():
                 page.on('pageerror',lambda e:errors.append(str(e)))
                 try:
                     if width==1440:
-                        page.add_init_script("""() => {
+                        page.add_init_script("""(() => {
                           window.__tmtSoundStarts=0;
                           const start=AudioBufferSourceNode.prototype.start;
                           AudioBufferSourceNode.prototype.start=function(...args){
                             window.__tmtSoundStarts++;
                             return start.apply(this,args);
                           };
-                        }""")
+                        })()""")
                     page.goto(url+'?table=sandbox',wait_until='networkidle')
                     page.locator('[data-table-nav="play"]').click()
                     page.locator('#table-profile').wait_for()
