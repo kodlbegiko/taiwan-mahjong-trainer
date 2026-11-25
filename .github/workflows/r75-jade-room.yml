@@ -24,7 +24,7 @@ jobs:
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           git diff --name-only 641fedef77421acdb49eea1a9e390f46a5f68adb HEAD | while read -r path; do
             case "$path" in
-              style.css|public/tiles/*.svg|src/table-ui/table.css|src/table-ui/view.js|sw.js|tests/browser/r75-jade-room-gates.py|tests/browser/r75-tile-gallery.py|tests/browser/r75-table-presentation.test.js|.github/workflows/r75-jade-room.yml) ;;
+              style.css|public/tiles/*.svg|src/table-ui/table.css|src/table-ui/view.js|src/table-ui/main.js|sw.js|tests/browser/r75-jade-room-gates.py|tests/browser/r75-tile-gallery.py|tests/browser/r75-table-presentation.test.js|.github/workflows/r75-jade-room.yml) ;;
               *) echo "::error::Unexpected change: $path"; exit 1 ;;
             esac
           done

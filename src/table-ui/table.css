@@ -539,3 +539,13 @@ body[data-table-view="replay"] #full-table-navigation {
   #full-table-root .table-own-river .table-river {grid-template-columns:repeat(8,minmax(0,27px));gap:3px;}
   #full-table-root .table-hand .table-tile {border-radius:5px;border-right-width:2px;border-bottom-width:7px;}
 }
+
+/* Exactly one Rules-confirmed public discard is highlighted; never guess a claim. */
+#full-table-root .table-last-discard {
+  outline:2px solid #ffe093;outline-offset:2px;
+  box-shadow:0 0 0 1px #352e17,0 0 12px #f0ce7866,0 2px 0 #14372d;
+}
+#full-table-root .table-latest-label {
+  background:#254b38;border:1px solid #c6ac72;border-radius:6px;
+  padding:3px 8px;color:#fff0c6;font-weight:750;
+}

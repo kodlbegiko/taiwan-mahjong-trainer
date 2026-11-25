@@ -1,7 +1,7 @@
 import { createSandboxSession, availableTableProfiles } from './session.js';
 import { createFullRoundSession, fullRoundCapability } from './full-round.js';
 import { createDailyPanel } from './daily.js';
-import { TableView, ReplayControls, BotDifficultySelect } from './view.js';
+import { TableView, ReplayControls, BotDifficultySelect, latestPublicDiscard } from './view.js';
 import { installTileFaceFallback } from '../tile-visuals.js';
 
 const root=document.querySelector('#full-table-root');
@@ -14,6 +14,7 @@ let busy=false,lastError='',activePage='academy',timeline=null,replayIndex=0;
 let replayFrame=null,replayBusy=false,botStatus='',storage=null;
 let dailyBoot='idle';
 let pendingAction=null,restartPending=false;
+let lastPaintedGame=null,lastPaintedRevision=-1;
 const forceSandbox=new URLSearchParams(window.location.search).get('table')==='sandbox';
 const seededQA=new URLSearchParams(window.location.search).get('qa')==='seeded';
 
@@ -83,6 +84,17 @@ function draw() {
   const snapshot=session?.snapshot();
   root.innerHTML=snapshot?TableView(snapshot,{selection,busy,error:lastError,
     botStatus,confirmation:pendingAction,restartPending}):renderEmpty();
+  // Animate only a genuinely new, already committed public discard. Selection,
+  // confirmation, rerender, initial restore and replay never replay the effect.
+  const view=snapshot?.view, latest=latestPublicDiscard(view);
+  const changed=Boolean(view&&latest&&view.gameId===lastPaintedGame&&latest.seq>lastPaintedRevision);
+  lastPaintedGame=view?.gameId??null;
+  lastPaintedRevision=view?.asOfEventSeq??-1;
+  if(changed&&!window.matchMedia('(prefers-reduced-motion: reduce)').matches){
+    const tile=root.querySelector('.table-last-discard');
+    tile?.animate?.([{transform:'translateY(-7px) scale(1.10)',opacity:.75},
+      {transform:'translateY(0) scale(1)',opacity:1}],{duration:230,easing:'ease-out'});
+  }
 }
 async function driveBots() {
   if(!session?.snapshot()||busy===false) return;

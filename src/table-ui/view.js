@@ -53,12 +53,25 @@ function flowersSection(flowers) {
       escapeHtml(f.flowerCode ?? '花') + '</span>').join('') :
       '<span class="table-quiet">花牌 0</span>') + '</div>';
 }
-function riverSection(river) {
+/** Identify the one newest public discard, only while it remains an unclaimed river tile.
+ * No hidden draw/claim data or guessed seat is used. */
+export function latestPublicDiscard(view) {
+  if(!Array.isArray(view?.publicEvents))return null;
+  const e=[...view.publicEvents].reverse().find(x=>x.type==='discard'&&x.visibility==='public'&&
+    Number.isSafeInteger(x.seq)&&x.seq<=view.asOfEventSeq);
+  if(!e||e.gameId!==view.gameId||!Number.isInteger(e.actorSeat)||e.actorSeat<0||e.actorSeat>3||
+    typeof e.payload?.tileId!=='string'||typeFromTile(e.payload.tileId)===null)return null;
+  const person=[view.self,...(view.opponents??[])].find(p=>p?.seat===e.actorSeat);
+  const matches=(person?.river??[]).filter(d=>d.seq===e.seq&&d.tileId===e.payload.tileId&&!d.claimedByEventId);
+  return matches.length===1?{seat:e.actorSeat,seq:e.seq,tileId:e.payload.tileId}:null;
+}
+function riverSection(river, latest=null, seat=null) {
   return '<div class="table-river" role="group" aria-label="牌河">' +
-    (river.length ? river.map((d, i) => tileSpan(d, i === river.length - 1 ? 'table-last-discard' : '')).join('')
+    (river.length ? river.map(d => tileSpan(d, latest&&latest.seat===seat&&d.seq===latest.seq&&
+      d.tileId===latest.tileId&&!d.claimedByEventId?'table-last-discard':'')).join('')
       : '<span class="table-quiet">尚未捨牌</span>') + '</div>';
 }
-export function OpponentSeat(person, currentSeat, dealerSeat) {
+export function OpponentSeat(person, currentSeat, dealerSeat, latest=null) {
   const active = currentSeat === person.seat;
   return '<section class="table-opponent table-seat-' + person.seat +
     (active ? ' table-seat-active' : '') + '" aria-label="' + SEATS[person.seat] + '">' +
@@ -71,9 +84,9 @@ export function OpponentSeat(person, currentSeat, dealerSeat) {
       '<i class="table-back-tile"></i>'.repeat(person.concealedCount):'') + '</span>' +
     '<span class="table-back-count">' + escapeHtml(person.concealedCount) + ' 張暗牌</span></div>' +
     '<div class="table-seat-extras">' + meldSection(person.melds ?? []) + flowersSection(person.flowers ?? []) + '</div>' +
-    riverSection(person.river ?? []) + '</section>';
+    riverSection(person.river ?? [],latest,person.seat) + '</section>';
 }
-export function PlayerHand(self, legalActions, selectedId) {
+export function PlayerHand(self, legalActions, selectedId, latest=null) {
   const byPhysicalId = new Map(legalActions.filter(a => a.kind === 'discard' && a.tileIds?.length === 1)
     .map(a => [a.tileIds[0], a]));
   const replacing=legalActions.some(a=>a.kind==='replace_flower');
@@ -84,7 +97,7 @@ export function PlayerHand(self, legalActions, selectedId) {
     self.concealed.length + ' 張</strong><span>' +
     (replacing?'補花階段：先選擇合法補花操作':'點牌選擇，二次確認')+
     '</span></div>' +
-    '<div class="table-own-river"><span class="table-river-label">我的牌河</span>' + riverSection(self.river ?? []) + '</div>' +
+    '<div class="table-own-river"><span class="table-river-label">我的牌河</span>' + riverSection(self.river ?? [],latest,self.seat) + '</div>' +
     '<div class="table-hand" role="group" aria-label="自己的手牌">' +
     ordered.map(tile => tileButton(tile, byPhysicalId.get(tile.id), selectedId === byPhysicalId.get(tile.id)?.actionId)).join('') +
     '</div><div class="table-seat-extras">' + meldSection(self.melds ?? []) + flowersSection(self.flowers ?? []) + '</div>' +
@@ -160,6 +173,7 @@ export function TableView(snapshot,{selection=null,busy=false,error='',botStatus
   const {view,profile,wallRemaining,botConnected,replayConnected,storageWarning,replayWarning}=snapshot;
   const opponents=new Map(view.opponents.map(p=>[p.seat,p]));
   const robbery=RobberyNotice(view,snapshot.robbery);
+  const latest=latestPublicDiscard(view);
   const actions=robbery.valid?view.legalActions.filter(a=>a.actorSeat===view.audienceSeat &&
     a.expectedRevision===view.asOfEventSeq&&typeof a.actionId==='string'):[];
   const humanCanAct=actions.length>0;
@@ -195,13 +209,14 @@ export function TableView(snapshot,{selection=null,busy=false,error='',botStatus
     (error?'<p role="alert" class="table-warning">'+escapeHtml(error)+'</p>':'')+
     '<div class="table-game-surface" data-table-theme="jade-room">'+
     '<div class="table-grid" role="group" aria-label="四人牌桌公開資訊">'+
-    OpponentSeat(opponents.get(2),view.round.currentSeat,view.round.dealerSeat)+
-    OpponentSeat(opponents.get(3),view.round.currentSeat,view.round.dealerSeat)+
+    OpponentSeat(opponents.get(2),view.round.currentSeat,view.round.dealerSeat,latest)+
+    OpponentSeat(opponents.get(3),view.round.currentSeat,view.round.dealerSeat,latest)+
     '<div class="table-felt" aria-live="polite"><strong>'+phaseLabel+
     '</strong><span>'+escapeHtml(botStatus||lastEvent(view.publicEvents))+
-    '</span><span class="table-center-wall">牌山 · '+escapeHtml(wallRemaining)+' 張</span><small>僅顯示當下的公開牌面與本人手牌</small></div>'+
-    OpponentSeat(opponents.get(1),view.round.currentSeat,view.round.dealerSeat)+'</div>'+
-    robbery.html+PlayerHand(view.self,actions,selection)+'</div>'+
+    '</span>'+(latest?'<span class="table-latest-label">最新捨牌 · '+SEATS[latest.seat]+' · '+escapeHtml(tileAccessibleName(typeFromTile(latest.tileId)))+'</span>':'')+
+    '<span class="table-center-wall">牌山 · '+escapeHtml(wallRemaining)+' 張</span><small>僅顯示當下的公開牌面與本人手牌</small></div>'+
+    OpponentSeat(opponents.get(1),view.round.currentSeat,view.round.dealerSeat,latest)+'</div>'+
+    robbery.html+PlayerHand(view.self,actions,selection,latest)+'</div>'+
     (!robbery.valid?'<section class="table-actions" aria-label="契約不相容">操作已停止</section>':ended?'<section class="table-actions"><h3>正式 Rules 已結算本局</h3></section>':
       humanCanAct?ActionBar(actions,selection,busy||snapshot.paused,confirmation):
         '<section class="table-actions" aria-label="等待其他玩家"><h3>'+
@@ -332,14 +347,15 @@ function ReplayPublicTable(view) {
     !Array.isArray(view.self.concealed)) return '<p>當時牌桌資訊無法驗證。</p>';
   const opponents = new Map(view.opponents.map(p => [p.seat, p]));
   if (![1, 2, 3].every(s => opponents.has(s))) return '<p>當時座位資料不完整。</p>';
+  const latest=latestPublicDiscard(view);
   return '<div class="table-grid table-history-grid" aria-label="歷史各家公開牌河與副露">' +
-    OpponentSeat(opponents.get(2), view.round?.currentSeat, view.round?.dealerSeat) +
-    OpponentSeat(opponents.get(3), view.round?.currentSeat, view.round?.dealerSeat) +
+    OpponentSeat(opponents.get(2), view.round?.currentSeat, view.round?.dealerSeat, latest) +
+    OpponentSeat(opponents.get(3), view.round?.currentSeat, view.round?.dealerSeat, latest) +
     '<div class="table-felt"><strong>歷史事件 ' + escapeHtml(view.asOfEventSeq) +
     '</strong><small>僅展示 Replay API 的歷史快照</small></div>' +
-    OpponentSeat(opponents.get(1), view.round?.currentSeat, view.round?.dealerSeat) +
+    OpponentSeat(opponents.get(1), view.round?.currentSeat, view.round?.dealerSeat, latest) +
     '</div><section class="table-replay-self"><h3>當時你的公開牌河、副露與花牌</h3>' +
-    riverSection(view.self.river ?? []) + meldSection(view.self.melds ?? []) +
+    riverSection(view.self.river ?? [],latest,view.self.seat) + meldSection(view.self.melds ?? []) +
     flowersSection(view.self.flowers ?? []) + '</section>';
 }
 export function ReplayControls(timeline,index,externalFrame=null){
