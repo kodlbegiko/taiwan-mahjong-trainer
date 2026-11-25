@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createSandboxSession,availableTableProfiles} from '../../src/table-ui/session.js';
-import {TableView,latestPublicDiscard,publicDeclaration,ActionBar,observedOwnDraw} from '../../src/table-ui/view.js';
+import {TableView,latestPublicDiscard,publicDeclaration,ActionBar,observedOwnDraw,seatWind} from '../../src/table-ui/view.js';
 
 test('R7.5 sorted hand keeps exact physical actions, hidden tiles and input bytes',()=>{
   const p=availableTableProfiles().find(x=>x.profileId==='tw16-four-player-sandbox');
@@ -112,4 +112,20 @@ test('R7.5 draw cue renders one physical tile without changing its legal action'
   assert.equal((html.match(/data-pick-action=/g)??[]).length,17);
   assert.ok(!TableView(snap,{drawCue:{...cue,revision:0}}).includes('table-fresh-draw'));
   assert.ok(!TableView(snap,{drawCue:{...cue,seat:1}}).includes('table-fresh-draw'));
+});
+
+test('R7.5 wind medallions follow dealer rotation and do not invent a round wind',()=>{
+  for(let dealer=0;dealer<4;dealer++){
+    assert.deepEqual(Array.from({length:4},(_,i)=>seatWind((dealer+i)%4,dealer)),['東','南','西','北']);
+  }
+  assert.equal(seatWind(4,0),'');
+  assert.equal(seatWind(0,null),'');
+  const p=availableTableProfiles().find(x=>x.profileId==='tw16-four-player-sandbox');
+  const s=createSandboxSession(),snap=s.start({profileId:p.profileId,ruleVersion:p.ruleVersion});
+  const html=TableView(snap);
+  assert.equal((html.match(/data-seat-wind=/g)??[]).length,4);
+  assert.equal((html.match(/data-dealer-seat="true"/g)??[]).length,1);
+  assert.equal((html.match(/data-seat-turn="true"/g)??[]).length,1);
+  assert.equal((TableView({...snap,paused:true}).match(/data-seat-turn="true"/g)??[]).length,0);
+  assert.equal((html.match(/data-pick-action=/g)??[]).length,17);
 });

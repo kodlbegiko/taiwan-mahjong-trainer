@@ -603,3 +603,33 @@ body[data-table-view="replay"] #full-table-navigation {
 }
 #full-table-root .table-sound-toggle[aria-pressed="true"] {color:#17382a;background:#d2e6b5;border-color:#d2e6b5;}
 #full-table-root .table-sound-toggle:disabled {opacity:.65;}
+
+/* Seat identity: classic wind medallions, no decorative avatar downloads. */
+#full-table-root .table-seat-identity {
+  display:flex;align-items:center;gap:7px;min-width:0;
+}
+#full-table-root .table-seat-identity strong {min-width:0;overflow-wrap:anywhere;}
+#full-table-root .table-seat-heading .table-seat-medallion {
+  display:grid;place-items:center;flex:0 0 34px;width:34px;height:34px;
+  border-radius:50%;border:1px solid #a68f58;
+  color:#f3e8ce;background:radial-gradient(circle at 34% 25%,#416b53,#183b30 72%);
+  box-shadow:inset 0 0 0 2px #132b2366,0 2px 3px #061c1766;
+  font-size:18px;font-weight:850;line-height:1;
+}
+#full-table-root .table-seat-heading .table-seat-medallion[data-dealer-seat="true"] {
+  color:#472d13;background:radial-gradient(circle at 34% 25%,#fff4c7,#d6ac65 76%);
+  border-color:#e9cd88;box-shadow:inset 0 0 0 2px #b18d4d66,0 2px 3px #061c1766;
+}
+#full-table-root .table-seat-status[data-seat-turn="true"] {
+  color:#fff0c3;border:1px solid #a38b57;border-radius:6px;
+  background:#56462b;padding:3px 6px;
+}
+#full-table-root .table-game-surface .table-self-active {
+  border-color:#d2b478;box-shadow:inset 0 0 0 1px #c7a86d44,0 0 13px #e9be6122;
+}
+@media(max-width:560px) {
+  #full-table-root .table-seat-identity {gap:5px;}
+  #full-table-root .table-seat-heading .table-seat-medallion {
+    flex-basis:26px;width:26px;height:26px;font-size:14px;
+  }
+}

@@ -71,13 +71,24 @@ function riverSection(river, latest=null, seat=null) {
       d.tileId===latest.tileId&&!d.claimedByEventId?'table-last-discard':'')).join('')
       : '<span class="table-quiet">尚未捨牌</span>') + '</div>';
 }
+// Seat wind is relative to the dealer, not the prevailing round wind.
+export function seatWind(seat,dealerSeat) {
+  if(!Number.isInteger(seat)||seat<0||seat>3||!Number.isInteger(dealerSeat)||dealerSeat<0||dealerSeat>3)return '';
+  return ['東','南','西','北'][(seat-dealerSeat+4)%4];
+}
+function seatMedallion(seat,dealerSeat){
+  const wind=seatWind(seat,dealerSeat);
+  return wind?'<span class="table-seat-medallion" data-seat-wind="'+wind+'" data-player-seat="'+seat+
+    '" aria-label="門風：'+wind+'"'+(seat===dealerSeat?' data-dealer-seat="true"':'')+'>'+wind+'</span>':'';
+}
 export function OpponentSeat(person, currentSeat, dealerSeat, latest=null) {
   const active = currentSeat === person.seat;
   return '<section class="table-opponent table-seat-' + person.seat +
     (active ? ' table-seat-active' : '') + '" aria-label="' + SEATS[person.seat] + '">' +
-    '<div class="table-seat-heading"><strong>' + SEATS[person.seat] +
-    (dealerSeat === person.seat ? ' · 莊家' : '') + '</strong><span>' +
-    (active ? '行動中' : '等待') + '</span></div>' +
+    '<div class="table-seat-heading"><div class="table-seat-identity">'+seatMedallion(person.seat,dealerSeat)+
+    '<strong>' + SEATS[person.seat] + (dealerSeat === person.seat ? ' · 莊家' : '') +
+    '</strong></div><span class="table-seat-status"'+(active?' data-seat-turn="true"':'')+'>' +
+    (active ? '行動席' : '等待') + '</span></div>' +
     '<div class="table-concealed" aria-label="暗牌僅顯示張數">' +
     '<span class="table-back-stack" aria-hidden="true">' +
     (Number.isSafeInteger(person.concealedCount)&&person.concealedCount>=0&&person.concealedCount<=18?
@@ -108,15 +119,18 @@ export function observedOwnDraw(previous, view) {
   if(added.length!==1||typeFromTile(added[0])===null)return null;
   return {gameId:view.gameId,seat:view.audienceSeat,revision:view.asOfEventSeq,seq:draws[0].seq,tileId:added[0]};
 }
-export function PlayerHand(self, legalActions, selectedId, latest=null, drawnId=null) {
+export function PlayerHand(self, legalActions, selectedId, latest=null, drawnId=null, dealerSeat=null, currentSeat=null) {
   const byPhysicalId = new Map(legalActions.filter(a => a.kind === 'discard' && a.tileIds?.length === 1)
     .map(a => [a.tileIds[0], a]));
   const replacing=legalActions.some(a=>a.kind==='replace_flower');
   // Presentation order only. Keep every physical tile/action ID, and never mutate PlayerView.
   const ordered=[...self.concealed].sort((a,b)=>(typeFromTile(a)??34)-(typeFromTile(b)??34)||
     String(a.id).localeCompare(String(b.id),'en'));
-  return '<div class="table-self"><div class="table-seat-heading"><strong>你的手牌 · ' +
-    self.concealed.length + ' 張</strong><span>' +
+  const active=self.seat===currentSeat;
+  return '<div class="table-self'+(active?' table-self-active':'')+'"><div class="table-seat-heading">'+
+    '<div class="table-seat-identity">'+seatMedallion(self.seat,dealerSeat)+'<strong>你的手牌 · ' +
+    self.concealed.length + ' 張'+(self.seat===dealerSeat?' · 莊家':'')+'</strong></div><span'+
+    (active?' class="table-seat-status" data-seat-turn="true"':'')+'>' +
     (replacing?'補花階段：先選擇合法補花操作':'點牌選擇，二次確認')+
     '</span></div>' +
     (drawnId?'<span class="table-fresh-label">剛摸到的牌已標記</span>':'')+
@@ -249,6 +263,7 @@ export function TableView(snapshot,{selection=null,busy=false,error='',botStatus
   const humanCanAct=actions.length>0;
   const ended=view.round.phase==='settled';
   const claim=view.round.phase==='claim_window';
+  const activeSeat=ended||snapshot.paused?null:view.round.currentSeat;
   const phaseLabel=snapshot.paused?'對局已暫停':ended?'本局已結束':humanCanAct?
     (claim?'請回應合法宣告':'輪到你'):botConnected?'等待三位 Bot':'等待 Bot API';
   return '<header class="table-heading"><div><span class="table-overline">EXPERIMENTAL / '+
@@ -282,14 +297,14 @@ export function TableView(snapshot,{selection=null,busy=false,error='',botStatus
     (error?'<p role="alert" class="table-warning">'+escapeHtml(error)+'</p>':'')+
     '<div class="table-game-surface" data-table-theme="jade-room">'+
     '<div class="table-grid" role="group" aria-label="四人牌桌公開資訊">'+
-    OpponentSeat(opponents.get(2),view.round.currentSeat,view.round.dealerSeat,latest)+
-    OpponentSeat(opponents.get(3),view.round.currentSeat,view.round.dealerSeat,latest)+
+    OpponentSeat(opponents.get(2),activeSeat,view.round.dealerSeat,latest)+
+    OpponentSeat(opponents.get(3),activeSeat,view.round.dealerSeat,latest)+
     '<div class="table-felt" aria-live="polite"><strong>'+phaseLabel+
     '</strong>'+declarationNotice(notice)+'<span>'+escapeHtml(botStatus||lastEvent(view.publicEvents))+
     '</span>'+(latest?'<span class="table-latest-label">最新捨牌 · '+SEATS[latest.seat]+' · '+escapeHtml(tileAccessibleName(typeFromTile(latest.tileId)))+'</span>':'')+
     '<span class="table-center-wall">牌山 · '+escapeHtml(wallRemaining)+' 張</span><small>僅顯示當下的公開牌面與本人手牌</small></div>'+
-    OpponentSeat(opponents.get(1),view.round.currentSeat,view.round.dealerSeat,latest)+'</div>'+
-    robbery.html+PlayerHand(view.self,actions,selection,latest,drawnId)+'</div>'+
+    OpponentSeat(opponents.get(1),activeSeat,view.round.dealerSeat,latest)+'</div>'+
+    robbery.html+PlayerHand(view.self,actions,selection,latest,drawnId,view.round.dealerSeat,activeSeat)+'</div>'+
     (!robbery.valid?'<section class="table-actions" aria-label="契約不相容">操作已停止</section>':ended?'<section class="table-actions"><h3>正式 Rules 已結算本局</h3></section>':
       humanCanAct?ActionBar(actions,selection,busy||snapshot.paused,confirmation):
         '<section class="table-actions" aria-label="等待其他玩家"><h3>'+
