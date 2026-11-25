@@ -25,7 +25,7 @@ jobs:
           git fetch --no-tags origin 641fedef77421acdb49eea1a9e390f46a5f68adb
           git diff --name-only 641fedef77421acdb49eea1a9e390f46a5f68adb HEAD | while read -r file; do
             case "$file" in
-              scripts/academy-combined-coverage.mjs|tests/r75-academy-combined-coverage.test.js|.github/workflows/r75-academy-coverage.yml) ;;
+              scripts/academy-combined-coverage.mjs|scripts/academy-meld-review.mjs|tests/r75-academy-combined-coverage.test.js|tests/r75-academy-meld-review.test.js|.github/workflows/r75-academy-coverage.yml) ;;
               *) echo "::error::Unexpected change $file"; exit 1 ;;
             esac
           done
@@ -33,13 +33,14 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p r75-evidence
-          node --test tests/r75-academy-combined-coverage.test.js | tee r75-evidence/coverage.tap
+          node --test tests/r75-academy-combined-coverage.test.js tests/r75-academy-meld-review.test.js | tee r75-evidence/coverage.tap
           grep -Fxq '# skipped 0' r75-evidence/coverage.tap
       - name: Export read-only coverage report and verify runtime graph
         run: |
           set -euo pipefail
           git rev-parse HEAD > r75-evidence/tested-sha.txt
           node scripts/academy-combined-coverage.mjs > r75-evidence/coverage.json
+          node scripts/academy-meld-review.mjs > r75-evidence/meld-review.json
           npm install --no-save --package-lock=false --ignore-scripts acorn@8.15.0
           node scripts/runtime-precache.mjs > r75-evidence/runtime-graph.json
           node --input-type=module -e "import assert from 'node:assert/strict'; import {readFileSync} from 'node:fs'; const g=JSON.parse(readFileSync('r75-evidence/runtime-graph.json')); assert.equal(g.sourceModules,74); assert.equal(g.shellAssets,120);"
