@@ -633,3 +633,39 @@ body[data-table-view="replay"] #full-table-navigation {
     flex-basis:26px;width:26px;height:26px;font-size:14px;
   }
 }
+
+/* Three material palettes, scoped to the game surface. Legal actions,
+   geometry, ivory artwork, and selected/focus states remain identical. */
+#full-table-root .table-theme-control {display:flex;align-items:center;gap:6px;color:#d9e8de;font-size:12px;}
+#full-table-root .table-theme-control select {min-height:44px;min-width:100px;max-width:100%;padding:6px 9px;border:1px solid #73927d;border-radius:9px;color:#f3f4e9;background:#183b30;font:inherit;}
+#full-table-root .table-game-surface[data-table-theme="walnut-room"] {
+  border-color:#aa8156;
+  background:repeating-linear-gradient(95deg,#d6a46c09 0px 2px,transparent 2px 7px),
+    linear-gradient(145deg,#936039,#4b2e21 38%,#684226 76%,#b17a49);
+  box-shadow:inset 0 1px 1px #e7c08e99,0 7px 0 #34241c,0 16px 34px #0006;
+}
+#full-table-root [data-table-theme="walnut-room"] .table-grid {
+  border-color:#a98a61;
+  background:repeating-linear-gradient(38deg,#ffffff02 0 1px,transparent 1px 4px),radial-gradient(ellipse at 50% 46%,#625141,#443b32 65%,#302b26);
+}
+#full-table-root [data-table-theme="walnut-room"] .table-felt {background:#342b25;border-color:#a98a61;}
+#full-table-root [data-table-theme="walnut-room"] .table-self {background:linear-gradient(180deg,#524338,#382d27);border-color:#a98a61;}
+#full-table-root [data-table-theme="walnut-room"] .table-seat-active {background:#44382db0;}
+#full-table-root .table-game-surface[data-table-theme="midnight-room"] {
+  border-color:#8492a0;
+  background:linear-gradient(145deg,#525f6a,#242b35 38%,#303b4a 75%,#71808b);
+  box-shadow:inset 0 1px 1px #c8d7df66,0 7px 0 #1c252e,0 16px 34px #0007;
+}
+#full-table-root [data-table-theme="midnight-room"] .table-grid {
+  border-color:#526c85;
+  background:repeating-linear-gradient(48deg,#ffffff02 0 1px,transparent 1px 4px),radial-gradient(ellipse at 50% 46%,#395b77,#243e58 62%,#172d43);
+}
+#full-table-root [data-table-theme="midnight-room"] .table-felt {background:#1a3048;border-color:#7c91a3;}
+#full-table-root [data-table-theme="midnight-room"] .table-self {background:linear-gradient(180deg,#2d4962,#1e354d);border-color:#708da2;}
+#full-table-root [data-table-theme="midnight-room"] .table-seat-active {background:#203a50b0;}
+#full-table-root [data-table-theme="walnut-room"] .table-self-active,
+#full-table-root [data-table-theme="midnight-room"] .table-self-active {border-color:#e0bd7c;}
+@media(max-width:560px) {
+  #full-table-root .table-theme-control {gap:4px;}
+  #full-table-root .table-theme-control select {min-width:90px;}
+}

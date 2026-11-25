@@ -75,6 +75,25 @@ def main():
                     assert page.locator('.table-hand button[aria-pressed="true"]').count()==1
                     assert page.locator('[data-submit-action]').count()==1
                     assert page.locator('.table-version').inner_text()==revision
+                    if width in (1440,390):
+                        selector=page.locator('[data-table-theme-select]')
+                        actions=page.locator('.table-hand button[data-pick-action]').evaluate_all('(els)=>els.map(e=>e.dataset.pickAction)')
+                        selected=page.locator('.table-hand button[aria-pressed="true"]').get_attribute('data-pick-action')
+                        backgrounds=[]
+                        for theme in ['walnut-room','midnight-room','jade-room']:
+                            selector.select_option(theme)
+                            surface=page.locator('[data-table-theme="'+theme+'"]')
+                            assert surface.count()==1
+                            backgrounds.append(surface.locator('.table-grid').evaluate('(el)=>getComputedStyle(el).backgroundImage'))
+                            assert page.locator('.table-version').inner_text()==revision
+                            assert page.locator('.table-hand button[data-pick-action]').evaluate_all('(els)=>els.map(e=>e.dataset.pickAction)')==actions
+                            assert page.locator('.table-hand button[aria-pressed="true"]').get_attribute('data-pick-action')==selected
+                            assert page.evaluate('document.documentElement.scrollWidth<=innerWidth+1')
+                            assert page.locator('.table-hand button[data-pick-action]').first.bounding_box()['width']>=44
+                            if theme!='jade-room':
+                                surface.screenshot(path=str(out/f'{theme}-{width}x{height}.png'))
+                        assert len(set(backgrounds))==3
+                        report['themes']='PASS: distinct CSS surfaces; exact actions, selection and revision unchanged'
                     page.locator('[data-clear-selection]').click()
                     assert page.locator('.table-hand button[aria-pressed="true"]').count()==0
                     if width==1440:

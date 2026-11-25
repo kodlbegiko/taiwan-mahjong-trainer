@@ -246,9 +246,19 @@ export function RobberyNotice(view,window){
     '；等待 Rules 裁定，尚未完成加槓或替代摸牌。</p>'}:
     {valid:false,html:'<p role="alert" data-robbery-invalid>搶加槓公開契約不相容，已停止本次操作。</p>'};
 }
+export const TABLE_THEMES=Object.freeze({'jade-room':'翡翠綠桌','walnut-room':'胡桃木桌','midnight-room':'午夜藍桌'});
+export function normalizeTableTheme(value){
+  return typeof value==='string'&&Object.hasOwn(TABLE_THEMES,value)?value:'jade-room';
+}
+function tableThemeSelect(theme){
+  return '<label class="table-theme-control"><span>牌桌</span><select data-table-theme-select aria-label="牌桌主題">'+
+    Object.entries(TABLE_THEMES).map(([id,name])=>'<option value="'+id+'"'+(id===theme?' selected':'')+'>'+name+'</option>').join('')+
+    '</select></label>';
+}
 export function TableView(snapshot,{selection=null,busy=false,error='',botStatus='',
-  confirmation=null,restartPending=false,drawCue=null,soundEnabled=false,soundAvailable=true}={}) {
+  confirmation=null,restartPending=false,drawCue=null,soundEnabled=false,soundAvailable=true,theme='jade-room'}={}) {
   if(!snapshot)return '';
+  theme=normalizeTableTheme(theme);
   const {view,profile,wallRemaining,botConnected,replayConnected,storageWarning,replayWarning}=snapshot;
   const opponents=new Map(view.opponents.map(p=>[p.seat,p]));
   const robbery=RobberyNotice(view,snapshot.robbery);
@@ -270,7 +280,7 @@ export function TableView(snapshot,{selection=null,busy=false,error='',botStatus
     escapeHtml(profile.ruleVersion)+'</span><h1 id="table-heading" tabindex="-1">四人牌桌</h1>'+
     '<p>Rules Engine 決定牌局、宣告與結算；此規則與台數政策均未取得完整台灣通用驗證。</p></div>'+
     '<div class="table-header-tools"><span class="table-version">Revision '+
-    view.asOfEventSeq+'</span><button type="button" class="secondary table-sound-toggle" data-table-sound aria-pressed="'+
+    view.asOfEventSeq+'</span>'+tableThemeSelect(theme)+'<button type="button" class="secondary table-sound-toggle" data-table-sound aria-pressed="'+
     (soundEnabled?'true':'false')+'" '+(soundAvailable?'':'disabled')+'>'+
     (soundAvailable?(soundEnabled?'音效：開啟':'音效：關閉'):'音效：不支援')+'</button>'+
     '<button type="button" class="secondary" data-start-new '+
@@ -295,7 +305,7 @@ export function TableView(snapshot,{selection=null,busy=false,error='',botStatus
     (storageWarning?'<p role="status" class="table-warning">'+escapeHtml(storageWarning)+'</p>':'')+
     (replayWarning?'<p role="status" class="table-warning">'+escapeHtml(replayWarning)+'</p>':'')+
     (error?'<p role="alert" class="table-warning">'+escapeHtml(error)+'</p>':'')+
-    '<div class="table-game-surface" data-table-theme="jade-room">'+
+    '<div class="table-game-surface" data-table-theme="'+theme+'">'+
     '<div class="table-grid" role="group" aria-label="四人牌桌公開資訊">'+
     OpponentSeat(opponents.get(2),activeSeat,view.round.dealerSeat,latest)+
     OpponentSeat(opponents.get(3),activeSeat,view.round.dealerSeat,latest)+

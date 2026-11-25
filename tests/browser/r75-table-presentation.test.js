@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createSandboxSession,availableTableProfiles} from '../../src/table-ui/session.js';
-import {TableView,latestPublicDiscard,publicDeclaration,ActionBar,observedOwnDraw,seatWind} from '../../src/table-ui/view.js';
+import {TableView,latestPublicDiscard,publicDeclaration,ActionBar,observedOwnDraw,seatWind,normalizeTableTheme,TABLE_THEMES} from '../../src/table-ui/view.js';
 
 test('R7.5 sorted hand keeps exact physical actions, hidden tiles and input bytes',()=>{
   const p=availableTableProfiles().find(x=>x.profileId==='tw16-four-player-sandbox');
@@ -128,4 +128,23 @@ test('R7.5 wind medallions follow dealer rotation and do not invent a round wind
   assert.equal((html.match(/data-seat-turn="true"/g)??[]).length,1);
   assert.equal((TableView({...snap,paused:true}).match(/data-seat-turn="true"/g)??[]).length,0);
   assert.equal((html.match(/data-pick-action=/g)??[]).length,17);
+});
+
+test('R7.5 themes are allowlisted presentation only and preserve the authoritative action set',()=>{
+  assert.deepEqual(Object.keys(TABLE_THEMES),['jade-room','walnut-room','midnight-room']);
+  for(const value of [null,undefined,{},'__proto__','constructor','"><script>'])assert.equal(normalizeTableTheme(value),'jade-room');
+  const p=availableTableProfiles().find(x=>x.profileId==='tw16-four-player-sandbox');
+  const s=createSandboxSession(),snap=s.start({profileId:p.profileId,ruleVersion:p.ruleVersion});
+  const before=JSON.stringify(snap);
+  const selected=snap.view.legalActions[0].actionId;
+  const expected=Array.from(TableView(snap,{selection:selected}).matchAll(/data-pick-action="([^"]+)"/g),m=>m[1]);
+  for(const theme of Object.keys(TABLE_THEMES)){
+    const html=TableView(snap,{theme,selection:selected});
+    assert.ok(html.includes('data-table-theme="'+theme+'"'));
+    assert.ok(html.includes('value="'+theme+'" selected'));
+    assert.deepEqual(Array.from(html.matchAll(/data-pick-action="([^"]+)"/g),m=>m[1]),expected);
+    assert.ok(html.includes('data-submit-action="'+selected+'"'));
+  }
+  assert.ok(TableView(snap,{theme:'invalid'}).includes('data-table-theme="jade-room"'));
+  assert.equal(JSON.stringify(snap),before);
 });
