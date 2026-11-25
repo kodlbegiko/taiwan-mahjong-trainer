@@ -250,6 +250,17 @@ export const TABLE_THEMES=Object.freeze({'jade-room':'翡翠綠桌','walnut-room
 export function normalizeTableTheme(value){
   return typeof value==='string'&&Object.hasOwn(TABLE_THEMES,value)?value:'jade-room';
 }
+// Isolated cosmetic preference. Never write a game, Replay or Academy key.
+export const TABLE_THEME_KEY='tw-mahjong-trainer:table-theme:v1';
+export function readTableTheme(storage){
+  try{return normalizeTableTheme(storage?.getItem(TABLE_THEME_KEY));}
+  catch{return 'jade-room';}
+}
+export function writeTableTheme(storage,value){
+  if(typeof value!=='string'||!Object.hasOwn(TABLE_THEMES,value)||!storage)return false;
+  try{storage.setItem(TABLE_THEME_KEY,value);return true;}
+  catch{return false;}
+}
 function tableThemeSelect(theme){
   return '<label class="table-theme-control"><span>牌桌</span><select data-table-theme-select aria-label="牌桌主題">'+
     Object.entries(TABLE_THEMES).map(([id,name])=>'<option value="'+id+'"'+(id===theme?' selected':'')+'>'+name+'</option>').join('')+

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createSandboxSession,availableTableProfiles} from '../../src/table-ui/session.js';
-import {TableView,latestPublicDiscard,publicDeclaration,ActionBar,observedOwnDraw,seatWind,normalizeTableTheme,TABLE_THEMES} from '../../src/table-ui/view.js';
+import {TableView,latestPublicDiscard,publicDeclaration,ActionBar,observedOwnDraw,seatWind,normalizeTableTheme,TABLE_THEMES,readTableTheme,writeTableTheme,TABLE_THEME_KEY} from '../../src/table-ui/view.js';
 
 test('R7.5 sorted hand keeps exact physical actions, hidden tiles and input bytes',()=>{
   const p=availableTableProfiles().find(x=>x.profileId==='tw16-four-player-sandbox');
@@ -147,4 +147,23 @@ test('R7.5 themes are allowlisted presentation only and preserve the authoritati
   }
   assert.ok(TableView(snap,{theme:'invalid'}).includes('data-table-theme="jade-room"'));
   assert.equal(JSON.stringify(snap),before);
+});
+
+test('R7.5 theme preference has its own storage key and fails safely when storage is blocked',()=>{
+  const map=new Map([['game','unchanged'],['academy','unchanged'],['replay','unchanged']]);
+  const storage={getItem:k=>map.get(k),setItem:(k,v)=>map.set(k,v)};
+  assert.equal(readTableTheme(storage),'jade-room');
+  assert.equal(writeTableTheme(storage,'walnut-room'),true);
+  assert.equal(readTableTheme(storage),'walnut-room');
+  assert.deepEqual([...map.keys()],['game','academy','replay',TABLE_THEME_KEY]);
+  assert.equal(writeTableTheme(storage,'__proto__'),false);
+  assert.equal(readTableTheme(storage),'walnut-room');
+  assert.equal(map.get('game'),'unchanged');
+  map.set(TABLE_THEME_KEY,'invalid');
+  assert.equal(readTableTheme(storage),'jade-room');
+  assert.equal(map.get(TABLE_THEME_KEY),'invalid');
+  const blocked={getItem(){throw Error('blocked')},setItem(){throw Error('quota')}};
+  assert.equal(readTableTheme(blocked),'jade-room');
+  assert.equal(writeTableTheme(blocked,'midnight-room'),false);
+  assert.equal(writeTableTheme(null,'midnight-room'),false);
 });

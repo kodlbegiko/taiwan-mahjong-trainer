@@ -1,7 +1,7 @@
 import { createSandboxSession, availableTableProfiles } from './session.js';
 import { createFullRoundSession, fullRoundCapability } from './full-round.js';
 import { createDailyPanel } from './daily.js';
-import { TableView, ReplayControls, BotDifficultySelect, latestPublicDiscard, publicDeclaration, observedOwnDraw, normalizeTableTheme } from './view.js';
+import { TableView, ReplayControls, BotDifficultySelect, latestPublicDiscard, publicDeclaration, observedOwnDraw, normalizeTableTheme, readTableTheme, writeTableTheme } from './view.js';
 import { installTileFaceFallback } from '../tile-visuals.js';
 
 const root=document.querySelector('#full-table-root');
@@ -435,6 +435,7 @@ function onClick(event) {
 async function init() {
   if(!root||!controls)return;
   try{storage=window.localStorage;}catch{storage=null;}
+  tableTheme=readTableTheme(storage);
   session=createSandboxSession({storage});
   if(!forceSandbox&&fullRoundCapability()){
     try{session=await createFullRoundSession({storage});fullMode=true;}
@@ -456,6 +457,7 @@ async function init() {
       if(activePage!=='play')return;
       tableTheme=normalizeTableTheme(event.target.value);
       event.target.value=tableTheme;
+      writeTableTheme(storage,tableTheme);
       // No redraw, no sound, no Rules submission: only switch the CSS surface.
       const surface=root.querySelector('.table-game-surface');
       if(surface)surface.dataset.tableTheme=tableTheme;

@@ -65,6 +65,9 @@ def main():
                     assert report['backs']==48 and report['sorted'] and report['ownRiver'],report
                     assert report['winds']==sorted(['東','南','西','北']) and report['dealerCount']==1 and report['activeCount']==1,report
                     assert report['overflow']<=1 and not report['invalid'],report
+                    if width<=560:
+                        columns=page.locator('.table-self .table-hand').evaluate("(el)=>getComputedStyle(el).gridTemplateColumns.split(' ').length")
+                        assert report['rowCount']==(17+columns-1)//columns,report
                     assert not errors,errors
                     report['viewport']=[width,height]
                     evidence.append(report)
@@ -96,6 +99,19 @@ def main():
                         report['themes']='PASS: distinct CSS surfaces; exact actions, selection and revision unchanged'
                     page.locator('[data-clear-selection]').click()
                     assert page.locator('.table-hand button[aria-pressed="true"]').count()==0
+                    if width in (1440,390):
+                        before=page.evaluate("""() => Object.fromEntries(Object.keys(localStorage).filter(k=>k!=='tw-mahjong-trainer:table-theme:v1').sort().map(k=>[k,localStorage.getItem(k)]))""")
+                        page.locator('[data-table-theme-select]').select_option('walnut-room')
+                        assert page.evaluate("localStorage.getItem('tw-mahjong-trainer:table-theme:v1')")=='walnut-room'
+                        assert page.evaluate("""() => Object.fromEntries(Object.keys(localStorage).filter(k=>k!=='tw-mahjong-trainer:table-theme:v1').sort().map(k=>[k,localStorage.getItem(k)]))""")==before
+                        page.reload(wait_until='networkidle')
+                        page.locator('[data-table-nav="play"]').click()
+                        assert page.locator('[data-table-theme-select]').input_value()=='walnut-room'
+                        assert page.locator('[data-table-theme="walnut-room"]').count()==1
+                        assert page.locator('.table-version').inner_text()==revision
+                        assert page.locator('.table-hand button[data-pick-action]').count()==17
+                        page.locator('[data-table-theme-select]').select_option('jade-room')
+                        report['themePersistence']='PASS: reload preserved theme and game revision; other storage bytes unchanged by switch'
                     if width==1440:
                         sound=page.locator('[data-table-sound]')
                         assert sound.get_attribute('aria-pressed')=='false'

@@ -669,3 +669,25 @@ body[data-table-view="replay"] #full-table-navigation {
   #full-table-root .table-theme-control {gap:4px;}
   #full-table-root .table-theme-control select {min-width:90px;}
 }
+
+/* Compact portrait: use available width instead of hard-coded columns.
+   Uniform row heights keep the tile rack aligned and retain 44px targets. */
+@media(max-width:560px) {
+  #full-table-root .table-game-surface .table-hand {
+    grid-template-columns:repeat(auto-fill,minmax(48px,1fr));
+    gap:7px 4px;align-items:stretch;
+  }
+  #full-table-root .table-game-surface .table-hand .table-tile,
+  #full-table-root .table-game-surface .table-hand-flower {
+    aspect-ratio:auto;height:clamp(64px,17vw,80px);min-width:44px;min-height:44px;
+  }
+  #full-table-root .table-header-tools {
+    width:100%;justify-content:flex-start;gap:6px;
+  }
+  #full-table-root .table-header-tools .table-version {flex:1 1 100%;}
+  #full-table-root .table-theme-control {flex:1 1 128px;min-width:0;}
+  #full-table-root .table-theme-control select {flex:1;min-width:0;}
+  #full-table-root .table-actions .table-selected {display:flex;flex-wrap:wrap;gap:8px;}
+  #full-table-root .table-actions .table-selected [role="status"] {flex:1 1 100%;}
+  #full-table-root .table-actions .table-selected button {flex:1 1 100px;}
+}
