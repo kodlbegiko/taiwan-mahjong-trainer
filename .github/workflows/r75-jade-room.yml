@@ -1,0 +1,81 @@
+name: R7.5 Jade Room visual acceptance
+on:
+  push:
+    branches: [feat/r75-table-visual-redesign]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  contracts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Exact SHA and narrow UI change boundary
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git diff --name-only 641fedef77421acdb49eea1a9e390f46a5f68adb HEAD | while read -r path; do
+            case "$path" in
+              src/table-ui/table.css|src/table-ui/view.js|sw.js|tests/browser/r75-jade-room-gates.py|.github/workflows/r75-jade-room.yml) ;;
+              *) echo "::error::Unexpected change: $path"; exit 1 ;;
+            esac
+          done
+      - run: node --test tests/tile-assets-integrity.test.js tests/browser/table-session.test.js tests/pwa/sw-transaction.test.js
+      - name: Runtime graph
+        run: |
+          npm install --no-save --package-lock=false --ignore-scripts acorn@8.15.0
+          node scripts/runtime-precache.mjs > graph.json
+          node --input-type=module -e "import assert from 'node:assert/strict'; import {readFileSync} from 'node:fs'; const g=JSON.parse(readFileSync('graph.json')); assert.equal(g.sourceModules,74); assert.equal(g.shellAssets,120);"
+  visual-browser:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install playwright==1.56.0
+      - name: Actual Jade Room screenshots and geometry
+        run: |
+          mkdir -p evidence
+          git rev-parse HEAD > evidence/tested-sha.txt
+          python tests/browser/r75-jade-room-gates.py --evidence evidence
+      - name: Preserve existing mobile accessibility and keyboard gates
+        run: python tests/browser/mobile-pwa-a11y-gates.py --evidence evidence/mobile
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: jade-room-screenshots
+          path: evidence/
+          retention-days: 14
+  offline-upgrade:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install playwright==1.56.0
+      - name: Existing rollback and explicit update with real game history
+        run: PHASE3_REQUIRE_SINGLE_WINNER=1 python tests/pwa/mobile-update-gates.py --with-game-history --evidence evidence
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: jade-room-offline-evidence
+          path: evidence/
+          retention-days: 14
