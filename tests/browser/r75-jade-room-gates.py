@@ -39,6 +39,9 @@ def main():
                         });
                         return {theme:root.dataset.tableTheme,tiles:buttons.length,
                             opponents:root.querySelectorAll('.table-opponent').length,
+                            backs:root.querySelectorAll('.table-back-tile').length,
+                            sorted:buttons.map(b=>Number(new URL(b.querySelector('img').src).pathname.match(/(\\d+)\\.svg$/)[1])).every((n,i,a)=>i===0||a[i-1]<=n),
+                            ownRiver:!!root.querySelector('.table-self .table-own-river .table-river'),
                             overflow:document.documentElement.scrollWidth-innerWidth,
                             invalid:rects.filter(r=>r.w<44||r.h<44||r.iw<20||r.ih<20||r.clipped||r.left<bounds.left-1||r.right>bounds.right+1),
                             rowCount:new Set(rects.map(r=>Math.round(r.top))).size,
@@ -47,6 +50,7 @@ def main():
                     }""")
                     assert report['theme']=='jade-room',report
                     assert report['tiles']==17 and report['opponents']==3,report
+                    assert report['backs']==48 and report['sorted'] and report['ownRiver'],report
                     assert report['overflow']<=1 and not report['invalid'],report
                     assert not errors,errors
                     report['viewport']=[width,height]

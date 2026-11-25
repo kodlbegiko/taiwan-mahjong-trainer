@@ -18,7 +18,7 @@ def main():
                 const {tileFaceMarkup,tileAccessibleName}=await import('./src/tile-visuals.js');
                 const root=document.createElement('section');
                 root.id='tile-gallery';
-                root.style.cssText='padding:32px;background:#164b3c;color:#f9f3df;font:600 16px system-ui;max-width:1200px';
+                root.style.cssText='padding:32px;background:#164b3c;color:#f9f3df;font:600 16px 'Noto Sans CJK TC',system-ui;max-width:1200px';
                 const title=document.createElement('h1');title.textContent='Ivory Engraving · 34 tile faces';
                 root.append(title);
                 for(const [start,end] of [[0,9],[9,18],[18,27],[27,34]]){

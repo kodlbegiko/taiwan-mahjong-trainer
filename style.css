@@ -1,6 +1,6 @@
 :root {
   color-scheme: dark;
-  font-family: Inter, "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+  font-family: Inter, "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", "Noto Sans CJK TC", system-ui, sans-serif;
   font-synthesis: none;
   line-height: 1.55;
   background: #0b2224;
@@ -470,3 +470,8 @@ footer { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wr
   max-width:none; max-height:none; object-fit:contain;
 }
 .tile .tile-face-image[hidden] { display:none; }
+
+/* Shared carved-face relief. Preserve selected/focus and small tile geometry. */
+.tile .tile-face-image {
+  filter:drop-shadow(0 1px 0 #fff9) drop-shadow(0 -.6px 0 #3a2e2538);
+}

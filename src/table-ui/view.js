@@ -66,21 +66,28 @@ export function OpponentSeat(person, currentSeat, dealerSeat) {
     (dealerSeat === person.seat ? ' · 莊家' : '') + '</strong><span>' +
     (active ? '行動中' : '等待') + '</span></div>' +
     '<div class="table-concealed" aria-label="暗牌僅顯示張數">' +
-    escapeHtml(person.concealedCount) + ' 張暗牌</div>' +
-    meldSection(person.melds ?? []) + flowersSection(person.flowers ?? []) +
+    '<span class="table-back-stack" aria-hidden="true">' +
+    (Number.isSafeInteger(person.concealedCount)&&person.concealedCount>=0&&person.concealedCount<=18?
+      '<i class="table-back-tile"></i>'.repeat(person.concealedCount):'') + '</span>' +
+    '<span class="table-back-count">' + escapeHtml(person.concealedCount) + ' 張暗牌</span></div>' +
+    '<div class="table-seat-extras">' + meldSection(person.melds ?? []) + flowersSection(person.flowers ?? []) + '</div>' +
     riverSection(person.river ?? []) + '</section>';
 }
 export function PlayerHand(self, legalActions, selectedId) {
   const byPhysicalId = new Map(legalActions.filter(a => a.kind === 'discard' && a.tileIds?.length === 1)
     .map(a => [a.tileIds[0], a]));
   const replacing=legalActions.some(a=>a.kind==='replace_flower');
+  // Presentation order only. Keep every physical tile/action ID, and never mutate PlayerView.
+  const ordered=[...self.concealed].sort((a,b)=>(typeFromTile(a)??34)-(typeFromTile(b)??34)||
+    String(a.id).localeCompare(String(b.id),'en'));
   return '<div class="table-self"><div class="table-seat-heading"><strong>你的手牌 · ' +
     self.concealed.length + ' 張</strong><span>' +
     (replacing?'補花階段：先選擇合法補花操作':'點牌選擇，二次確認')+
     '</span></div>' +
+    '<div class="table-own-river"><span class="table-river-label">我的牌河</span>' + riverSection(self.river ?? []) + '</div>' +
     '<div class="table-hand" role="group" aria-label="自己的手牌">' +
-    self.concealed.map(tile => tileButton(tile, byPhysicalId.get(tile.id), selectedId === byPhysicalId.get(tile.id)?.actionId)).join('') +
-    '</div>' + meldSection(self.melds ?? []) + flowersSection(self.flowers ?? []) + riverSection(self.river ?? []) +
+    ordered.map(tile => tileButton(tile, byPhysicalId.get(tile.id), selectedId === byPhysicalId.get(tile.id)?.actionId)).join('') +
+    '</div><div class="table-seat-extras">' + meldSection(self.melds ?? []) + flowersSection(self.flowers ?? []) + '</div>' +
     '</div>';
 }
 function actionName(action) {
@@ -192,7 +199,7 @@ export function TableView(snapshot,{selection=null,busy=false,error='',botStatus
     OpponentSeat(opponents.get(3),view.round.currentSeat,view.round.dealerSeat)+
     '<div class="table-felt" aria-live="polite"><strong>'+phaseLabel+
     '</strong><span>'+escapeHtml(botStatus||lastEvent(view.publicEvents))+
-    '</span><small>僅顯示當下的公開牌面與本人手牌</small></div>'+
+    '</span><span class="table-center-wall">牌山 · '+escapeHtml(wallRemaining)+' 張</span><small>僅顯示當下的公開牌面與本人手牌</small></div>'+
     OpponentSeat(opponents.get(1),view.round.currentSeat,view.round.dealerSeat)+'</div>'+
     robbery.html+PlayerHand(view.self,actions,selection)+'</div>'+
     (!robbery.valid?'<section class="table-actions" aria-label="契約不相容">操作已停止</section>':ended?'<section class="table-actions"><h3>正式 Rules 已結算本局</h3></section>':

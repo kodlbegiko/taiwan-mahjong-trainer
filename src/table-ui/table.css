@@ -438,3 +438,104 @@ body[data-table-view="replay"] #full-table-navigation {
 @media(max-width:560px) {
   #full-table-root .table-hand .table-tile {border-right-width:2px;border-bottom-width:5px;border-radius:5px;}
 }
+
+/* R7.5 Carved Resin — continuous felt, real concealed-count silhouettes and
+   an inward-facing own river. Keep all Rules-backed controls and DOM IDs. */
+#full-table-root .table-game-surface {
+  padding: 12px;
+  border: 2px solid #806d48;
+  border-radius: 22px;
+  background: linear-gradient(150deg,#725e3b,#383429 26%,#292d23 73%,#54452c);
+  box-shadow: inset 0 1px 1px #b49c69aa, 0 7px 0 #24251e, 0 16px 34px #0006;
+}
+#full-table-root .table-grid {
+  grid-template-columns: minmax(0,1fr) minmax(0,1.24fr) minmax(0,1fr);
+  padding: 18px; gap: 14px; align-items: start;
+  border: 1px solid #456b53; border-radius: 13px;
+  background: repeating-linear-gradient(48deg,#ffffff02 0 1px,transparent 1px 4px),
+    radial-gradient(ellipse at 50% 46%,#285f4e,#1b493b 60%,#11372d);
+}
+#full-table-root .table-game-surface .table-opponent {
+  padding: 6px 8px; border: 1px solid transparent; background: transparent;
+  box-shadow: none; border-radius: 9px;
+}
+#full-table-root .table-game-surface .table-seat-active {
+  border-color: #dbb975; background: #193d30b0; box-shadow: 0 0 14px #e2be6821;
+}
+#full-table-root .table-game-surface .table-seat-2 .table-seat-heading {
+  justify-content:center; gap: 14px;
+}
+#full-table-root .table-game-surface .table-concealed {
+  background: none; border: 0; box-shadow: none; text-shadow: none;
+  display:flex; flex-direction:column; align-items:center; gap:5px; padding: 0; min-height: 0;
+}
+#full-table-root .table-back-stack {
+  display:flex; width:100%; min-width:0; gap:2px; justify-content:center;
+}
+#full-table-root .table-back-tile {
+  display:block; flex:0 1 17px; height:35px; min-width:0;
+  background:linear-gradient(130deg,#72aa86 0%,#3c8a65 20%,#276d50 65%,#1c4d3a 100%);
+  border:1px solid #a0b992; border-right:2px solid #225640;
+  border-bottom:5px solid #d5d1b9; border-radius:3px;
+  box-shadow:inset 0 1px 0 #cee3ba88,0 2px 2px #05221999;
+}
+#full-table-root .table-back-count { color:#d9e5d6; font-size:11px; }
+#full-table-root .table-seat-extras { display:flex; align-items:center; flex-wrap:wrap; gap:4px 10px; min-width:0; }
+#full-table-root .table-seat-extras .table-melds,
+#full-table-root .table-seat-extras .table-flowers { margin:2px 0; }
+#full-table-root .table-game-surface .table-felt {
+  margin: 0; min-height: 130px; align-self:center; border-radius:12px;
+  background: #14392f; box-shadow:inset 0 0 0 3px #46715a44,0 3px 9px #071c1655;
+}
+#full-table-root .table-center-wall {
+  border:1px solid #63866f; border-radius:20px; padding:2px 10px;
+  font-variant-numeric:tabular-nums; color:#e9ead7;
+}
+#full-table-root .table-game-surface .table-self {
+  background:linear-gradient(180deg,#19473a,#143b31);
+  border-color:#557b62; gap:8px; margin-top:8px; padding:10px 13px 12px;
+}
+#full-table-root .table-own-river {
+  display:flex; flex-direction:column; align-items:center; gap:4px; min-width:0;
+  padding:5px 8px 9px; border-bottom:1px solid #648c6c66;
+}
+#full-table-root .table-river-label { font-size:11px; color:#d4dfcf; }
+#full-table-root .table-own-river .table-river {
+  width:100%; justify-content:center; grid-template-columns:repeat(12,minmax(0,30px)); margin-top:0;
+}
+#full-table-root .table-own-river .table-quiet { text-align:center; }
+#full-table-root .table-hand .table-tile {
+  border-radius:8px; border:1px solid #dcd3be; border-right:5px solid #c3b99f;
+  border-bottom:11px solid #28694f;
+  background: linear-gradient(125deg,#fffefa 0%,#fffcf1 42%,#ede6d4 100%);
+  box-shadow: inset 1px 1px 0 #fff, inset -1px -1px 2px #c2b59a,
+    0 2px 0 #164432,0 5px 0 #0e3628,0 8px 8px #051b1466;
+}
+#full-table-root .table-hand .table-tile::before {
+  inset:1px; border-radius:6px; box-shadow:inset 0 0 0 1px #ffffffb0,inset 0 -2px 4px #b9a98c33;
+}
+#full-table-root .table-hand .tile-face-image {
+  inset:2px; width:calc(100% - 4px); height:calc(100% - 4px);
+  filter:drop-shadow(0 1px 0 #fff8) drop-shadow(0 -0.6px 0 #3a2e2538);
+}
+#full-table-root .table-hand .table-tile.is-selected {
+  outline:3px solid #ffe093; outline-offset:2px;
+  box-shadow:inset 1px 1px 0 #fff,0 4px 0 #185440,0 8px 0 #0e3628,0 12px 12px #0008;
+}
+@media(max-width:1080px) {
+  #full-table-root .table-grid { padding:10px; gap:8px; }
+  #full-table-root .table-back-tile { height:28px; }
+  #full-table-root .table-hand .table-tile { border-right-width:3px; border-bottom-width:8px; }
+}
+@media(max-width:560px) {
+  #full-table-root .table-game-surface { padding:5px; border-radius:14px; }
+  #full-table-root .table-grid { grid-template-columns:repeat(2,minmax(0,1fr)); padding:7px; gap:6px; }
+  #full-table-root .table-game-surface .table-opponent { padding:4px; }
+  #full-table-root .table-game-surface .table-felt { min-height:0; padding:8px; }
+  #full-table-root .table-back-stack {gap:1px;}
+  #full-table-root .table-back-tile {height:22px;border-right-width:1px;border-bottom-width:3px;}
+  #full-table-root .table-game-surface .table-self {padding:8px 6px 12px;}
+  #full-table-root .table-own-river {padding:3px 3px 6px;}
+  #full-table-root .table-own-river .table-river {grid-template-columns:repeat(8,minmax(0,27px));gap:3px;}
+  #full-table-root .table-hand .table-tile {border-radius:5px;border-right-width:2px;border-bottom-width:7px;}
+}
