@@ -797,7 +797,7 @@ body[data-table-view="replay"] #full-table-navigation {
   }
   #full-table-root [data-table-camera="perspective"] :is(.table-seat-1,.table-seat-3) {
     display:grid;grid-template-columns:56px minmax(0,1fr);
-    grid-template-rows:auto 1fr auto;
+    grid-template-rows:auto max-content minmax(0,1fr);
     grid-template-areas:"heading heading" "rack river" "rack extras";
     gap:5px 10px;align-content:start;align-items:start;
   }
@@ -849,11 +849,11 @@ body[data-table-view="replay"] #full-table-navigation {
 }
 #full-table-root .table-claimed-discard .tile-face-image {
   position:absolute;inset:1px;width:calc(100% - 2px);height:calc(100% - 2px);
-  object-fit:contain;opacity:.32;background:#e8e7d5;border-radius:3px;
+  object-fit:contain;opacity:.62;background:#e8e7d5;border-radius:3px;
 }
 #full-table-root .table-claimed-discard i {
   position:relative;align-self:end;justify-self:end;
-  background:#203e32;color:#ecedda;border:1px solid #8ca28d;
+  background:#18382b;color:#fff5d8;border:1px solid #b7c5aa;
   border-radius:3px;font:700 9px/1.2 system-ui;padding:1px;
 }
 #full-table-root .table-seat-extras .table-melds {

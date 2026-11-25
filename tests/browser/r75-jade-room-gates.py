@@ -240,12 +240,21 @@ def main():
                           claimed:r.querySelectorAll('.table-claimed-discard').length,
                           ghostMeshes:r.querySelectorAll('.table-claimed-discard .table-tile-extrusion').length
                         })),melds:root.querySelectorAll('.table-meld').length,
+                        claimedOpacity:Number(getComputedStyle(root.querySelector('.table-claimed-discard img')).opacity),
+                        sideRiverMeldGaps:[...root.querySelectorAll('.table-seat-1,.table-seat-3')].map(seat=>{
+                          const river=seat.querySelector('.table-river').getBoundingClientRect();
+                          const extras=seat.querySelector('.table-seat-extras').getBoundingClientRect();
+                          return extras.top-river.bottom;
+                        }),
                         overflow:document.documentElement.scrollWidth-innerWidth,
                         handTargets:[...root.querySelectorAll('.table-hand button')].every(b=>b.getBoundingClientRect().width>=44&&b.getBoundingClientRect().height>=44)
                       };
                     }""")
                     assert len(report['rivers'])==4 and all(r=={'history':24,'live':20,'physical':20,'claimed':4,'ghostMeshes':0} for r in report['rivers']),report
                     assert report['melds']==12 and report['overflow']<=1 and report['handTargets'],report
+                    assert .55<=report['claimedOpacity']<1,report
+                    if width==1440:
+                        assert all(-2<=gap<=24 for gap in report['sideRiverMeldGaps']),report
                     page.locator('.table-game-surface').screenshot(path=str(out/f'layout-stress-fixture-{width}.png'))
                     evidence.append(report)
                     print('PASS synthetic layout stress',json.dumps(report,ensure_ascii=False))
