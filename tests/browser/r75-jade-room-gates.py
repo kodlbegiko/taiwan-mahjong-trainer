@@ -113,6 +113,14 @@ def main():
                         assert surface.locator('.table-hand .table-tile-extrusion').count()==0
                         if width==1440:
                             assert surface.locator('.table-grid').evaluate('(el)=>getComputedStyle(el).transform')!='none'
+                            for seat in (1,3):
+                                stack=surface.locator(f'.table-seat-{seat} .table-back-stack')
+                                assert stack.evaluate('(el)=>getComputedStyle(el).flexDirection')=='column'
+                                rect=stack.bounding_box()
+                                assert rect['height']>rect['width']*2,rect
+                            assert surface.locator('.table-seat-2 .table-back-stack').evaluate('(el)=>getComputedStyle(el).flexDirection')=='row'
+                        else:
+                            assert surface.locator('.table-seat-1 .table-back-stack').evaluate('(el)=>getComputedStyle(el).flexDirection')=='row'
                         assert page.locator('.table-version').inner_text()==revision
                         assert page.locator('.table-hand button[data-pick-action]').evaluate_all('(els)=>els.map(e=>e.dataset.pickAction)')==actions
                         assert page.locator('.table-hand button[aria-pressed="true"]').get_attribute('data-pick-action')==selected

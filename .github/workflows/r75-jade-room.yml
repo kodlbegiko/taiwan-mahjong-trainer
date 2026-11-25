@@ -87,3 +87,30 @@ jobs:
           name: jade-room-offline-evidence
           path: evidence/
           retention-days: 14
+
+  real-full-match:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install playwright==1.56.0
+      - name: Verify exact source
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          mkdir -p full-match-evidence
+          git rev-parse HEAD > full-match-evidence/tested-sha.txt
+      - name: Real full round, legal declarations, terminal replay and Daily offline
+        run: PHASE3_REQUIRE_SINGLE_WINNER=1 python tests/browser/full-table-ui-r3-gates.py --screenshots full-match-evidence
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: jade-room-full-match
+          path: full-match-evidence/
+          retention-days: 14
