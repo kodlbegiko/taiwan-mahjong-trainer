@@ -1,0 +1,51 @@
+name: R7.5 Academy coverage audit
+on:
+  push:
+    branches: [feat/r75-academy-coverage-audit]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  coverage:
+    if: github.ref_name == 'feat/r75-academy-coverage-audit'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify exact SHA and QA-only change scope
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git fetch --no-tags origin 641fedef77421acdb49eea1a9e390f46a5f68adb
+          git diff --name-only 641fedef77421acdb49eea1a9e390f46a5f68adb HEAD | while read -r file; do
+            case "$file" in
+              scripts/academy-combined-coverage.mjs|tests/r75-academy-combined-coverage.test.js|.github/workflows/r75-academy-coverage.yml) ;;
+              *) echo "::error::Unexpected change $file"; exit 1 ;;
+            esac
+          done
+      - name: Combined coverage tests
+        run: |
+          set -euo pipefail
+          mkdir -p r75-evidence
+          node --test tests/r75-academy-combined-coverage.test.js | tee r75-evidence/coverage.tap
+          grep -Fxq '# skipped 0' r75-evidence/coverage.tap
+      - name: Export read-only coverage report and verify runtime graph
+        run: |
+          set -euo pipefail
+          git rev-parse HEAD > r75-evidence/tested-sha.txt
+          node scripts/academy-combined-coverage.mjs > r75-evidence/coverage.json
+          npm install --no-save --package-lock=false --ignore-scripts acorn@8.15.0
+          node scripts/runtime-precache.mjs > r75-evidence/runtime-graph.json
+          node --input-type=module -e "import assert from 'node:assert/strict'; import {readFileSync} from 'node:fs'; const g=JSON.parse(readFileSync('r75-evidence/runtime-graph.json')); assert.equal(g.sourceModules,74); assert.equal(g.shellAssets,120);"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r75-coverage-evidence
+          path: r75-evidence/
+          retention-days: 7
