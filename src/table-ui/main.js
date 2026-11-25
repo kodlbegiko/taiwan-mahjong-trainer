@@ -446,7 +446,7 @@ async function init() {
   // Add the Daily route without touching index.html (AI6 owns shared shell).
   if(!controls.querySelector('[data-table-nav="daily"]')){
     const nav=document.createElement('button');
-    nav.type='button';nav.dataset.tableNav='daily';
+    nav.type='button';nav.dataset.tableNav='daily';nav.disabled=true;
     nav.setAttribute('aria-current','false');nav.textContent='今日正式訓練';
     controls.appendChild(nav);
   }
@@ -495,5 +495,10 @@ async function init() {
     catch(e){lastError='恢復後的 Bot 自動輪轉已安全停止：'+e.message;}
     finally{busy=false;botStatus='';draw();}
   }
+  // Enable only after listeners, restore and any restored Bot turn are ready.
+  // Static HTML starts disabled so clicks cannot vanish before module startup.
+  controls.dataset.tableReady='true';
+  controls.setAttribute('aria-busy','false');
+  for(const button of controls.querySelectorAll('[data-table-nav]'))button.disabled=false;
 }
 void init();

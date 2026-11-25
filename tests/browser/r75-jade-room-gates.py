@@ -14,6 +14,34 @@ def main():
     with served_site() as (url,_), sync_playwright() as pw:
         browser=pw.chromium.launch(channel='chrome',headless=True,args=['--no-sandbox'])
         try:
+            # Fail closed if the entry module never loads: the static HTML
+            # must not advertise a clickable yet unbound navigation action.
+            blocked=browser.new_context(service_workers='block')
+            try:
+                page=blocked.new_page()
+                page.route('**/src/table-ui/main.js',lambda route: route.abort())
+                page.goto(url,wait_until='networkidle')
+                assert page.locator('[data-table-nav="play"]').is_disabled()
+                assert page.locator('[data-table-nav="replay"]').is_disabled()
+                assert page.locator('#full-table-navigation').get_attribute('data-table-ready')=='false'
+                assert page.locator('#full-table-root').is_hidden()
+            finally:
+                blocked.close()
+            # Real full-mode startup: click once as soon as HTML exists.
+            # Playwright's normal actionability must wait for enablement.
+            cold=browser.new_context(viewport={'width':390,'height':844},service_workers='block')
+            try:
+                page=cold.new_page()
+                page.goto(url,wait_until='commit')
+                page.locator('[data-table-nav="play"]').click()
+                assert page.locator('#full-table-navigation').get_attribute('data-table-ready')=='true'
+                assert page.locator('#full-table-navigation').get_attribute('aria-busy')=='false'
+                page.locator('#table-profile').wait_for()
+                assert any('tw16-configurable-table' in x for x in page.locator('#table-profile option').all_text_contents())
+                assert page.locator('#table-bot-difficulty').is_visible()
+                print('PASS cold full-mode navigation; blocked module stays disabled')
+            finally:
+                cold.close()
             for width,height in [(1440,900),(1024,768),(900,700),(741,850),(681,850),(561,800),(430,932),(390,844),(375,812),(320,640),(844,390)]:
                 ctx=browser.new_context(viewport={'width':width,'height':height},
                     reduced_motion='reduce',device_scale_factor=1)
