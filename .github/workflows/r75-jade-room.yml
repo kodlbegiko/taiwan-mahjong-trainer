@@ -24,7 +24,7 @@ jobs:
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           git diff --name-only 641fedef77421acdb49eea1a9e390f46a5f68adb HEAD | while read -r path; do
             case "$path" in
-              src/table-ui/table.css|src/table-ui/view.js|sw.js|tests/browser/r75-jade-room-gates.py|.github/workflows/r75-jade-room.yml) ;;
+              style.css|public/tiles/*.svg|src/table-ui/table.css|src/table-ui/view.js|sw.js|tests/browser/r75-jade-room-gates.py|tests/browser/r75-tile-gallery.py|.github/workflows/r75-jade-room.yml) ;;
               *) echo "::error::Unexpected change: $path"; exit 1 ;;
             esac
           done
@@ -51,6 +51,8 @@ jobs:
           mkdir -p evidence
           git rev-parse HEAD > evidence/tested-sha.txt
           python tests/browser/r75-jade-room-gates.py --evidence evidence
+      - name: Render complete 34-tile gallery
+        run: python tests/browser/r75-tile-gallery.py --evidence evidence
       - name: Preserve existing mobile accessibility and keyboard gates
         run: python tests/browser/mobile-pwa-a11y-gates.py --evidence evidence/mobile
       - uses: actions/upload-artifact@v4
