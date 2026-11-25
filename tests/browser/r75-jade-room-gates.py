@@ -1,0 +1,71 @@
+"""Visual geometry checks for actual local sandbox table, not a mockup."""
+import argparse
+import json
+from pathlib import Path
+from playwright.sync_api import sync_playwright
+from _release_site import served_site
+
+def main():
+    p=argparse.ArgumentParser()
+    p.add_argument('--evidence',type=Path,required=True)
+    out=p.parse_args().evidence
+    out.mkdir(parents=True,exist_ok=True)
+    evidence=[]
+    with served_site() as (url,_), sync_playwright() as pw:
+        browser=pw.chromium.launch(channel='chrome',headless=True,args=['--no-sandbox'])
+        try:
+            for width,height in [(1440,900),(1024,768),(900,700),(741,850),(681,850),(561,800),(430,932),(390,844),(375,812),(320,640),(844,390)]:
+                ctx=browser.new_context(viewport={'width':width,'height':height},
+                    reduced_motion='reduce',device_scale_factor=1)
+                page=ctx.new_page()
+                errors=[]
+                page.on('pageerror',lambda e:errors.append(str(e)))
+                try:
+                    page.goto(url+'?table=sandbox',wait_until='networkidle')
+                    page.locator('[data-table-nav="play"]').click()
+                    page.locator('#table-profile').wait_for()
+                    page.locator('#full-table-root [data-start-new]').click()
+                    page.locator('.table-hand button[data-pick-action]').first.wait_for()
+                    page.wait_for_function("""() => [...document.querySelectorAll('.table-hand img')].every(i=>i.complete&&i.naturalWidth>0)""")
+                    report=page.evaluate("""() => {
+                        const root=document.querySelector('[data-table-theme="jade-room"]');
+                        const hand=root.querySelector('.table-hand');
+                        const bounds=hand.getBoundingClientRect();
+                        const buttons=[...hand.querySelectorAll('button[data-pick-action]')];
+                        const rects=buttons.map(b=>{
+                            const r=b.getBoundingClientRect(), i=b.querySelector('img').getBoundingClientRect();
+                            return {w:r.width,h:r.height,left:r.left,right:r.right,top:r.top,bottom:r.bottom,
+                                iw:i.width,ih:i.height,clipped:i.left<r.left-1||i.right>r.right+1||i.top<r.top-1||i.bottom>r.bottom+1};
+                        });
+                        return {theme:root.dataset.tableTheme,tiles:buttons.length,
+                            opponents:root.querySelectorAll('.table-opponent').length,
+                            overflow:document.documentElement.scrollWidth-innerWidth,
+                            invalid:rects.filter(r=>r.w<44||r.h<44||r.iw<20||r.ih<20||r.clipped||r.left<bounds.left-1||r.right>bounds.right+1),
+                            rowCount:new Set(rects.map(r=>Math.round(r.top))).size,
+                            minTileWidth:Math.min(...rects.map(r=>r.w)),
+                            minFaceWidth:Math.min(...rects.map(r=>r.iw))};
+                    }""")
+                    assert report['theme']=='jade-room',report
+                    assert report['tiles']==17 and report['opponents']==3,report
+                    assert report['overflow']<=1 and not report['invalid'],report
+                    assert not errors,errors
+                    report['viewport']=[width,height]
+                    evidence.append(report)
+                    page.locator('[data-table-theme="jade-room"]').screenshot(path=str(out/f'jade-{width}x{height}.png'))
+                    first=page.locator('.table-hand button[data-pick-action]').first
+                    revision=page.locator('.table-version').inner_text()
+                    first.click()
+                    assert page.locator('.table-hand button[aria-pressed="true"]').count()==1
+                    assert page.locator('[data-submit-action]').count()==1
+                    assert page.locator('.table-version').inner_text()==revision
+                    page.locator('[data-clear-selection]').click()
+                    assert page.locator('.table-hand button[aria-pressed="true"]').count()==0
+                    print('PASS',width,height,json.dumps(report,ensure_ascii=False))
+                finally:
+                    ctx.close()
+        finally:
+            browser.close()
+    (out/'jade-geometry.json').write_text(json.dumps(evidence,indent=2),encoding='utf-8')
+
+if __name__=='__main__':
+    main()
