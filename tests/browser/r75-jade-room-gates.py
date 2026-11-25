@@ -180,6 +180,49 @@ def main():
                     print('PASS',width,height,json.dumps(report,ensure_ascii=False))
                 finally:
                     ctx.close()
+            # Renderer stress fixture, NOT a played round or valid Rules state.
+            # Render the real TableView/CSS without touching live game storage.
+            for width,height in [(1440,900),(390,844),(320,640)]:
+                ctx=browser.new_context(viewport={'width':width,'height':height},reduced_motion='reduce')
+                page=ctx.new_page()
+                try:
+                    page.goto(url+'?table=sandbox',wait_until='networkidle')
+                    page.evaluate("""async () => {
+                        const {TableView}=await import('./src/table-ui/view.js');
+                        const {createSandboxSession,availableTableProfiles}=await import('./src/table-ui/session.js');
+                        const p=availableTableProfiles().find(x=>x.profileId==='tw16-four-player-sandbox');
+                        const snap=createSandboxSession().start({profileId:p.profileId,ruleVersion:p.ruleVersion});
+                        for(const person of [snap.view.self,...snap.view.opponents]){
+                          person.river=Array.from({length:24},(_,i)=>({tileId:'t:'+(i%34)+':0',seq:i+1,
+                            ...(i%6===0?{claimedByEventId:'fixture-'+i}:{})}));
+                          person.melds=Array.from({length:3},(_,i)=>({kind:'kong',tileIds:Array.from({length:4},(_,j)=>'t:'+i+':'+j)}));
+                        }
+                        const root=document.querySelector('#full-table-root');
+                        document.body.dataset.tableView='play';
+                        root.hidden=false;
+                        root.innerHTML=TableView(snap,{camera:'perspective'});
+                    }""")
+                    page.wait_for_function("""() => [...document.querySelectorAll('#full-table-root img')].every(i=>i.complete&&i.naturalWidth>0)""")
+                    report=page.evaluate("""() => {
+                      const root=document.querySelector('.table-game-surface');
+                      return {fixture:true,viewport:[innerWidth,innerHeight],
+                        rivers:[...root.querySelectorAll('.table-river')].map(r=>({
+                          history:Number(r.dataset.riverHistoryCount),live:Number(r.dataset.riverLiveCount),
+                          physical:r.querySelectorAll('.table-tile').length,
+                          claimed:r.querySelectorAll('.table-claimed-discard').length,
+                          ghostMeshes:r.querySelectorAll('.table-claimed-discard .table-tile-extrusion').length
+                        })),melds:root.querySelectorAll('.table-meld').length,
+                        overflow:document.documentElement.scrollWidth-innerWidth,
+                        handTargets:[...root.querySelectorAll('.table-hand button')].every(b=>b.getBoundingClientRect().width>=44&&b.getBoundingClientRect().height>=44)
+                      };
+                    }""")
+                    assert len(report['rivers'])==4 and all(r=={'history':24,'live':20,'physical':20,'claimed':4,'ghostMeshes':0} for r in report['rivers']),report
+                    assert report['melds']==12 and report['overflow']<=1 and report['handTargets'],report
+                    page.locator('.table-game-surface').screenshot(path=str(out/f'layout-stress-fixture-{width}.png'))
+                    evidence.append(report)
+                    print('PASS synthetic layout stress',json.dumps(report,ensure_ascii=False))
+                finally:
+                    ctx.close()
         finally:
             browser.close()
     (out/'jade-geometry.json').write_text(json.dumps(evidence,indent=2),encoding='utf-8')

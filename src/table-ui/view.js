@@ -71,10 +71,24 @@ export function latestPublicDiscard(view) {
   return matches.length===1?{seat:e.actorSeat,seq:e.seq,tileId:e.payload.tileId}:null;
 }
 function riverSection(river, latest=null, seat=null) {
-  return '<div class="table-river" role="group" aria-label="牌河">' +
-    (river.length ? river.map(d => tileSpan(d, latest&&latest.seat===seat&&d.seq===latest.seq&&
-      d.tileId===latest.tileId&&!d.claimedByEventId?'table-last-discard':'')).join('')
-      : '<span class="table-quiet">尚未捨牌</span>') + '</div>';
+  // The ledger retains claimed discards for history. Render these as flat
+  // historical markers, never as a second live physical tile.
+  const remaining=river.filter(d=>!d.claimedByEventId).length;
+  return '<div class="table-river" role="group" aria-label="牌河，共 '+river.length+
+    ' 次捨牌，'+remaining+' 張留在牌河" data-river-history-count="'+river.length+
+    '" data-river-live-count="'+remaining+'">' +
+    (river.length ? '<span class="table-river-summary">牌河 '+remaining+' 張'+
+      (remaining!==river.length?' · '+(river.length-remaining)+' 已取牌':'')+'</span>'+
+      river.map(d=>{
+        if(d.claimedByEventId){
+          const t=typeFromTile(d);
+          return '<span class="table-claimed-discard" role="img" aria-label="'+
+            escapeHtml(t===null?'已取走的棄牌':tileAccessibleName(t)+'；已被取走')+
+            '">'+(t===null?'':tileFaceMarkup(t))+'<i aria-hidden="true">取</i></span>';
+        }
+        return tileSpan(d,latest&&latest.seat===seat&&d.seq===latest.seq&&
+          d.tileId===latest.tileId?'table-last-discard':'');
+      }).join('') : '<span class="table-quiet">尚未捨牌</span>') + '</div>';
 }
 // Seat wind is relative to the dealer, not the prevailing round wind.
 export function seatWind(seat,dealerSeat) {

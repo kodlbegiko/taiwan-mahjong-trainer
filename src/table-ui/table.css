@@ -835,3 +835,51 @@ body[data-table-view="replay"] #full-table-navigation {
   #full-table-root [data-table-camera="perspective"] .table-seat-2 .table-seat-extras {justify-content:center;}
   #full-table-root [data-table-camera="perspective"] .table-felt {min-height:110px;padding:9px 12px;}
 }
+
+/* Long-round public history: distinguish claimed tiles from live physical
+   discards. No scrolling subpanels or clipped ledger entries. */
+#full-table-root .table-river-summary {
+  grid-column:1/-1;font-size:10px;line-height:1.4;
+  color:#d1e2d1;text-align:start;overflow-wrap:anywhere;
+}
+#full-table-root .table-claimed-discard {
+  position:relative;display:grid;place-items:center;width:100%;min-width:0;
+  aspect-ratio:.72;border:1px dashed #94a99a;border-radius:4px;
+  background:#132c2866;box-sizing:border-box;
+}
+#full-table-root .table-claimed-discard .tile-face-image {
+  position:absolute;inset:1px;width:calc(100% - 2px);height:calc(100% - 2px);
+  object-fit:contain;opacity:.32;background:#e8e7d5;border-radius:3px;
+}
+#full-table-root .table-claimed-discard i {
+  position:relative;align-self:end;justify-self:end;
+  background:#203e32;color:#ecedda;border:1px solid #8ca28d;
+  border-radius:3px;font:700 9px/1.2 system-ui;padding:1px;
+}
+#full-table-root .table-seat-extras .table-melds {
+  max-width:100%;flex:0 1 auto;gap:4px 6px;
+}
+#full-table-root .table-seat-extras .table-meld {
+  min-width:0;max-width:100%;flex-wrap:nowrap;gap:2px;
+}
+#full-table-root .table-seat-extras .table-meld .table-tile {
+  min-width:0;flex:0 1 24px;
+}
+@media(max-width:560px) {
+  #full-table-root .table-seat-extras .table-meld .table-tile {flex-basis:19px;}
+  #full-table-root .table-game-surface .table-opponent .table-river {
+    grid-template-columns:repeat(auto-fill,minmax(min(24px,100%),1fr));
+  }
+  #full-table-root .table-game-surface .table-opponent .table-river .table-tile,
+  #full-table-root .table-game-surface .table-opponent .table-claimed-discard {
+    max-width:32px;
+  }
+}
+@media(min-width:901px) {
+  #full-table-root [data-table-camera="perspective"] :is(.table-seat-1,.table-seat-3) .table-river {
+    min-width:0;grid-template-columns:repeat(auto-fill,minmax(min(25px,100%),1fr));
+  }
+  #full-table-root [data-table-camera="perspective"] :is(.table-seat-1,.table-seat-3) .table-river :is(.table-tile,.table-claimed-discard) {
+    max-width:32px;
+  }
+}

@@ -198,3 +198,19 @@ test('R7.5 extrusion adds anonymous planes to public tiles only and preserves ac
   assert.equal((next.match(/table-last-discard/g)??[]).length,1);
   assert.ok(after.view.opponents.every(p=>!Object.hasOwn(p,'concealed')));
 });
+
+test('R7.5 claimed river history is visually distinct from a live physical tile',()=>{
+  const p=availableTableProfiles().find(x=>x.profileId==='tw16-four-player-sandbox');
+  const s=createSandboxSession(),snap=s.start({profileId:p.profileId,ruleVersion:p.ruleVersion});
+  const a=snap.view.legalActions[0];
+  const after=s.submit({actionId:a.actionId,actorSeat:a.actorSeat,expectedRevision:a.expectedRevision});
+  const fixture=JSON.parse(JSON.stringify(after));
+  fixture.view.self.river[0].claimedByEventId='fixture-claimed';
+  const bytes=JSON.stringify(fixture);
+  const html=TableView(fixture,{camera:'perspective'});
+  assert.equal((html.match(/class="table-claimed-discard"/g)??[]).length,1);
+  assert.ok(html.includes('data-river-history-count="1" data-river-live-count="0"'));
+  assert.equal((html.match(/class="table-tile-extrusion"/g)??[]).length,48);
+  assert.equal((html.match(/table-last-discard/g)??[]).length,0);
+  assert.equal(JSON.stringify(fixture),bytes);
+});
