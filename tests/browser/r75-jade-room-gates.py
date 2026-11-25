@@ -208,6 +208,63 @@ def main():
                     print('PASS',width,height,json.dumps(report,ensure_ascii=False))
                 finally:
                     ctx.close()
+            # Actual touch-browser orientation changes must keep all physical
+            # IDs and the selected action, without rebooting or advancing Rules.
+            for portrait,landscape in [((390,844),(844,390)),((375,667),(667,375)),((430,932),(932,430))]:
+                ctx=browser.new_context(viewport={'width':portrait[0],'height':portrait[1]},
+                    is_mobile=True,has_touch=True,device_scale_factor=1,reduced_motion='reduce')
+                page=ctx.new_page()
+                try:
+                    page.goto(url+'?table=sandbox',wait_until='networkidle')
+                    page.locator('[data-table-nav="play"]').click()
+                    assert page.locator('.table-rotate-hint').is_visible()
+                    page.locator('#full-table-root [data-start-new]').click()
+                    hand=page.locator('.table-hand button[data-pick-action]')
+                    hand.first.wait_for()
+                    revision=page.locator('.table-version').inner_text()
+                    ids=hand.evaluate_all('(els)=>els.map(e=>e.dataset.pickAction)')
+                    hand.first.tap()
+                    selected=page.locator('.table-hand button[aria-pressed="true"]').get_attribute('data-pick-action')
+                    page.set_viewport_size({'width':landscape[0],'height':landscape[1]})
+                    assert not page.locator('.table-rotate-hint').is_visible()
+                    assert page.locator('.table-version').inner_text()==revision
+                    assert hand.evaluate_all('(els)=>els.map(e=>e.dataset.pickAction)')==ids
+                    assert page.locator('.table-hand button[aria-pressed="true"]').get_attribute('data-pick-action')==selected
+                    report=page.evaluate("""() => {
+                      const root=document.querySelector('.table-game-surface');
+                      const hand=root.querySelector('.table-hand');
+                      const rects=[...hand.querySelectorAll('button[data-pick-action]')].map(b=>b.getBoundingClientRect());
+                      return {landscape:true,viewport:[innerWidth,innerHeight],
+                        rows:new Set(rects.map(r=>Math.round(r.top))).size,
+                        minWidth:Math.min(...rects.map(r=>r.width)),
+                        minHeight:Math.min(...rects.map(r=>r.height)),
+                        overflow:document.documentElement.scrollWidth-innerWidth,
+                        areas:getComputedStyle(root.querySelector('.table-grid')).gridTemplateAreas,
+                        available:hand.getBoundingClientRect().width,
+                        seats:root.querySelectorAll('.table-opponent').length};
+                    }""")
+                    assert report['seats']==3 and report['overflow']<=1 and report['minWidth']>=44 and report['minHeight']>=44,report
+                    assert 'left top right' in report['areas'] and 'left felt right' in report['areas'],report
+                    # Selected tile may be lifted 5px; clear selection before row count.
+                    page.locator('[data-clear-selection]').tap()
+                    rows=hand.evaluate_all('(els)=>new Set(els.map(e=>Math.round(e.getBoundingClientRect().top))).size')
+                    assert rows==(1 if report['available']>=780 else 2),report
+                    report['rows']=rows
+                    page.locator('[data-table-theme="jade-room"]').screenshot(path=str(out/f'phone-landscape-{landscape[0]}x{landscape[1]}.png'))
+                    hand.first.tap()
+                    page.locator('[data-submit-action]').tap()
+                    page.wait_for_function("(rev)=>document.querySelector('.table-version').innerText!==rev",arg=revision)
+                    after=page.locator('.table-version').inner_text()
+                    page.set_viewport_size({'width':portrait[0],'height':portrait[1]})
+                    assert page.locator('.table-rotate-hint').is_visible()
+                    assert page.locator('.table-version').inner_text()==after
+                    page.locator('[data-table-nav="academy"]').click()
+                    assert not page.locator('.table-rotate-hint').is_visible()
+                    report['rotation']='PASS: selection preserved, real touch discard, no reset, academy unaffected'
+                    evidence.append(report)
+                    print('PASS landscape touch',json.dumps(report,ensure_ascii=False))
+                finally:
+                    ctx.close()
             # Renderer stress fixture, NOT a played round or valid Rules state.
             # Render the real TableView/CSS without touching live game storage.
             for width,height in [(1440,900),(390,844),(320,640)]:

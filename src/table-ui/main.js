@@ -1,7 +1,7 @@
 import { createSandboxSession, availableTableProfiles } from './session.js';
 import { createFullRoundSession, fullRoundCapability } from './full-round.js';
 import { createDailyPanel } from './daily.js';
-import { TableView, ReplayControls, BotDifficultySelect, latestPublicDiscard, publicDeclaration, observedOwnDraw, normalizeTableTheme, readTableTheme, writeTableTheme, normalizeTableCamera } from './view.js';
+import { TableView, ReplayControls, BotDifficultySelect, latestPublicDiscard, publicDeclaration, observedOwnDraw, normalizeTableTheme, readTableTheme, writeTableTheme, normalizeTableCamera, landscapeHint } from './view.js';
 import { installTileFaceFallback } from '../tile-visuals.js';
 
 const root=document.querySelector('#full-table-root');
@@ -103,7 +103,7 @@ function renderEmpty() {
     '<p>'+(fullMode
       ? 'R3 規則、三名 Bot 與 Replay 正式接線；台數仍為實驗性簡化政策。'
       : '目前沒有通過版本驗證的 R3 Bot／Replay 接線，僅提供舊版摸打 Sandbox。')+
-    '</p></div></header><section class="table-empty"><h2>建立實驗牌桌</h2>'+
+    '</p></div></header>'+landscapeHint()+'<section class="table-empty"><h2>建立實驗牌桌</h2>'+
     '<label for="table-profile">明確選擇 RuleProfile</label>'+
     '<select id="table-profile">'+profiles()+'</select>'+
     (fullMode?BotDifficultySelect('Beginner'):'')+
