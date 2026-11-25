@@ -21,6 +21,15 @@ def main():
                 errors=[]
                 page.on('pageerror',lambda e:errors.append(str(e)))
                 try:
+                    if width==1440:
+                        page.add_init_script("""() => {
+                          window.__tmtSoundStarts=0;
+                          const start=AudioBufferSourceNode.prototype.start;
+                          AudioBufferSourceNode.prototype.start=function(...args){
+                            window.__tmtSoundStarts++;
+                            return start.apply(this,args);
+                          };
+                        }""")
                     page.goto(url+'?table=sandbox',wait_until='networkidle')
                     page.locator('[data-table-nav="play"]').click()
                     page.locator('#table-profile').wait_for()
@@ -64,6 +73,27 @@ def main():
                     assert page.locator('.table-version').inner_text()==revision
                     page.locator('[data-clear-selection]').click()
                     assert page.locator('.table-hand button[aria-pressed="true"]').count()==0
+                    if width==1440:
+                        sound=page.locator('[data-table-sound]')
+                        assert sound.get_attribute('aria-pressed')=='false'
+                        assert page.evaluate('window.__tmtSoundStarts')==0
+                        sound.click()
+                        page.wait_for_function("""() => document.querySelector('[data-table-sound]')?.getAttribute('aria-pressed')==='true'""")
+                        assert page.evaluate('window.__tmtSoundStarts')==0
+                        page.locator('.table-hand button[data-pick-action]').first.click()
+                        assert page.evaluate('window.__tmtSoundStarts')==0
+                        page.locator('[data-submit-action]').click()
+                        page.wait_for_function('window.__tmtSoundStarts===1')
+                        assert page.locator('.table-last-discard').count()==1
+                        sound.click()
+                        assert sound.get_attribute('aria-pressed')=='false'
+                        assert page.evaluate('window.__tmtSoundStarts')==1
+                        page.reload(wait_until='networkidle')
+                        page.locator('[data-table-nav="play"]').click()
+                        assert page.locator('[data-table-sound]').get_attribute('aria-pressed')=='false'
+                        assert page.evaluate('window.__tmtSoundStarts')==0
+                        report['soundOptIn']='PASS: real Web Audio start on committed discard only; reload silent'
+                        assert not errors,errors
                     print('PASS',width,height,json.dumps(report,ensure_ascii=False))
                 finally:
                     ctx.close()

@@ -233,7 +233,7 @@ export function RobberyNotice(view,window){
     {valid:false,html:'<p role="alert" data-robbery-invalid>搶加槓公開契約不相容，已停止本次操作。</p>'};
 }
 export function TableView(snapshot,{selection=null,busy=false,error='',botStatus='',
-  confirmation=null,restartPending=false,drawCue=null}={}) {
+  confirmation=null,restartPending=false,drawCue=null,soundEnabled=false,soundAvailable=true}={}) {
   if(!snapshot)return '';
   const {view,profile,wallRemaining,botConnected,replayConnected,storageWarning,replayWarning}=snapshot;
   const opponents=new Map(view.opponents.map(p=>[p.seat,p]));
@@ -255,7 +255,10 @@ export function TableView(snapshot,{selection=null,busy=false,error='',botStatus
     escapeHtml(profile.ruleVersion)+'</span><h1 id="table-heading" tabindex="-1">四人牌桌</h1>'+
     '<p>Rules Engine 決定牌局、宣告與結算；此規則與台數政策均未取得完整台灣通用驗證。</p></div>'+
     '<div class="table-header-tools"><span class="table-version">Revision '+
-    view.asOfEventSeq+'</span><button type="button" class="secondary" data-start-new '+
+    view.asOfEventSeq+'</span><button type="button" class="secondary table-sound-toggle" data-table-sound aria-pressed="'+
+    (soundEnabled?'true':'false')+'" '+(soundAvailable?'':'disabled')+'>'+
+    (soundAvailable?(soundEnabled?'音效：開啟':'音效：關閉'):'音效：不支援')+'</button>'+
+    '<button type="button" class="secondary" data-start-new '+
     (busy?'disabled':'')+'>重新開局</button></div></header>'+
     (restartPending?'<div class="table-selected table-confirmation" data-restart-confirmation '+
       'role="group" aria-label="重新開局確認"><p>確定重新開局？目前對局會被取代。</p>'+

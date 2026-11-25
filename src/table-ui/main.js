@@ -16,6 +16,70 @@ let dailyBoot='idle';
 let pendingAction=null,restartPending=false;
 let lastPaintedGame=null,lastPaintedRevision=-1;
 let previousOwnView=null,drawCue=null;
+// Sound is strictly opt-in per page session. No assets, autoplay, network,
+// private tile data, storage writes, or influence on Rules/Replay timing.
+let audioContext=null,audioMaster=null,audioEnabled=false,audioPending=false,audioFailed=false;
+const audioBuffers=new Map();
+const AudioCtor=window.AudioContext??window.webkitAudioContext;
+function tileSound(kind){
+  if(!audioEnabled||audioContext?.state!=='running'||document.hidden||activePage!=='play')return;
+  try{
+    // Original procedural impact: short decaying ceramic resonances plus a
+    // deterministic noise transient. Different cues vary decay and pitch.
+    let buffer=audioBuffers.get(kind);
+    if(!buffer){
+      const settings={draw:[.085,930,.55],discard:[.13,680,.83],declaration:[.19,810,.72],win:[.24,1040,.65]};
+      const [duration,pitch,strength]=settings[kind]??settings.discard;
+      const rate=audioContext.sampleRate,n=Math.ceil(duration*rate);
+      buffer=audioContext.createBuffer(1,n,rate);
+      const samples=buffer.getChannelData(0);
+      let random=0x6d2b79f5;
+      for(let i=0;i<n;i++){
+        const t=i/rate;
+        random^=random<<13;random^=random>>>17;random^=random<<5;
+        const noise=(random>>>0)/2147483648-1;
+        const attack=Math.min(1,t/.0015),end=Math.min(1,(n-i)/(rate*.006));
+        const ring=(.5*Math.sin(2*Math.PI*pitch*t)+.28*Math.sin(2*Math.PI*pitch*2.37*t)+
+          .13*Math.sin(2*Math.PI*pitch*4.13*t))*Math.exp(-t*44);
+        const tap=noise*.46*Math.exp(-t*230);
+        samples[i]=Math.max(-1,Math.min(1,(ring+tap)*strength*attack*end));
+      }
+      audioBuffers.set(kind,buffer);
+    }
+    const source=audioContext.createBufferSource();
+    source.buffer=buffer;source.connect(audioMaster);
+    source.onended=()=>{try{source.disconnect();}catch{}};
+    source.start();
+  }catch{/* Optional feedback must never break or delay game control. */}
+}
+async function toggleTableSound(){
+  if(audioPending)return;
+  if(audioEnabled){
+    audioEnabled=false;
+    if(audioMaster)audioMaster.gain.value=0;
+    draw();root.querySelector('[data-table-sound]')?.focus({preventScroll:true});
+    return;
+  }
+  if(!AudioCtor||audioFailed)return;
+  audioPending=true;
+  try{
+    if(!audioContext){
+      audioContext=new AudioCtor();
+      audioMaster=audioContext.createGain();
+      audioMaster.gain.value=0;audioMaster.connect(audioContext.destination);
+    }
+    // This call is inside the trusted click gesture before any await.
+    await audioContext.resume();
+    if(audioContext.state!=='running')throw Error('audio unavailable');
+    audioMaster.gain.value=.30;audioEnabled=true;
+  }catch{
+    audioEnabled=false;audioFailed=true;
+    if(audioMaster)audioMaster.gain.value=0;
+  }finally{
+    audioPending=false;
+    if(activePage==='play'){draw();root.querySelector('[data-table-sound]')?.focus({preventScroll:true});}
+  }
+}
 const forceSandbox=new URLSearchParams(window.location.search).get('table')==='sandbox';
 const seededQA=new URLSearchParams(window.location.search).get('qa')==='seeded';
 
@@ -92,7 +156,8 @@ function draw() {
     asOfEventSeq:nextView.asOfEventSeq,self:{seat:nextView.self.seat,
       concealed:nextView.self.concealed.map(t=>({id:t.id}))}}:null;
   root.innerHTML=snapshot?TableView(snapshot,{selection,busy,error:lastError,
-    botStatus,confirmation:pendingAction,restartPending,drawCue}):renderEmpty();
+    botStatus,confirmation:pendingAction,restartPending,drawCue,
+    soundEnabled:audioEnabled,soundAvailable:Boolean(AudioCtor)&&!audioFailed}):renderEmpty();
   // Animate only a genuinely new, already committed public discard. Selection,
   // confirmation, rerender, initial restore and replay never replay the effect.
   const view=snapshot?.view, latest=latestPublicDiscard(view);
@@ -101,6 +166,11 @@ function draw() {
   const newNotice=Boolean(view&&notice&&view.gameId===lastPaintedGame&&notice.seq>lastPaintedRevision);
   lastPaintedGame=view?.gameId??null;
   lastPaintedRevision=view?.asOfEventSeq??-1;
+  // At most one short sound per observed revision. Prefer a terminal/declaration
+  // cue over a discard/draw when a Bot batch produced multiple events.
+  if(newNotice)tileSound(notice.kind==='win'?'win':'declaration');
+  else if(newDraw)tileSound('draw');
+  else if(changed)tileSound('discard');
   const motionAllowed=!window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   if(newDraw&&motionAllowed){
     root.querySelector('.table-fresh-draw')?.animate?.(
@@ -281,6 +351,10 @@ async function dailyAction(kind) {
 function onClick(event) {
   const button=event.target.closest('button');
   if(!button)return;
+  if(button.hasAttribute('data-table-sound')){
+    if(!button.disabled)void toggleTableSound();
+    return;
+  }
   if(button.hasAttribute('data-pause-bots')){
     pendingAction=null;selection=null;restartPending=false;
     session?.pause?.();botStatus='對局已暫停';draw();return;

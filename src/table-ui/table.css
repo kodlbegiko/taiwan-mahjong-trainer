@@ -595,3 +595,11 @@ body[data-table-view="replay"] #full-table-navigation {
   justify-self:start;color:#d9f5e7;background:#235843;border:1px solid #72a98e;
   border-radius:6px;padding:2px 8px;font-size:11px;
 }
+
+/* Optional sound control; does not occupy the legal-action region. */
+#full-table-root .table-sound-toggle {
+  min-height:44px;min-width:44px;white-space:nowrap;font-size:12px;
+  color:#e3ede0;background:#183b30;border:1px solid #73927d;border-radius:9px;
+}
+#full-table-root .table-sound-toggle[aria-pressed="true"] {color:#17382a;background:#d2e6b5;border-color:#d2e6b5;}
+#full-table-root .table-sound-toggle:disabled {opacity:.65;}
