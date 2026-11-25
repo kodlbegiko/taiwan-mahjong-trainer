@@ -186,6 +186,7 @@ export function TableView(snapshot,{selection=null,busy=false,error='',botStatus
     (storageWarning?'<p role="status" class="table-warning">'+escapeHtml(storageWarning)+'</p>':'')+
     (replayWarning?'<p role="status" class="table-warning">'+escapeHtml(replayWarning)+'</p>':'')+
     (error?'<p role="alert" class="table-warning">'+escapeHtml(error)+'</p>':'')+
+    '<div class="table-game-surface" data-table-theme="jade-room">'+
     '<div class="table-grid" role="group" aria-label="四人牌桌公開資訊">'+
     OpponentSeat(opponents.get(2),view.round.currentSeat,view.round.dealerSeat)+
     OpponentSeat(opponents.get(3),view.round.currentSeat,view.round.dealerSeat)+
@@ -193,7 +194,7 @@ export function TableView(snapshot,{selection=null,busy=false,error='',botStatus
     '</strong><span>'+escapeHtml(botStatus||lastEvent(view.publicEvents))+
     '</span><small>僅顯示當下的公開牌面與本人手牌</small></div>'+
     OpponentSeat(opponents.get(1),view.round.currentSeat,view.round.dealerSeat)+'</div>'+
-    robbery.html+PlayerHand(view.self,actions,selection)+
+    robbery.html+PlayerHand(view.self,actions,selection)+'</div>'+
     (!robbery.valid?'<section class="table-actions" aria-label="契約不相容">操作已停止</section>':ended?'<section class="table-actions"><h3>正式 Rules 已結算本局</h3></section>':
       humanCanAct?ActionBar(actions,selection,busy||snapshot.paused,confirmation):
         '<section class="table-actions" aria-label="等待其他玩家"><h3>'+
