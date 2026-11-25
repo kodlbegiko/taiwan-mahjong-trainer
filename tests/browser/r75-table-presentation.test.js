@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createSandboxSession,availableTableProfiles} from '../../src/table-ui/session.js';
-import {TableView,latestPublicDiscard} from '../../src/table-ui/view.js';
+import {TableView,latestPublicDiscard,publicDeclaration,ActionBar} from '../../src/table-ui/view.js';
 
 test('R7.5 sorted hand keeps exact physical actions, hidden tiles and input bytes',()=>{
   const p=availableTableProfiles().find(x=>x.profileId==='tw16-four-player-sandbox');
@@ -47,4 +47,36 @@ test('R7.5 latest public discard highlights only one river tile and never a clai
   copy.view.publicEvents.at(-1).visibility='seat-private';
   assert.equal(latestPublicDiscard(copy.view),null);
   assert.equal(latestPublicDiscard({...v,gameId:'different-game'}),null);
+});
+
+test('R7.5 declarations use only public resolved events and never private or proposed kong',()=>{
+  const base={gameId:'g',asOfEventSeq:8,round:{phase:'await_discard'},publicEvents:[]};
+  const event=(type,payload,actorSeat=1)=>({gameId:'g',seq:7,visibility:'public',type,payload,actorSeat});
+  const claim=event('claim',{kind:'chi',sourceSeat:0,claimEventId:'d',tileIds:['t:0:0','t:1:0','t:2:0']});
+  const view=(events,phase='await_discard')=>({...base,round:{phase},publicEvents:events});
+  assert.deepEqual(publicDeclaration(view([claim])),{kind:'chi',label:'吃',seat:1,seq:7});
+  assert.equal(publicDeclaration(view([{...claim,visibility:'seat-private'}])),null);
+  assert.equal(publicDeclaration(view([{...claim,actorSeat:undefined,payload:{}}])),null);
+  assert.equal(publicDeclaration(view([claim,{...event('discard',{tileId:'t:4:0'}),seq:8}])),null);
+  assert.equal(publicDeclaration(view([claim,{...event('kong_proposed',{kind:'ADDED_KONG',tileId:'t:4:0'}),seq:8}])),null);
+  const kong=event('kong',{kind:'CONCEALED_KONG',tileIds:['t:4:0','t:4:1','t:4:2','t:4:3']});
+  assert.equal(publicDeclaration(view([kong])).label,'暗槓');
+  const win=event('win',{seat:1,sourceSeat:1});
+  assert.equal(publicDeclaration(view([win])),null);
+  assert.equal(publicDeclaration(view([win],'settled')).label,'自摸');
+  assert.equal(publicDeclaration(view([{...win,payload:{seat:1,sourceSeat:0}}],'settled')).label,'胡牌');
+  assert.equal(publicDeclaration(view([{...claim,seq:9}])),null);
+  assert.equal(publicDeclaration(view([{...claim,gameId:'other'}])),null);
+});
+test('R7.5 declaration previews preserve exact issued action IDs and confirmation',()=>{
+  const action={kind:'chi',actionId:'issued-a',actorSeat:0,expectedRevision:4,tileIds:['t:0:0','t:1:0','t:2:0']};
+  const pass={kind:'pass',actionId:'issued-pass',actorSeat:0,expectedRevision:4,tileIds:[]};
+  const html=ActionBar([action,pass],null,false);
+  assert.equal((html.match(/data-submit-action=/g)??[]).length,2);
+  assert.equal((html.match(/data-action-kind="chi"/g)??[]).length,1);
+  assert.equal((html.match(/class="table-declare-face"/g)??[]).length,3);
+  assert.ok(html.includes('data-submit-action="issued-a"'));
+  assert.ok(!html.includes('data-confirm-action='));
+  assert.ok(ActionBar([action,pass],null,false,action).includes('data-confirm-action="issued-a"'));
+  assert.ok(!ActionBar([action,pass],null,false,{...action,expectedRevision:5}).includes('data-confirm-action='));
 });

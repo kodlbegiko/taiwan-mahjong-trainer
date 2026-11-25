@@ -119,6 +119,51 @@ function actionName(action) {
   const physical=action.kind==='chi'&&ids.length?' ['+ids.join(', ')+']':'';
   return kind+(action.kind!=='discard'&&extra.length?' · '+extra.join('、'):'')+physical;
 }
+const DECLARATION_LABELS=Object.freeze({chi:'吃',pong:'碰',kong:'槓',win:'胡',pass:'過',draw:'摸',replace_flower:'補花'});
+function declarationButton(a,busy) {
+  const kind=Object.hasOwn(DECLARATION_LABELS,a.kind)?a.kind:'other';
+  const title=actionName(a);
+  const preview=(a.tileIds??[]).map(id=>typeFromTile(id)).filter(n=>n!==null);
+  return '<button type="button" class="secondary table-declare-button" data-action-kind="'+kind+
+    '" data-submit-action="'+escapeHtml(a.actionId)+'" aria-label="'+escapeHtml(title)+'" '+(busy?'disabled':'')+'>'+
+    '<span class="table-declare-symbol" aria-hidden="true">'+(DECLARATION_LABELS[kind]??'宣告')+'</span>'+
+    (preview.length?'<span class="table-declare-preview" aria-hidden="true">'+
+      preview.map(n=>'<span class="table-declare-face">'+tileFaceMarkup(n)+'</span>').join('')+'</span>':'')+
+    '<span class="table-declare-caption">'+escapeHtml(title)+'</span></button>';
+}
+
+/** Public presentation only: never read private claim intent, or treat a kong
+ * proposal as a completed kong. A subsequent discard invalidates the badge. */
+export function publicDeclaration(view) {
+  if(!Array.isArray(view?.publicEvents))return null;
+  const e=[...view.publicEvents].reverse().find(x=>x.gameId===view.gameId&&
+    x.visibility==='public'&&Number.isSafeInteger(x.seq)&&x.seq<=view.asOfEventSeq&&
+    (['discard','kong_proposed','win','kong'].includes(x.type)||
+      (x.type==='claim'&&Number.isInteger(x.actorSeat)&&typeof x.payload?.kind==='string')));
+  if(!e||!Number.isInteger(e.actorSeat)||e.actorSeat<0||e.actorSeat>3)return null;
+  const p=e.payload??{};
+  let kind=null,label=null;
+  if(e.type==='claim'&&['chi','pong'].includes(p.kind)&&Array.isArray(p.tileIds)&&
+      p.tileIds.length===3&&p.tileIds.every(id=>typeFromTile(id)!==null)&&
+      new Set(p.tileIds).size===3&&typeof p.claimEventId==='string'&&
+      Number.isInteger(p.sourceSeat)&&p.sourceSeat>=0&&p.sourceSeat<=3&&p.sourceSeat!==e.actorSeat){
+    kind=p.kind;label=DECLARATION_LABELS[kind];
+  }else if(e.type==='kong'&&Array.isArray(p.tileIds)&&p.tileIds.every(id=>typeFromTile(id)!==null)&&
+      new Set(p.tileIds).size===p.tileIds.length&&
+      ((p.kind==='kong'&&p.tileIds.length===4&&typeof p.claimEventId==='string')||
+       (p.kind==='CONCEALED_KONG'&&p.tileIds.length===4)||
+       (p.kind==='ADDED_KONG'&&[1,4].includes(p.tileIds.length)))){
+    kind='kong';label=p.kind==='CONCEALED_KONG'?'暗槓':p.kind==='ADDED_KONG'?'加槓':'明槓';
+  }else if(e.type==='win'&&view.round?.phase==='settled'&&p.seat===e.actorSeat&&
+      Number.isInteger(p.sourceSeat)&&p.sourceSeat>=0&&p.sourceSeat<=3){
+    kind='win';label=p.sourceSeat===e.actorSeat?'自摸':'胡牌';
+  }
+  return kind?{kind,label,seat:e.actorSeat,seq:e.seq}:null;
+}
+function declarationNotice(notice){
+  return notice?'<span class="table-declaration-notice" data-public-declaration="'+notice.kind+
+    '" data-declaration-seq="'+notice.seq+'"><span>'+SEATS[notice.seat]+'</span><b>'+notice.label+'</b></span>':'';
+}
 export function ActionBar(legalActions, selectedId, busy, confirmation=null) {
   const chosen = legalActions.find(a => a.kind === 'discard' && a.actionId === selectedId);
   const declarationActions = legalActions.filter(a => a.kind !== 'discard');
@@ -132,10 +177,7 @@ export function ActionBar(legalActions, selectedId, busy, confirmation=null) {
       '" class="primary" ' + (busy ? 'disabled' : '') + '>確認捨牌</button>' +
       '<button type="button" data-clear-selection class="secondary" '+(busy?'disabled':'')+'>取消</button></div>'
       : '<p class="table-quiet">請點選一張手牌；捨牌不會立即送出。</p>') +
-    '<div class="table-action-buttons">' + declarationActions.map(a =>
-      '<button type="button" class="secondary" data-submit-action="' +
-      escapeHtml(a.actionId) + '" ' + (busy ? 'disabled' : '') +
-      '>' + escapeHtml(actionName(a)) + '</button>').join('') + '</div>' +
+    '<div class="table-action-buttons">' + declarationActions.map(a=>declarationButton(a,busy)).join('') + '</div>' +
     (pending?'<div class="table-selected table-confirmation" data-action-confirmation role="group" '+
       'aria-label="正式動作確認"><p role="status" aria-live="polite">確定執行合法動作：'+escapeHtml(actionName(pending))+
       '？宣告後無法撤銷。</p><button type="button" class="primary" data-confirm-action="'+
@@ -174,6 +216,7 @@ export function TableView(snapshot,{selection=null,busy=false,error='',botStatus
   const opponents=new Map(view.opponents.map(p=>[p.seat,p]));
   const robbery=RobberyNotice(view,snapshot.robbery);
   const latest=latestPublicDiscard(view);
+  const notice=publicDeclaration(view);
   const actions=robbery.valid?view.legalActions.filter(a=>a.actorSeat===view.audienceSeat &&
     a.expectedRevision===view.asOfEventSeq&&typeof a.actionId==='string'):[];
   const humanCanAct=actions.length>0;
@@ -212,7 +255,7 @@ export function TableView(snapshot,{selection=null,busy=false,error='',botStatus
     OpponentSeat(opponents.get(2),view.round.currentSeat,view.round.dealerSeat,latest)+
     OpponentSeat(opponents.get(3),view.round.currentSeat,view.round.dealerSeat,latest)+
     '<div class="table-felt" aria-live="polite"><strong>'+phaseLabel+
-    '</strong><span>'+escapeHtml(botStatus||lastEvent(view.publicEvents))+
+    '</strong>'+declarationNotice(notice)+'<span>'+escapeHtml(botStatus||lastEvent(view.publicEvents))+
     '</span>'+(latest?'<span class="table-latest-label">最新捨牌 · '+SEATS[latest.seat]+' · '+escapeHtml(tileAccessibleName(typeFromTile(latest.tileId)))+'</span>':'')+
     '<span class="table-center-wall">牌山 · '+escapeHtml(wallRemaining)+' 張</span><small>僅顯示當下的公開牌面與本人手牌</small></div>'+
     OpponentSeat(opponents.get(1),view.round.currentSeat,view.round.dealerSeat,latest)+'</div>'+

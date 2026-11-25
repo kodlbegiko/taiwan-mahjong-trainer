@@ -1,7 +1,7 @@
 import { createSandboxSession, availableTableProfiles } from './session.js';
 import { createFullRoundSession, fullRoundCapability } from './full-round.js';
 import { createDailyPanel } from './daily.js';
-import { TableView, ReplayControls, BotDifficultySelect, latestPublicDiscard } from './view.js';
+import { TableView, ReplayControls, BotDifficultySelect, latestPublicDiscard, publicDeclaration } from './view.js';
 import { installTileFaceFallback } from '../tile-visuals.js';
 
 const root=document.querySelector('#full-table-root');
@@ -88,9 +88,17 @@ function draw() {
   // confirmation, rerender, initial restore and replay never replay the effect.
   const view=snapshot?.view, latest=latestPublicDiscard(view);
   const changed=Boolean(view&&latest&&view.gameId===lastPaintedGame&&latest.seq>lastPaintedRevision);
+  const notice=publicDeclaration(view);
+  const newNotice=Boolean(view&&notice&&view.gameId===lastPaintedGame&&notice.seq>lastPaintedRevision);
   lastPaintedGame=view?.gameId??null;
   lastPaintedRevision=view?.asOfEventSeq??-1;
-  if(changed&&!window.matchMedia('(prefers-reduced-motion: reduce)').matches){
+  const motionAllowed=!window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if(newNotice&&motionAllowed){
+    root.querySelector('[data-public-declaration]')?.animate?.(
+      [{transform:'scale(.84)',opacity:.35},{transform:'scale(1.08)',opacity:1},{transform:'scale(1)',opacity:1}],
+      {duration:360,easing:'ease-out'});
+  }
+  if(changed&&motionAllowed){
     const tile=root.querySelector('.table-last-discard');
     tile?.animate?.([{transform:'translateY(-7px) scale(1.10)',opacity:.75},
       {transform:'translateY(0) scale(1)',opacity:1}],{duration:230,easing:'ease-out'});

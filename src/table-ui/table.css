@@ -549,3 +549,38 @@ body[data-table-view="replay"] #full-table-navigation {
   background:#254b38;border:1px solid #c6ac72;border-radius:6px;
   padding:3px 8px;color:#fff0c6;font-weight:750;
 }
+
+/* Public declaration feedback and tactile, legal-action-only controls. */
+#full-table-root .table-declaration-notice {
+  display:flex; align-items:center; justify-content:center; gap:10px;
+  padding:5px 12px; border:1px solid #d5bd84; border-radius:10px;
+  color:#fff1cd; background:linear-gradient(145deg,#675131,#3d3626);
+  box-shadow:0 3px 0 #2e2617,0 5px 12px #111b;
+}
+#full-table-root .table-declaration-notice b {font-size:clamp(20px,3vw,28px);font-weight:850;letter-spacing:.08em;}
+#full-table-root .table-declaration-notice[data-public-declaration="win"] {
+  background:linear-gradient(145deg,#a33c34,#642620);border-color:#f2c87a;
+}
+#full-table-root .table-declare-button {
+  display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;
+  min-width:80px;min-height:54px;max-width:100%;
+  padding:7px 11px;border-radius:11px;text-align:left;
+}
+#full-table-root .table-declare-symbol {
+  color:#f9dd9a;font-size:23px;font-weight:850;line-height:1;
+}
+#full-table-root .table-declare-preview {display:flex;align-items:center;gap:2px;flex-wrap:wrap;}
+#full-table-root .table-declare-face {
+  display:flex;align-items:center;justify-content:center;flex:0 0 20px;
+  width:20px;height:29px;padding:1px;border-radius:3px;
+  background:#fff9eb;border-bottom:3px solid #4c8a6a;
+}
+#full-table-root .table-declare-face .tile-face-image {width:100%;height:100%;object-fit:contain;pointer-events:none;}
+#full-table-root .table-declare-caption {font-size:11px;flex:1 1 100%;overflow-wrap:anywhere;color:#e2ecdf;}
+#full-table-root .table-declare-button[data-action-kind="win"] {background:#692d29;border-color:#d9a26b;}
+#full-table-root .table-declare-button[data-action-kind="pass"] {background:#17352e;}
+#full-table-root .table-declare-button:disabled {opacity:.65;}
+@media(max-width:560px) {
+  #full-table-root .table-declare-button {min-height:50px;flex:1 1 105px;}
+  #full-table-root .table-declare-caption {font-size:10px;}
+}
