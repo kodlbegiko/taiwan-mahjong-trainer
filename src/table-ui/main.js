@@ -1,7 +1,7 @@
 import { createSandboxSession, availableTableProfiles } from './session.js';
 import { createFullRoundSession, fullRoundCapability } from './full-round.js';
 import { createDailyPanel } from './daily.js';
-import { TableView, ReplayControls, BotDifficultySelect, latestPublicDiscard, publicDeclaration, observedOwnDraw, normalizeTableTheme, readTableTheme, writeTableTheme } from './view.js';
+import { TableView, ReplayControls, BotDifficultySelect, latestPublicDiscard, publicDeclaration, observedOwnDraw, normalizeTableTheme, readTableTheme, writeTableTheme, normalizeTableCamera } from './view.js';
 import { installTileFaceFallback } from '../tile-visuals.js';
 
 const root=document.querySelector('#full-table-root');
@@ -16,7 +16,7 @@ let dailyBoot='idle';
 let pendingAction=null,restartPending=false;
 let lastPaintedGame=null,lastPaintedRevision=-1;
 let previousOwnView=null,drawCue=null;
-let tableTheme='jade-room';
+let tableTheme='jade-room',tableCamera='flat';
 // Sound is strictly opt-in per page session. No assets, autoplay, network,
 // private tile data, storage writes, or influence on Rules/Replay timing.
 let audioContext=null,audioMaster=null,audioEnabled=false,audioPending=false,audioFailed=false;
@@ -158,7 +158,7 @@ function draw() {
       concealed:nextView.self.concealed.map(t=>({id:t.id}))}}:null;
   root.innerHTML=snapshot?TableView(snapshot,{selection,busy,error:lastError,
     botStatus,confirmation:pendingAction,restartPending,drawCue,
-    soundEnabled:audioEnabled,soundAvailable:Boolean(AudioCtor)&&!audioFailed,theme:tableTheme}):renderEmpty();
+    soundEnabled:audioEnabled,soundAvailable:Boolean(AudioCtor)&&!audioFailed,theme:tableTheme,camera:tableCamera}):renderEmpty();
   // Animate only a genuinely new, already committed public discard. Selection,
   // confirmation, rerender, initial restore and replay never replay the effect.
   const view=snapshot?.view, latest=latestPublicDiscard(view);
@@ -453,6 +453,14 @@ async function init() {
   installTileFaceFallback(root);
   root.addEventListener('click',onClick);
   root.addEventListener('change',event=>{
+    if(event.target.matches('[data-table-camera-select]')){
+      if(activePage!=='play')return;
+      tableCamera=normalizeTableCamera(event.target.value);
+      event.target.value=tableCamera;
+      const surface=root.querySelector('.table-game-surface');
+      if(surface)surface.dataset.tableCamera=tableCamera;
+      return;
+    }
     if(event.target.matches('[data-table-theme-select]')){
       if(activePage!=='play')return;
       tableTheme=normalizeTableTheme(event.target.value);

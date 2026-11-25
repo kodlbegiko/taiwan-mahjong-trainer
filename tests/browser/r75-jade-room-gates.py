@@ -97,6 +97,26 @@ def main():
                                 surface.screenshot(path=str(out/f'{theme}-{width}x{height}.png'))
                         assert len(set(backgrounds))==3
                         report['themes']='PASS: distinct CSS surfaces; exact actions, selection and revision unchanged'
+                        camera=page.locator('[data-table-camera-select]')
+                        hand=page.locator('.table-hand button[data-pick-action]').first
+                        before_box=hand.bounding_box()
+                        camera.select_option('perspective')
+                        surface=page.locator('[data-table-camera="perspective"]')
+                        assert surface.count()==1
+                        assert surface.locator('.table-back-stack').first.evaluate('(el)=>getComputedStyle(el).transform')!='none'
+                        if width==1440:
+                            assert surface.locator('.table-grid').evaluate('(el)=>getComputedStyle(el).transform')!='none'
+                        assert page.locator('.table-version').inner_text()==revision
+                        assert page.locator('.table-hand button[data-pick-action]').evaluate_all('(els)=>els.map(e=>e.dataset.pickAction)')==actions
+                        assert page.locator('.table-hand button[aria-pressed="true"]').get_attribute('data-pick-action')==selected
+                        assert page.evaluate('document.documentElement.scrollWidth<=innerWidth+1')
+                        after_box=hand.bounding_box()
+                        assert abs(before_box['width']-after_box['width'])<1
+                        assert abs(before_box['height']-after_box['height'])<1
+                        surface.screenshot(path=str(out/f'perspective-{width}x{height}.png'))
+                        camera.select_option('flat')
+                        assert page.locator('[data-table-camera="flat"]').count()==1
+                        report['camera']='PASS: public perspective; unchanged hand targets, selection, revision and action IDs'
                     page.locator('[data-clear-selection]').click()
                     assert page.locator('.table-hand button[aria-pressed="true"]').count()==0
                     if width in (1440,390):

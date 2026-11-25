@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createSandboxSession,availableTableProfiles} from '../../src/table-ui/session.js';
-import {TableView,latestPublicDiscard,publicDeclaration,ActionBar,observedOwnDraw,seatWind,normalizeTableTheme,TABLE_THEMES,readTableTheme,writeTableTheme,TABLE_THEME_KEY} from '../../src/table-ui/view.js';
+import {TableView,latestPublicDiscard,publicDeclaration,ActionBar,observedOwnDraw,seatWind,normalizeTableTheme,TABLE_THEMES,readTableTheme,writeTableTheme,TABLE_THEME_KEY,normalizeTableCamera,TABLE_CAMERAS} from '../../src/table-ui/view.js';
 
 test('R7.5 sorted hand keeps exact physical actions, hidden tiles and input bytes',()=>{
   const p=availableTableProfiles().find(x=>x.profileId==='tw16-four-player-sandbox');
@@ -166,4 +166,20 @@ test('R7.5 theme preference has its own storage key and fails safely when storag
   assert.equal(readTableTheme(blocked),'jade-room');
   assert.equal(writeTableTheme(blocked,'midnight-room'),false);
   assert.equal(writeTableTheme(null,'midnight-room'),false);
+});
+
+test('R7.5 camera is allowlisted and presentation-only',()=>{
+  assert.deepEqual(Object.keys(TABLE_CAMERAS),['flat','perspective']);
+  for(const bad of [null,undefined,{},'constructor','__proto__','"><script>'])assert.equal(normalizeTableCamera(bad),'flat');
+  const p=availableTableProfiles().find(x=>x.profileId==='tw16-four-player-sandbox');
+  const s=createSandboxSession(),snap=s.start({profileId:p.profileId,ruleVersion:p.ruleVersion});
+  const bytes=JSON.stringify(snap),id=snap.view.legalActions[0].actionId;
+  const flat=TableView(snap,{selection:id});
+  const perspective=TableView(snap,{selection:id,camera:'perspective'});
+  assert.ok(perspective.includes('data-table-camera="perspective"'));
+  assert.ok(flat.includes('data-table-camera="flat"'));
+  const actions=html=>Array.from(html.matchAll(/data-pick-action="([^"]+)"/g),x=>x[1]);
+  assert.deepEqual(actions(flat),actions(perspective));
+  assert.ok(perspective.includes('data-submit-action="'+id+'"'));
+  assert.equal(JSON.stringify(snap),bytes);
 });
