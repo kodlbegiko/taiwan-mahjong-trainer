@@ -163,7 +163,9 @@ def main():
                         assert page.locator('.table-last-discard').count()==1
                         page.locator('[data-table-camera-select]').select_option('perspective')
                         assert page.locator('.table-last-discard .table-mesh-face').count()==5
-                        assert page.locator('.table-last-discard .table-face-image').count()==1
+                        face=page.locator('.table-last-discard img.tile-face-image')
+                        assert face.count()==1
+                        assert face.evaluate('(el)=>el.complete && el.naturalWidth>0')
                         page.locator('[data-table-camera="perspective"]').screenshot(path=str(out/'perspective-public-discard.png'))
                         page.locator('[data-table-camera-select]').select_option('flat')
                         sound.click()
