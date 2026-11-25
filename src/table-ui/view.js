@@ -29,12 +29,12 @@ function tileSpan(tile, className = '') {
   return '<span class="table-tile tile ' + className + '" role="img" aria-label="' +
     escapeHtml(tileAccessibleName(t)) + '">' + tileFaceMarkup(t) + '</span>';
 }
-function tileButton(tile, action, selected) {
+function tileButton(tile, action, selected, drawn=false) {
   const t = typeFromTile(tile);
   if (t === null) return '<span class="table-flower table-hand-flower" role="img" aria-label="'+escapeHtml(tile?.flowerCode ?? '花牌')+'">花</span>';
   return '<button type="button" class="table-tile tile table-hand-tile' +
-    (selected ? ' is-selected' : '') + '" aria-pressed="' + (selected ? 'true' : 'false') +
-    '" aria-label="' + escapeHtml(tileAccessibleName(t)) +
+    (selected ? ' is-selected' : '') + (drawn?' table-fresh-draw':'') + '" aria-pressed="' + (selected ? 'true' : 'false') +
+    '" aria-label="' + escapeHtml(tileAccessibleName(t)) + (drawn?'；剛摸到的牌':'') +
     '；' + (action ? '選取後確認捨牌' : '目前不能捨牌') + '" ' +
     (action ? 'data-pick-action="' + escapeHtml(action.actionId) + '"' : 'disabled') +
     '>' + tileFaceMarkup(t) + '</button>';
@@ -86,7 +86,29 @@ export function OpponentSeat(person, currentSeat, dealerSeat, latest=null) {
     '<div class="table-seat-extras">' + meldSection(person.melds ?? []) + flowersSection(person.flowers ?? []) + '</div>' +
     riverSection(person.river ?? [],latest,person.seat) + '</section>';
 }
-export function PlayerHand(self, legalActions, selectedId, latest=null) {
+/** Conservative draw cue from two self-only PlayerViews. The projected draw
+ * never contains a hidden tile ID. Only a unique newly owned tile can be marked.
+ * No cue on initial restore, other seats, ambiguous batches or replacement draws
+ * without a matching public draw event. This is presentation, not game evidence. */
+export function observedOwnDraw(previous, view) {
+  if(!previous||!view||previous.gameId!==view.gameId||previous.audienceSeat!==view.audienceSeat||
+      previous.self?.seat!==view.audienceSeat||view.self?.seat!==view.audienceSeat||
+      !Number.isSafeInteger(previous.asOfEventSeq)||!Number.isSafeInteger(view.asOfEventSeq)||
+      view.asOfEventSeq<=previous.asOfEventSeq||view.round?.currentSeat!==view.audienceSeat||
+      view.round?.phase!=='await_discard'||!Array.isArray(view.publicEvents)||
+      !Array.isArray(previous.self.concealed)||!Array.isArray(view.self.concealed))return null;
+  const events=view.publicEvents.filter(e=>e.gameId===view.gameId&&e.visibility==='public'&&
+    Number.isSafeInteger(e.seq)&&e.seq>previous.asOfEventSeq&&e.seq<=view.asOfEventSeq&&e.actorSeat===view.audienceSeat);
+  const draws=events.filter(e=>e.type==='draw'&&e.payload?.count===1);
+  if(draws.length!==1||events.some(e=>e.seq>draws[0].seq&&['discard','claim','kong','kong_proposed','flower','win','settle'].includes(e.type)))return null;
+  const prior=new Set(previous.self.concealed.map(t=>t.id));
+  const now=view.self.concealed.map(t=>t.id);
+  if(prior.size!==previous.self.concealed.length||new Set(now).size!==now.length)return null;
+  const added=now.filter(id=>!prior.has(id));
+  if(added.length!==1||typeFromTile(added[0])===null)return null;
+  return {gameId:view.gameId,seat:view.audienceSeat,revision:view.asOfEventSeq,seq:draws[0].seq,tileId:added[0]};
+}
+export function PlayerHand(self, legalActions, selectedId, latest=null, drawnId=null) {
   const byPhysicalId = new Map(legalActions.filter(a => a.kind === 'discard' && a.tileIds?.length === 1)
     .map(a => [a.tileIds[0], a]));
   const replacing=legalActions.some(a=>a.kind==='replace_flower');
@@ -97,9 +119,10 @@ export function PlayerHand(self, legalActions, selectedId, latest=null) {
     self.concealed.length + ' 張</strong><span>' +
     (replacing?'補花階段：先選擇合法補花操作':'點牌選擇，二次確認')+
     '</span></div>' +
+    (drawnId?'<span class="table-fresh-label">剛摸到的牌已標記</span>':'')+
     '<div class="table-own-river"><span class="table-river-label">我的牌河</span>' + riverSection(self.river ?? [],latest,self.seat) + '</div>' +
     '<div class="table-hand" role="group" aria-label="自己的手牌">' +
-    ordered.map(tile => tileButton(tile, byPhysicalId.get(tile.id), selectedId === byPhysicalId.get(tile.id)?.actionId)).join('') +
+    ordered.map(tile => tileButton(tile, byPhysicalId.get(tile.id), selectedId === byPhysicalId.get(tile.id)?.actionId,drawnId===tile.id)).join('') +
     '</div><div class="table-seat-extras">' + meldSection(self.melds ?? []) + flowersSection(self.flowers ?? []) + '</div>' +
     '</div>';
 }
@@ -210,13 +233,17 @@ export function RobberyNotice(view,window){
     {valid:false,html:'<p role="alert" data-robbery-invalid>搶加槓公開契約不相容，已停止本次操作。</p>'};
 }
 export function TableView(snapshot,{selection=null,busy=false,error='',botStatus='',
-  confirmation=null,restartPending=false}={}) {
+  confirmation=null,restartPending=false,drawCue=null}={}) {
   if(!snapshot)return '';
   const {view,profile,wallRemaining,botConnected,replayConnected,storageWarning,replayWarning}=snapshot;
   const opponents=new Map(view.opponents.map(p=>[p.seat,p]));
   const robbery=RobberyNotice(view,snapshot.robbery);
   const latest=latestPublicDiscard(view);
   const notice=publicDeclaration(view);
+  const drawnId=drawCue?.gameId===view.gameId&&drawCue.seat===view.audienceSeat&&
+    drawCue.revision===view.asOfEventSeq&&view.round.phase==='await_discard'&&
+    view.round.currentSeat===view.audienceSeat&&view.self.concealed.some(t=>t.id===drawCue.tileId)&&
+    typeFromTile(drawCue.tileId)!==null?drawCue.tileId:null;
   const actions=robbery.valid?view.legalActions.filter(a=>a.actorSeat===view.audienceSeat &&
     a.expectedRevision===view.asOfEventSeq&&typeof a.actionId==='string'):[];
   const humanCanAct=actions.length>0;
@@ -259,7 +286,7 @@ export function TableView(snapshot,{selection=null,busy=false,error='',botStatus
     '</span>'+(latest?'<span class="table-latest-label">最新捨牌 · '+SEATS[latest.seat]+' · '+escapeHtml(tileAccessibleName(typeFromTile(latest.tileId)))+'</span>':'')+
     '<span class="table-center-wall">牌山 · '+escapeHtml(wallRemaining)+' 張</span><small>僅顯示當下的公開牌面與本人手牌</small></div>'+
     OpponentSeat(opponents.get(1),view.round.currentSeat,view.round.dealerSeat,latest)+'</div>'+
-    robbery.html+PlayerHand(view.self,actions,selection,latest)+'</div>'+
+    robbery.html+PlayerHand(view.self,actions,selection,latest,drawnId)+'</div>'+
     (!robbery.valid?'<section class="table-actions" aria-label="契約不相容">操作已停止</section>':ended?'<section class="table-actions"><h3>正式 Rules 已結算本局</h3></section>':
       humanCanAct?ActionBar(actions,selection,busy||snapshot.paused,confirmation):
         '<section class="table-actions" aria-label="等待其他玩家"><h3>'+

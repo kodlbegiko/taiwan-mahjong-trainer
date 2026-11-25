@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createSandboxSession,availableTableProfiles} from '../../src/table-ui/session.js';
-import {TableView,latestPublicDiscard,publicDeclaration,ActionBar} from '../../src/table-ui/view.js';
+import {TableView,latestPublicDiscard,publicDeclaration,ActionBar,observedOwnDraw} from '../../src/table-ui/view.js';
 
 test('R7.5 sorted hand keeps exact physical actions, hidden tiles and input bytes',()=>{
   const p=availableTableProfiles().find(x=>x.profileId==='tw16-four-player-sandbox');
@@ -79,4 +79,37 @@ test('R7.5 declaration previews preserve exact issued action IDs and confirmatio
   assert.ok(!html.includes('data-confirm-action='));
   assert.ok(ActionBar([action,pass],null,false,action).includes('data-confirm-action="issued-a"'));
   assert.ok(!ActionBar([action,pass],null,false,{...action,expectedRevision:5}).includes('data-confirm-action='));
+});
+
+test('R7.5 fresh draw is marked only for a uniquely observed own draw',()=>{
+  const tile=id=>({id});
+  const prev={gameId:'g',audienceSeat:0,asOfEventSeq:10,self:{seat:0,concealed:[tile('t:0:0')]}};
+  const draw={gameId:'g',seq:11,visibility:'public',type:'draw',actorSeat:0,payload:{count:1}};
+  const view={...prev,asOfEventSeq:11,round:{currentSeat:0,phase:'await_discard'},
+    self:{seat:0,concealed:[tile('t:0:0'),tile('t:4:1')]},publicEvents:[draw]};
+  const cue=observedOwnDraw(prev,view);
+  assert.deepEqual(cue,{gameId:'g',seat:0,revision:11,seq:11,tileId:'t:4:1'});
+  assert.equal(observedOwnDraw(null,view),null);
+  assert.equal(observedOwnDraw(view,view),null);
+  assert.equal(observedOwnDraw(prev,{...view,gameId:'new'}),null);
+  assert.equal(observedOwnDraw(prev,{...view,publicEvents:[{...draw,actorSeat:1}]}),null);
+  assert.equal(observedOwnDraw(prev,{...view,publicEvents:[{...draw,visibility:'seat-private'}]}),null);
+  assert.equal(observedOwnDraw(prev,{...view,asOfEventSeq:12,publicEvents:[draw,{...draw,seq:12}]}),null);
+  assert.equal(observedOwnDraw(prev,{...view,self:{seat:0,concealed:[...view.self.concealed,tile('t:5:0')]}}),null);
+  assert.equal(observedOwnDraw(prev,{...view,round:{currentSeat:0,phase:'replacement'}}),null);
+  assert.equal(observedOwnDraw(prev,{...view,asOfEventSeq:12,publicEvents:[draw,{...draw,type:'discard',seq:12}]}),null);
+});
+test('R7.5 draw cue renders one physical tile without changing its legal action',()=>{
+  const p=availableTableProfiles().find(x=>x.profileId==='tw16-four-player-sandbox');
+  const s=createSandboxSession();
+  const snap=s.start({profileId:p.profileId,ruleVersion:p.ruleVersion});
+  const v=snap.view,id=v.self.concealed[0].id;
+  const a=v.legalActions.find(a=>a.tileIds[0]===id);
+  const cue={gameId:v.gameId,seat:v.audienceSeat,revision:v.asOfEventSeq,tileId:id};
+  const html=TableView(snap,{drawCue:cue,selection:a.actionId});
+  assert.equal((html.match(/table-fresh-draw/g)??[]).length,1);
+  assert.ok(html.includes('data-submit-action="'+a.actionId+'"'));
+  assert.equal((html.match(/data-pick-action=/g)??[]).length,17);
+  assert.ok(!TableView(snap,{drawCue:{...cue,revision:0}}).includes('table-fresh-draw'));
+  assert.ok(!TableView(snap,{drawCue:{...cue,seat:1}}).includes('table-fresh-draw'));
 });

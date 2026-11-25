@@ -1,7 +1,7 @@
 import { createSandboxSession, availableTableProfiles } from './session.js';
 import { createFullRoundSession, fullRoundCapability } from './full-round.js';
 import { createDailyPanel } from './daily.js';
-import { TableView, ReplayControls, BotDifficultySelect, latestPublicDiscard, publicDeclaration } from './view.js';
+import { TableView, ReplayControls, BotDifficultySelect, latestPublicDiscard, publicDeclaration, observedOwnDraw } from './view.js';
 import { installTileFaceFallback } from '../tile-visuals.js';
 
 const root=document.querySelector('#full-table-root');
@@ -15,6 +15,7 @@ let replayFrame=null,replayBusy=false,botStatus='',storage=null;
 let dailyBoot='idle';
 let pendingAction=null,restartPending=false;
 let lastPaintedGame=null,lastPaintedRevision=-1;
+let previousOwnView=null,drawCue=null;
 const forceSandbox=new URLSearchParams(window.location.search).get('table')==='sandbox';
 const seededQA=new URLSearchParams(window.location.search).get('qa')==='seeded';
 
@@ -49,7 +50,7 @@ function renderEmpty() {
     '<button type="button" class="secondary" data-return-academy>返回課程</button></section>';
 }
 function activate(page,{focus=true}={}) {
-  if(page!==activePage){pendingAction=null;selection=null;restartPending=false;}
+  if(page!==activePage){pendingAction=null;selection=null;restartPending=false;previousOwnView=null;drawCue=null;lastPaintedGame=null;lastPaintedRevision=-1;}
   activePage=page;
   document.body.dataset.tableView=page==='academy'?'none':page;
   if(root)root.hidden=page==='academy';
@@ -82,8 +83,16 @@ function draw() {
     return;
   }
   const snapshot=session?.snapshot();
+  const nextView=snapshot?.view;
+  const newDraw=observedOwnDraw(previousOwnView,nextView);
+  if(newDraw)drawCue=newDraw;
+  else if(!nextView||drawCue?.gameId!==nextView.gameId||drawCue?.revision!==nextView.asOfEventSeq)drawCue=null;
+  // Keep only the previous own hand/revision; never retain other players' private data.
+  previousOwnView=nextView?{gameId:nextView.gameId,audienceSeat:nextView.audienceSeat,
+    asOfEventSeq:nextView.asOfEventSeq,self:{seat:nextView.self.seat,
+      concealed:nextView.self.concealed.map(t=>({id:t.id}))}}:null;
   root.innerHTML=snapshot?TableView(snapshot,{selection,busy,error:lastError,
-    botStatus,confirmation:pendingAction,restartPending}):renderEmpty();
+    botStatus,confirmation:pendingAction,restartPending,drawCue}):renderEmpty();
   // Animate only a genuinely new, already committed public discard. Selection,
   // confirmation, rerender, initial restore and replay never replay the effect.
   const view=snapshot?.view, latest=latestPublicDiscard(view);
@@ -93,6 +102,11 @@ function draw() {
   lastPaintedGame=view?.gameId??null;
   lastPaintedRevision=view?.asOfEventSeq??-1;
   const motionAllowed=!window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if(newDraw&&motionAllowed){
+    root.querySelector('.table-fresh-draw')?.animate?.(
+      [{transform:'translateY(-12px)',opacity:.55},{transform:'translateY(0)',opacity:1}],
+      {duration:260,easing:'ease-out'});
+  }
   if(newNotice&&motionAllowed){
     root.querySelector('[data-public-declaration]')?.animate?.(
       [{transform:'scale(.84)',opacity:.35},{transform:'scale(1.08)',opacity:1},{transform:'scale(1)',opacity:1}],
